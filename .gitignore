@@ -1,0 +1,13 @@
+.env
+cdp_api_key.json
+cdp_wallet_secret.txt
+cdp_wallet_data.json
+bot.db
+bot.db-wal
+bot.db-shm
+__pycache__/
+*.pyc
+node_modules/
+frontend/dist/
+.vite/
+.DS_Store
