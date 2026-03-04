@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  claudebot:
+    build: .
+    container_name: claudebot
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_PATH=/app/data/bot.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

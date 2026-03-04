@@ -1,194 +1,110 @@
-import { useEffect, useRef, useCallback } from "react";
-import { createChart, CrosshairMode, LineStyle, CandlestickSeries, HistogramSeries } from "lightweight-charts";
+import { useEffect, useRef, memo } from "react";
 
-const CHART_BG = "#06060f";
-const GRID_COLOR = "#0d0d1c";
-const TEXT_COLOR = "#2d3748";
-const UP_COLOR = "#00ff88";
-const DOWN_COLOR = "#ff3366";
-const CROSSHAIR_COLOR = "#4a5568";
+const SYMBOL_MAP = {
+  BTC:  "COINBASE:BTCUSD",
+  ETH:  "COINBASE:ETHUSD",
+  SOL:  "COINBASE:SOLUSD",
+  DOGE: "COINBASE:DOGEUSD",
+  LINK: "COINBASE:LINKUSD",
+  AVAX: "COINBASE:AVAXUSD",
+  UNI:  "COINBASE:UNIUSD",
+  AAVE: "COINBASE:AAVEUSD",
+};
 
-export default function TradingViewChart({ history, position, priceUp, height }) {
+function getSymbol(coin) {
+  return SYMBOL_MAP[coin] || `COINBASE:${coin}USD`;
+}
+
+function TradingViewChart({ symbol = "BTC" }) {
   const containerRef = useRef(null);
-  const chartRef = useRef(null);
-  const candleSeriesRef = useRef(null);
-  const volumeSeriesRef = useRef(null);
-  const entryLineRef = useRef(null);
-  const tpLineRef = useRef(null);
-  const slLineRef = useRef(null);
-  const resizeObserverRef = useRef(null);
 
-  const initChart = useCallback(() => {
+  useEffect(() => {
     if (!containerRef.current) return;
+    const container = containerRef.current;
+    container.innerHTML = "";
 
-    if (chartRef.current) {
-      chartRef.current.remove();
-      chartRef.current = null;
-    }
+    let timeoutId = null;
+    const rafId = requestAnimationFrame(() => {
+      timeoutId = setTimeout(() => {
+        if (!container.isConnected) return;
 
-    const chart = createChart(containerRef.current, {
-      width: containerRef.current.clientWidth,
-      height: height || containerRef.current.clientHeight || 380,
-      layout: {
-        background: { color: CHART_BG },
-        textColor: TEXT_COLOR,
-        fontFamily: "'Space Mono', monospace",
-        fontSize: 10,
-      },
-      grid: {
-        vertLines: { color: GRID_COLOR },
-        horzLines: { color: GRID_COLOR },
-      },
-      crosshair: {
-        mode: CrosshairMode.Normal,
-        vertLine: { color: CROSSHAIR_COLOR, width: 1, style: LineStyle.Dashed, labelBackgroundColor: "#131828" },
-        horzLine: { color: CROSSHAIR_COLOR, width: 1, style: LineStyle.Dashed, labelBackgroundColor: "#131828" },
-      },
-      rightPriceScale: {
-        borderColor: "#131828",
-        scaleMargins: { top: 0.08, bottom: 0.15 },
-      },
-      timeScale: {
-        borderColor: "#131828",
-        timeVisible: true,
-        secondsVisible: false,
-        rightOffset: 5,
-        barSpacing: 8,
-        fixLeftEdge: false,
-        fixRightEdge: false,
-      },
-      handleScroll: { vertTouchDrag: false },
+        const script = document.createElement("script");
+        script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+        script.type = "text/javascript";
+        script.async = true;
+        script.innerHTML = JSON.stringify({
+          symbol: getSymbol(symbol),
+          interval: "5",
+          timezone: "Etc/UTC",
+          theme: "dark",
+          style: "1",
+          locale: "en",
+          backgroundColor: "rgba(6, 6, 15, 1)",
+          gridColor: "rgba(13, 13, 28, 1)",
+          allow_symbol_change: true,
+          withdateranges: true,
+          hide_side_toolbar: false,
+          details: true,
+          hotlist: true,
+          calendar: false,
+          hide_volume: false,
+          support_host: "https://www.tradingview.com",
+          studies: [
+            "STD;EMA",
+            "STD;RSI",
+            "STD;MACD",
+            "STD;Bollinger_Bands",
+            "STD;VWAP",
+          ],
+          show_popup_button: true,
+          popup_width: "1400",
+          popup_height: "900",
+          width: "100%",
+          height: "100%",
+          save_image: true,
+          enable_publishing: false,
+          overrides: {
+            "paneProperties.backgroundType": "solid",
+            "paneProperties.background": "rgba(6, 6, 15, 1)",
+            "paneProperties.vertGridProperties.color": "rgba(13, 13, 28, 1)",
+            "paneProperties.horzGridProperties.color": "rgba(13, 13, 28, 1)",
+            "mainSeriesProperties.candleStyle.upColor": "#00ff88",
+            "mainSeriesProperties.candleStyle.downColor": "#ff3366",
+            "mainSeriesProperties.candleStyle.borderUpColor": "#00ff88",
+            "mainSeriesProperties.candleStyle.borderDownColor": "#ff3366",
+            "mainSeriesProperties.candleStyle.wickUpColor": "#00ff88",
+            "mainSeriesProperties.candleStyle.wickDownColor": "#ff3366",
+          },
+        });
+
+        const widgetDiv = document.createElement("div");
+        widgetDiv.className = "tradingview-widget-container";
+        widgetDiv.style.width = "100%";
+        widgetDiv.style.height = "100%";
+
+        const inner = document.createElement("div");
+        inner.className = "tradingview-widget-container__widget";
+        inner.style.width = "100%";
+        inner.style.height = "100%";
+
+        widgetDiv.appendChild(inner);
+        widgetDiv.appendChild(script);
+        container.appendChild(widgetDiv);
+      }, 50);
     });
 
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: UP_COLOR,
-      downColor: DOWN_COLOR,
-      borderUpColor: UP_COLOR,
-      borderDownColor: DOWN_COLOR,
-      wickUpColor: UP_COLOR,
-      wickDownColor: DOWN_COLOR,
-    });
-
-    const volumeSeries = chart.addSeries(HistogramSeries, {
-      priceFormat: { type: "volume" },
-      priceScaleId: "volume",
-    });
-
-    chart.priceScale("volume").applyOptions({
-      scaleMargins: { top: 0.85, bottom: 0 },
-    });
-
-    chartRef.current = chart;
-    candleSeriesRef.current = candleSeries;
-    volumeSeriesRef.current = volumeSeries;
-
-    resizeObserverRef.current = new ResizeObserver((entries) => {
-      const { width, height: h } = entries[0].contentRect;
-      chart.applyOptions({ width, height: h });
-    });
-    resizeObserverRef.current.observe(containerRef.current);
-  }, [height]);
-
-  useEffect(() => {
-    initChart();
     return () => {
-      resizeObserverRef.current?.disconnect();
-      chartRef.current?.remove();
-      chartRef.current = null;
+      cancelAnimationFrame(rafId);
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [initChart]);
-
-  const prevLenRef = useRef(0);
-
-  useEffect(() => {
-    if (!candleSeriesRef.current || !history || history.length === 0) return;
-
-    const candles = history
-      .filter((h) => h.time != null)
-      .map((h) => ({
-        time: h.time,
-        open: h.open,
-        high: h.high,
-        low: h.low,
-        close: h.close,
-      }));
-
-    if (candles.length === 0) return;
-
-    const isFullRefresh = Math.abs(candles.length - prevLenRef.current) > 2 || prevLenRef.current === 0;
-    prevLenRef.current = candles.length;
-
-    if (isFullRefresh) {
-      candleSeriesRef.current.setData(candles);
-    } else {
-      candleSeriesRef.current.update(candles[candles.length - 1]);
-    }
-
-    const volumes = history
-      .filter((h) => h.time != null && h.volume != null)
-      .map((h) => ({
-        time: h.time,
-        value: h.volume || 0,
-        color: h.close >= h.open ? UP_COLOR + "30" : DOWN_COLOR + "30",
-      }));
-
-    if (volumes.length > 0) {
-      if (isFullRefresh) {
-        volumeSeriesRef.current.setData(volumes);
-      } else {
-        volumeSeriesRef.current.update(volumes[volumes.length - 1]);
-      }
-    }
-
-    if (isFullRefresh) {
-      chartRef.current?.timeScale().scrollToPosition(2, false);
-    }
-  }, [history]);
-
-  useEffect(() => {
-    if (!candleSeriesRef.current) return;
-
-    [entryLineRef, tpLineRef, slLineRef].forEach((ref) => {
-      if (ref.current) {
-        candleSeriesRef.current.removePriceLine(ref.current);
-        ref.current = null;
-      }
-    });
-
-    if (!position) return;
-
-    entryLineRef.current = candleSeriesRef.current.createPriceLine({
-      price: position.entry,
-      color: "#00d4ff",
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      axisLabelVisible: true,
-      title: "ENTRY",
-    });
-
-    tpLineRef.current = candleSeriesRef.current.createPriceLine({
-      price: position.tp,
-      color: UP_COLOR,
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      axisLabelVisible: true,
-      title: "TP",
-    });
-
-    slLineRef.current = candleSeriesRef.current.createPriceLine({
-      price: position.sl,
-      color: DOWN_COLOR,
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      axisLabelVisible: true,
-      title: "SL",
-    });
-  }, [position]);
+  }, [symbol]);
 
   return (
     <div
       ref={containerRef}
-      style={{ width: "100%", height: "100%", minHeight: 280 }}
+      style={{ width: "100%", height: "100%", minHeight: 0 }}
     />
   );
 }
+
+export default memo(TradingViewChart);

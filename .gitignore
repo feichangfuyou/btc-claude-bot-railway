@@ -5,6 +5,8 @@ cdp_wallet_data.json
 bot.db
 bot.db-wal
 bot.db-shm
+backups/
+logs/
 __pycache__/
 *.pyc
 node_modules/

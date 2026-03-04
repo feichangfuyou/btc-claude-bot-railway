@@ -4,13 +4,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "icons": "npx pwa-asset-generator public/icon.svg public/ --icon-only --no-manifest --no-index"
   },
   "dependencies": {
-    "lightweight-charts": "^5.1.0",
+    "canvas-confetti": "^1.9.4",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "recharts": "^2.15.0"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
