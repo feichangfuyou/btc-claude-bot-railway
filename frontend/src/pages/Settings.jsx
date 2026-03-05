@@ -471,7 +471,7 @@ const styles = {
     padding: "8px 0",
     borderBottom: "1px solid rgba(255,255,255,0.04)",
   },
-  rowLabel: { color: MUTED },
+  rowLabel: { color: colors.muted },
   label: { fontSize: 11, color: "#888", letterSpacing: 1, display: "block", marginTop: 14, marginBottom: 6 },
   select: {
     fontFamily: "'Space Mono', monospace",

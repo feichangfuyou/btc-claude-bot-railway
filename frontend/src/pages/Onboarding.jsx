@@ -549,7 +549,7 @@ const styles = {
     transition: "border-color 0.2s ease",
   },
   exchangeName: { fontSize: 13, fontWeight: 600, color: "#D4D4D4" },
-  exchangeDesc: { fontSize: 10, color: MUTED, marginTop: 2 },
+  exchangeDesc: { fontSize: 10, color: colors.muted, marginTop: 2 },
   connectBtn: {
     fontFamily: typography.fontButton,
     fontSize: 11,
