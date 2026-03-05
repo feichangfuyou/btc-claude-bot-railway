@@ -3,6 +3,7 @@
 Print Supabase config for DoYou.trade. Add output to .env.
 Run: python scripts/fetch_supabase_config.py
 """
+
 # DoYou.trade project (Supabase MCP: bszxamytfibyrkgmxeue)
 URL = "https://bszxamytfibyrkgmxeue.supabase.co"
 # Anon key (public, client-safe) — from get_publishable_keys
