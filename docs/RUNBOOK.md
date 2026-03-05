@@ -83,6 +83,7 @@ Copy from `.env.10k.example` and fill in secrets.
 
 ```sql
 -- Run in order:
+\i supabase/migrations/20260304990000_profiles_table.sql
 \i supabase/migrations/20260305000000_rls_user_exchanges.sql
 \i supabase/migrations/20260305100000_user_tables.sql
 \i supabase/migrations/20260305200000_user_learning_tables.sql

@@ -1,13 +1,43 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
+import { supabase } from "../supabaseClient.js";
 
 export default function AuthCallback() {
   const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [exchanging, setExchanging] = useState(true);
 
   useEffect(() => {
-    if (loading) return;
+    const code = searchParams.get("code");
+    const errorParam = searchParams.get("error");
+    const errorDescription = searchParams.get("error_description");
+
+    if (errorParam) {
+      console.error("OAuth error:", errorParam, errorDescription);
+      navigate("/login?error=" + encodeURIComponent(errorDescription || errorParam), { replace: true });
+      return;
+    }
+
+    if (code) {
+      supabase.auth
+        .exchangeCodeForSession(code)
+        .then(() => {
+          window.history.replaceState({}, "", window.location.pathname);
+          setExchanging(false);
+        })
+        .catch((err) => {
+          console.error("Failed to exchange code for session:", err);
+          navigate("/login?error=" + encodeURIComponent(err.message || "Sign-in failed"), { replace: true });
+        });
+    } else {
+      setExchanging(false);
+    }
+  }, [searchParams, navigate]);
+
+  useEffect(() => {
+    if (exchanging || loading) return;
 
     if (user && profile?.onboarding_complete) {
       navigate("/dashboard", { replace: true });
@@ -16,7 +46,7 @@ export default function AuthCallback() {
     } else {
       navigate("/login", { replace: true });
     }
-  }, [user, profile, loading, navigate]);
+  }, [user, profile, loading, exchanging, navigate]);
 
   return (
     <div className="page-loading">

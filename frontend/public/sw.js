@@ -41,7 +41,11 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (response.ok && request.method === 'GET') {
+        const isCacheable =
+          response.ok &&
+          request.method === 'GET' &&
+          (request.url.startsWith('http:') || request.url.startsWith('https:'));
+        if (isCacheable) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }

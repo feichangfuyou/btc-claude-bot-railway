@@ -53,7 +53,7 @@ See [`.env.example`](.env.example) for all options.
 
 ## Production Checklist
 
-Before deploying to a public host:
+Before deploying to a public host, see **[docs/PRODUCTION_CHECKLIST.md](docs/PRODUCTION_CHECKLIST.md)** for the full checklist. Summary:
 
 1. **Set `BOT_API_SECRET`** — Without it, `/trades`, `/account`, `/emergency/stop`, and other sensitive endpoints are unprotected. Generate: `openssl rand -hex 32`
 2. **Set `EXCHANGE_KEYS_ENCRYPTION_KEY`** — Encrypts API keys in Supabase. Generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
