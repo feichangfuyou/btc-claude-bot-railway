@@ -9,8 +9,8 @@ from datetime import datetime
 
 from fastapi import WebSocket
 
+from ai.trade_screenshots import capture_trade_screenshot
 from api.agentkit_provider import agentkit
-from safety.circuit_breaker import CircuitBreaker
 from core.coin_state import CoinState
 from core.config import (
     ACTIVE_COINS,
@@ -54,12 +54,12 @@ from core.database import (
     db_save_state,
     db_save_trade,
 )
-from utils.notifications import send_notification
-from safety.semantic_kill_switch import SemanticKillSwitch
 from executors.solver_executor import execute_via_solver, get_solver_stats
 from learning.trade_memory import record_market_snapshot, record_trade_memory, run_learning_cycle
+from safety.circuit_breaker import CircuitBreaker
+from safety.semantic_kill_switch import SemanticKillSwitch
 from strategy.trading_presets import get_min_rr, get_sl_tp_for_regime
-from ai.trade_screenshots import capture_trade_screenshot
+from utils.notifications import send_notification
 
 
 class BotState:
@@ -131,9 +131,7 @@ class BotState:
     def _capture_screenshot_bg(self, trade_id: int, symbol: str, phase: str, trade_info: dict):
         """Fire-and-forget chart screenshot capture for trade visual record."""
         try:
-            asyncio.create_task(
-                capture_trade_screenshot(trade_id, symbol, phase, trade_info)
-            )
+            asyncio.create_task(capture_trade_screenshot(trade_id, symbol, phase, trade_info))
         except Exception:
             pass
 
@@ -441,12 +439,21 @@ class BotState:
         self.trades = [trade] + self.trades[:29]
         db_save_trade(trade)
 
-        self._capture_screenshot_bg(trade["id"], pos_symbol, "exit", {
-            "side": pos["side"], "entry": pos["entry"], "exit": exit_price,
-            "pnl": net, "win": net > 0, "reason": reason,
-            "usd_size": pos["usd_size"],
-            "hold_duration": pos.get("open_ts", ""),
-        })
+        self._capture_screenshot_bg(
+            trade["id"],
+            pos_symbol,
+            "exit",
+            {
+                "side": pos["side"],
+                "entry": pos["entry"],
+                "exit": exit_price,
+                "pnl": net,
+                "win": net > 0,
+                "reason": reason,
+                "usd_size": pos["usd_size"],
+                "hold_duration": pos.get("open_ts", ""),
+            },
+        )
 
         coin_state = self.coins.get(pos_symbol)
         try:
@@ -529,11 +536,20 @@ class BotState:
         self.trades = [trade] + self.trades[:29]
         db_save_trade(trade)
 
-        self._capture_screenshot_bg(trade["id"], pos_symbol, "exit", {
-            "side": pos["side"], "entry": pos["entry"], "exit": current_price,
-            "pnl": net, "win": net > 0, "reason": reason,
-            "usd_size": pos["usd_size"],
-        })
+        self._capture_screenshot_bg(
+            trade["id"],
+            pos_symbol,
+            "exit",
+            {
+                "side": pos["side"],
+                "entry": pos["entry"],
+                "exit": current_price,
+                "pnl": net,
+                "win": net > 0,
+                "reason": reason,
+                "usd_size": pos["usd_size"],
+            },
+        )
 
         coin_state = self.coins.get(pos_symbol)
         try:
@@ -1005,11 +1021,20 @@ class BotState:
         self.trades = [trade] + self.trades[:29]
         db_save_trade(trade)
 
-        self._capture_screenshot_bg(trade["id"], pos_symbol, "exit", {
-            "side": pos["side"], "entry": pos["entry"], "exit": current_price,
-            "pnl": net, "win": net > 0, "reason": reason,
-            "usd_size": pos["usd_size"],
-        })
+        self._capture_screenshot_bg(
+            trade["id"],
+            pos_symbol,
+            "exit",
+            {
+                "side": pos["side"],
+                "entry": pos["entry"],
+                "exit": current_price,
+                "pnl": net,
+                "win": net > 0,
+                "reason": reason,
+                "usd_size": pos["usd_size"],
+            },
+        )
 
         coin_state = self.coins.get(pos_symbol)
         try:
@@ -1336,16 +1361,28 @@ class BotState:
             f"Pos {pos_count}/{MAX_CONCURRENT_POSITIONS}" + (f" | {patterns_str}" if patterns_str else ""),
             "success" if action == "buy" else "sell",
         )
-        self._capture_screenshot_bg(new_pos["id"], symbol, "entry", {
-            "side": action, "entry": entry, "tp": tp, "sl": sl,
-            "usd_size": usd_sz, "confidence": decision.get("confidence", 0),
-            "reasoning": decision.get("reasoning", ""),
-            "patterns": decision.get("patterns_detected", []),
-            "strategy": decision.get("strategy", ""),
-            "market_condition": decision.get("market_condition", ""),
-            "indicators": {k: v for k, v in (cs.indicators if cs else {}).items()
-                          if not isinstance(v, (list, dict)) or k in ("confluence", "price_action_quality")},
-        })
+        self._capture_screenshot_bg(
+            new_pos["id"],
+            symbol,
+            "entry",
+            {
+                "side": action,
+                "entry": entry,
+                "tp": tp,
+                "sl": sl,
+                "usd_size": usd_sz,
+                "confidence": decision.get("confidence", 0),
+                "reasoning": decision.get("reasoning", ""),
+                "patterns": decision.get("patterns_detected", []),
+                "strategy": decision.get("strategy", ""),
+                "market_condition": decision.get("market_condition", ""),
+                "indicators": {
+                    k: v
+                    for k, v in (cs.indicators if cs else {}).items()
+                    if not isinstance(v, (list, dict)) or k in ("confluence", "price_action_quality")
+                },
+            },
+        )
         asyncio.create_task(
             self._broadcast(
                 {

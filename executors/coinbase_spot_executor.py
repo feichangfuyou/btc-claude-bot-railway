@@ -10,8 +10,8 @@ from datetime import datetime
 from api.coinbase_api import create_spot_market_order, is_configured
 from core.config import AI_COST_PER_TRADE, ROUND_TRIP_FEE
 from core.database import db_save_trade
-from utils.notifications import send_notification
 from learning.trade_memory import record_trade_memory, run_learning_cycle
+from utils.notifications import send_notification
 
 
 async def execute_coinbase_spot(

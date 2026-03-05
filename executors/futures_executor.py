@@ -3,7 +3,6 @@ Futures executor — paper and live perpetual futures execution.
 Supports Coinbase INTX perpetuals alongside spot trading.
 """
 
-import asyncio
 import time
 from datetime import datetime
 
@@ -15,8 +14,8 @@ from core.config import (
     PERP_PRODUCT_IDS,
 )
 from core.database import db_save_state, db_save_trade
-from utils.notifications import send_notification
 from learning.trade_memory import record_trade_memory, run_learning_cycle
+from utils.notifications import send_notification
 
 # Futures taker fee ~0.03% per leg (Coinbase INTX) = 0.06% round trip
 FUTURES_ROUND_TRIP_FEE = 0.0006

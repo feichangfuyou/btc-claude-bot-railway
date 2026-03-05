@@ -42,6 +42,7 @@ def _get_stripe():
     """Lazy import stripe to avoid import errors when not installed."""
     try:
         import stripe
+
         stripe.api_key = STRIPE_SECRET_KEY
         return stripe
     except ImportError:
@@ -122,12 +123,15 @@ def _activate_subscription(user_id: str, tier: str, stripe_subscription_id: str 
     """Update the user's subscription in Supabase."""
     try:
         from core.supabase_client import get_supabase
+
         sb = get_supabase()
-        sb.table("profiles").update({
-            "subscription_tier": tier,
-            "subscription_status": "active",
-            "stripe_customer_id": stripe_subscription_id,
-        }).eq("id", user_id).execute()
+        sb.table("profiles").update(
+            {
+                "subscription_tier": tier,
+                "subscription_status": "active",
+                "stripe_customer_id": stripe_subscription_id,
+            }
+        ).eq("id", user_id).execute()
         logger.info(f"Activated {tier} subscription for user {user_id[:8]}")
     except Exception as e:
         logger.error(f"Failed to activate subscription: {e}")

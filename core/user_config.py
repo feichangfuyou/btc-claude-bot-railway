@@ -92,12 +92,25 @@ def save_user_preferences(user_id: str, prefs: dict) -> bool:
 
     sb = get_supabase()
     allowed = {
-        "trading_preset", "risk_level", "paper_trading", "start_balance",
-        "target_balance", "direction_bias", "require_trade_approval",
-        "max_concurrent_positions", "max_position_usd", "min_trade_usd",
-        "coins", "enable_futures", "futures_leverage", "trade_mode",
-        "sl_atr_widen", "trailing_stop_pct", "claude_interval",
-        "scout_min_signals", "scout_min_confidence",
+        "trading_preset",
+        "risk_level",
+        "paper_trading",
+        "start_balance",
+        "target_balance",
+        "direction_bias",
+        "require_trade_approval",
+        "max_concurrent_positions",
+        "max_position_usd",
+        "min_trade_usd",
+        "coins",
+        "enable_futures",
+        "futures_leverage",
+        "trade_mode",
+        "sl_atr_widen",
+        "trailing_stop_pct",
+        "claude_interval",
+        "scout_min_signals",
+        "scout_min_confidence",
     }
     filtered = {k: v for k, v in prefs.items() if k in allowed}
     if not filtered:

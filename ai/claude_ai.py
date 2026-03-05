@@ -19,8 +19,9 @@ import time
 import httpx
 
 from ai.adversary_agent import adversary_review
-from api.agentkit_provider import agentkit
 from ai.claude_schema import validate_scout_response, validate_trade_decision
+from ai.vision_feed import ENABLE_VISION, get_vision_confirmation
+from api.agentkit_provider import agentkit
 from core.config import (
     ACTIVE_COINS,
     AI_COST_PER_TRADE,
@@ -43,16 +44,15 @@ from core.config import (
     TEST_MODE,
     TRADE_COST_PER_CALL,
 )
+from learning.memory_compactor import get_compacted_wisdom
+from learning.trade_memory import build_memory_briefing, get_pattern_verdict
 from safety.kya_compliance import (
     build_audit_entry,
     get_bot_did,
     hash_reasoning,
     model_fallback,
 )
-from learning.memory_compactor import get_compacted_wisdom
-from learning.trade_memory import build_memory_briefing, get_pattern_verdict
 from strategy.trading_presets import get_preset
-from ai.vision_feed import ENABLE_VISION, get_vision_confirmation
 
 SCOUT_MODEL = "claude-3-haiku-20240307"
 

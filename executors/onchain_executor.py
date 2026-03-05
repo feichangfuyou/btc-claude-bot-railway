@@ -11,8 +11,8 @@ from functools import partial
 from api.agentkit_provider import agentkit
 from core.config import AI_COST_PER_TRADE, GAS_COST_USD, MIN_ETH_GAS, ONCHAIN_SLIPPAGE, ROUND_TRIP_FEE
 from core.database import db_save_trade
-from utils.notifications import send_notification
 from learning.trade_memory import record_trade_memory, run_learning_cycle
+from utils.notifications import send_notification
 
 
 async def execute_onchain(

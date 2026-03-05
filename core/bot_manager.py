@@ -22,7 +22,6 @@ from core.user_database import (
     udb_save_account_snapshot,
     udb_save_state,
     udb_save_trade,
-    udb_save_trade_context,
 )
 from executors.order_router import OrderRouter
 
@@ -67,13 +66,17 @@ class UserBotInstance:
     def persist_state(self):
         """Save current state to Supabase."""
         try:
-            udb_save_state(self.user_id, "bot_state", {
-                "balance": self.balance,
-                "daily_pnl": self.daily_pnl,
-                "total_pnl": self.total_pnl,
-                "open_positions": self.open_positions,
-                "consecutive_losses": self.consecutive_losses,
-            })
+            udb_save_state(
+                self.user_id,
+                "bot_state",
+                {
+                    "balance": self.balance,
+                    "daily_pnl": self.daily_pnl,
+                    "total_pnl": self.total_pnl,
+                    "open_positions": self.open_positions,
+                    "consecutive_losses": self.consecutive_losses,
+                },
+            )
         except Exception as e:
             logger.error(f"Failed to persist state for user {self.user_id[:8]}: {e}")
 
@@ -87,11 +90,14 @@ class UserBotInstance:
 
     def save_snapshot(self):
         """Save an account snapshot for equity curve."""
-        udb_save_account_snapshot(self.user_id, {
-            "balance": self.balance,
-            "daily_pnl": self.daily_pnl,
-            "total_pnl": self.total_pnl,
-        })
+        udb_save_account_snapshot(
+            self.user_id,
+            {
+                "balance": self.balance,
+                "daily_pnl": self.daily_pnl,
+                "total_pnl": self.total_pnl,
+            },
+        )
 
     def account_snapshot(self) -> dict:
         """Current account state for the frontend."""

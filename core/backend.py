@@ -20,9 +20,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from api.agentkit_provider import agentkit
-from core.bot_state import BotState
 from ai.claude_ai import call_claude, get_cost_tracker
+from api.agentkit_provider import agentkit
+from api.exchange_validate import validate_exchange_keys
+from billing.stripe_handler import create_checkout_session, handle_webhook
+from core.auth import AuthenticatedUser, get_current_user
+from core.bot_state import BotState
 from core.config import (
     ACTIVE_COINS,
     ANTHROPIC_API_KEY,
@@ -68,7 +71,13 @@ from core.database import (
     file_log,
     init_db,
 )
-from learning.memory_compactor import run_synthesis_loop, should_compact
+from core.user_config import (
+    complete_onboarding,
+    load_user_config,
+    remove_user_exchange,
+    save_user_exchange,
+    save_user_preferences,
+)
 from feeds.price_feeds import (
     bootstrap_candles,
     bootstrap_prices_async,
@@ -76,8 +85,9 @@ from feeds.price_feeds import (
     fear_greed_cycle,
     stats_refresh_cycle,
 )
-from strategy.symbol_registry import SYMBOL_TO_COINGECKO, get_coingecko_id
+from learning.memory_compactor import run_synthesis_loop, should_compact
 from learning.trade_memory import build_memory_briefing, run_learning_cycle
+from strategy.symbol_registry import SYMBOL_TO_COINGECKO, get_coingecko_id
 from strategy.trading_presets import PRESETS, get_preset, list_preset_categories, list_presets
 
 # ─── Initialise DB + BotState ────────────────────────────────────────────────
@@ -465,15 +475,6 @@ app.add_middleware(
 )
 
 # ─── Auth API Routes (Supabase) ──────────────────────────────────────────────
-from core.auth import AuthenticatedUser, get_current_user, get_optional_user
-from core.user_config import (
-    load_user_config,
-    save_user_preferences,
-    complete_onboarding,
-    save_user_exchange,
-    remove_user_exchange,
-)
-from core.supabase_client import SUPABASE_URL
 
 
 @app.get("/auth/me")
@@ -520,9 +521,6 @@ async def mark_onboarding_complete(user: AuthenticatedUser = Depends(get_current
     """Mark onboarding as complete."""
     complete_onboarding(user.id)
     return {"ok": True}
-
-
-from api.exchange_validate import validate_exchange_keys
 
 
 @app.post("/api/exchange/validate")
@@ -587,7 +585,6 @@ async def disconnect_exchange(
 
 
 # ─── Billing API Routes ─────────────────────────────────────────────────────
-from billing.stripe_handler import create_checkout_session, handle_webhook
 
 
 @app.post("/billing/checkout")
@@ -1848,17 +1845,13 @@ def get_trade_full_context(trade_id: int):
             (ts_str, ts_str),
         ).fetchone()
         if not trade_row:
-            trade_row = conn.execute(
-                "SELECT * FROM trades WHERE id = ?", (trade_id,)
-            ).fetchone()
+            trade_row = conn.execute("SELECT * FROM trades WHERE id = ?", (trade_id,)).fetchone()
 
         db_trade_id = trade_row["id"] if trade_row else None
 
         ctx_row = None
         if db_trade_id:
-            ctx_row = conn.execute(
-                "SELECT * FROM trade_context WHERE trade_id = ?", (db_trade_id,)
-            ).fetchone()
+            ctx_row = conn.execute("SELECT * FROM trade_context WHERE trade_id = ?", (db_trade_id,)).fetchone()
         if not ctx_row and ts_str:
             ctx_row = conn.execute(
                 "SELECT * FROM trade_context WHERE ts = ? ORDER BY id DESC LIMIT 1",

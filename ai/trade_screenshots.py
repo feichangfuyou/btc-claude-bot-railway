@@ -12,7 +12,6 @@ import asyncio
 import json
 import logging
 import os
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -70,10 +69,7 @@ async def _capture_chart_screenshot(symbol: str, interval: str = "5") -> bytes |
     try:
         import httpx
 
-        chart_url = (
-            f"https://www.tradingview.com/chart/image/"
-            f"?symbol={tv_symbol}&interval={interval}&theme=dark"
-        )
+        chart_url = f"https://www.tradingview.com/chart/image/?symbol={tv_symbol}&interval={interval}&theme=dark"
         async with httpx.AsyncClient(timeout=12) as client:
             resp = await client.get(chart_url)
             if resp.status_code == 200 and len(resp.content) > 1000:

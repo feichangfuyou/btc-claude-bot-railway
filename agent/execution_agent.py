@@ -60,11 +60,14 @@ class ExecutionAgent:
             try:
                 async with websockets.connect(url) as ws:
                     logger.info("Connected to DoYou.trade server")
-                    await self._send(ws, {
-                        "type": "agent_hello",
-                        "exchanges": self._available_exchanges(),
-                        "version": "1.0.0",
-                    })
+                    await self._send(
+                        ws,
+                        {
+                            "type": "agent_hello",
+                            "exchanges": self._available_exchanges(),
+                            "version": "1.0.0",
+                        },
+                    )
 
                     async for message in ws:
                         try:
@@ -101,12 +104,15 @@ class ExecutionAgent:
             await self._send(ws, {"type": "pong"})
 
         elif msg_type == "status_request":
-            await self._send(ws, {
-                "type": "status",
-                "exchanges": self._available_exchanges(),
-                "executed_count": self.executed_count,
-                "running": self.running,
-            })
+            await self._send(
+                ws,
+                {
+                    "type": "status",
+                    "exchanges": self._available_exchanges(),
+                    "executed_count": self.executed_count,
+                    "running": self.running,
+                },
+            )
 
     async def _execute_signal(self, signal: dict) -> dict:
         """Execute a trade signal on the appropriate exchange."""

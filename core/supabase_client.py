@@ -22,8 +22,7 @@ def get_supabase():
 
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         raise RuntimeError(
-            "SUPABASE_URL and SUPABASE_SERVICE_KEY must be set. "
-            "Get them from your Supabase project settings."
+            "SUPABASE_URL and SUPABASE_SERVICE_KEY must be set. Get them from your Supabase project settings."
         )
     return create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
