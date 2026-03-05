@@ -466,7 +466,10 @@ async def lifespan(app: FastAPI):
 # ─── FastAPI app ─────────────────────────────────────────────────────────────
 app = FastAPI(title="ClaudeBot Backend", lifespan=lifespan)
 
-ALLOWED_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:8000").split(",")
+ALLOWED_ORIGINS = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://localhost:8000,https://doyou.trade,https://www.doyou.trade",
+).split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,

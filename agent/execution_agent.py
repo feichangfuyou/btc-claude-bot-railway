@@ -12,7 +12,7 @@ API keys NEVER leave this machine. The server only sends signals like
 
 Usage:
   python -m agent.execution_agent \
-    --server wss://your-doyou-trade-server.com/agent/ws \
+    --server wss://doyou.trade/agent/ws \
     --token YOUR_JWT_TOKEN
 """
 
