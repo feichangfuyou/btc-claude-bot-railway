@@ -68,11 +68,29 @@ def _extract_order_id(resp) -> str | None:
     return None
 
 
+def _get_client_with_keys(api_key: str = None, api_secret: str = None):
+    """Get REST client. Uses provided keys if given, else global client."""
+    if api_key and api_secret:
+        try:
+            from coinbase.rest import RESTClient
+
+            return RESTClient(
+                api_key=api_key,
+                api_secret=api_secret,
+                timeout=15,
+            )
+        except Exception:
+            return None
+    return _get_client()
+
+
 async def create_spot_market_order(
     symbol: str,
     side: str,
     quote_size_usd: float = None,
     base_size: float = None,
+    api_key: str = None,
+    api_secret: str = None,
 ) -> str | None:
     """
     Create a spot market order on Coinbase Advanced Trade.
@@ -80,7 +98,7 @@ async def create_spot_market_order(
     Sell: pass base_size (coin amount to sell).
     Returns order_id on success, None on failure.
     """
-    client = _get_client()
+    client = _get_client_with_keys(api_key, api_secret)
     if not client:
         return None
 

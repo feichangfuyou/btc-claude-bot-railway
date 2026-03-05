@@ -1,14 +1,21 @@
+# 10k scale: docker compose up -d --scale claudebot=2  (or use deploy.replicas with swarm)
 services:
   claudebot:
     build: .
     ports:
       - "8000:8000"
+    deploy:
+      replicas: 1  # Increase for 10k: docker compose up -d --scale claudebot=3
     env_file:
       - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
     volumes:
       - bot-data:/app/data
       - bot-logs:/app/logs
       - bot-backups:/app/backups
+    depends_on:
+      - redis
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -17,7 +24,27 @@ services:
       retries: 3
       start_period: 15s
 
+  celery-worker:
+    build: .
+    command: celery -A workers.celery_app worker -l info -Q default,ai
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
 volumes:
   bot-data:
   bot-logs:
   bot-backups:
+  redis-data:

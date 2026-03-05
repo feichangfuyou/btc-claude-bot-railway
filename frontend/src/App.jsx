@@ -8,6 +8,8 @@ import FetchingPrice from "./FetchingPrice.jsx";
 import Skeleton from "./Skeleton.jsx";
 import TickerItem from "./TickerItem.jsx";
 import { staggerIn } from "./animations.js";
+import { useAuthHeaders, useAuthQueryParam } from "./hooks/useAuthHeaders.js";
+import { colors } from "./theme.js";
 
 // ─── Trading Quotes (rotating) ──────────────────────────────────────────────────
 const TRADE_QUOTES = [
@@ -28,7 +30,7 @@ function TradeQuote() {
     return () => clearInterval(timer);
   }, []);
   return (
-    <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"11px", color:"#D4AF37", letterSpacing:"0.5px", fontStyle:"italic", maxWidth:"300px", lineHeight:"1.5", opacity:fade?1:0, transition:"opacity 0.4s ease" }}>
+    <div style={{ fontFamily:"'Space Mono',monospace", fontSize:"11px", color:colors.gold, letterSpacing:"0.5px", fontStyle:"italic", maxWidth:"300px", lineHeight:"1.5", opacity:fade?1:0, transition:"opacity 0.4s ease" }}>
       &ldquo;{TRADE_QUOTES[idx]}&rdquo;
     </div>
   );
@@ -48,13 +50,13 @@ class ErrorBoundary extends Component {
       return (
         <div style={{ fontFamily:"'Space Mono',monospace", background:"#0A0A0A", color:"#D4D4D4", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:"16px", padding:"20px", textAlign:"center" }}>
           <div style={{ fontSize:"48px" }}>🥊</div>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:"28px", fontWeight:"400", color:"#C0392B", letterSpacing:"4px" }}>DOWN FOR THE COUNT</div>
-          <div style={{ fontSize:"12px", color:"#5C5C5C", maxWidth:"500px", lineHeight:"1.8" }}>
+          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:"28px", fontWeight:"400", color:colors.error, letterSpacing:"4px" }}>DOWN FOR THE COUNT</div>
+          <div style={{ fontSize:"12px", color:colors.muted, maxWidth:"500px", lineHeight:"1.8" }}>
             {this.state.error?.message || "An unexpected error occurred."}
           </div>
           <button
             onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
-            style={{ fontFamily:"'Oswald',sans-serif", fontSize:"12px", fontWeight:"600", letterSpacing:"2px", padding:"10px 24px", border:"none", borderRadius:"3px", cursor:"pointer", background:"linear-gradient(180deg,#D4AF37,#B8860B)", color:"#0A0A0A" }}
+            style={{ fontFamily:"'Oswald',sans-serif", fontSize:"12px", fontWeight:"600", letterSpacing:"2px", padding:"10px 24px", border:"none", borderRadius:"3px", cursor:"pointer", background:`linear-gradient(180deg,${colors.gold},${colors.goldDark})`, color:colors.dark }}
           >
             GET BACK UP
           </button>
@@ -102,27 +104,26 @@ function logId() { return `log_${Date.now()}_${++_logSeq}`; }
 
 const API_SECRET = import.meta.env.VITE_BOT_API_SECRET || "";
 
-function authHeaders() {
-  const h = {};
-  if (API_SECRET) h["x-bot-secret"] = API_SECRET;
-  return h;
-}
-
 // Direct backend connection by default (no proxy). More reliable for WebSocket + API.
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL
   || (import.meta.env.DEV ? "http://localhost:8000" : "");
 
-function getBackendWsUrl() {
-  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL + (API_SECRET ? `?secret=${encodeURIComponent(API_SECRET)}` : "");
+function getBackendWsUrl(accessToken) {
+  // Prefer JWT when logged in so backend can resolve per-user keys (dev vs user_exchanges)
+  const auth = accessToken
+    ? `?token=${encodeURIComponent(accessToken)}`
+    : API_SECRET
+      ? `?secret=${encodeURIComponent(API_SECRET)}`
+      : "";
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL + auth;
   if (BACKEND_BASE) {
     try {
       const u = new URL(BACKEND_BASE.replace(/\/$/, ""));
       const proto = u.protocol === "https:" ? "wss:" : "ws:";
-      return `${proto}//${u.host}/ws` + (API_SECRET ? `?secret=${encodeURIComponent(API_SECRET)}` : "");
+      return `${proto}//${u.host}/ws` + auth;
     } catch {}
   }
-  return (window.location.protocol === "https:" ? "wss:" : "ws:") + "//" + window.location.host + "/ws"
-    + (API_SECRET ? `?secret=${encodeURIComponent(API_SECRET)}` : "");
+  return (window.location.protocol === "https:" ? "wss:" : "ws:") + "//" + window.location.host + "/ws" + auth;
 }
 const DEFAULT_ROUND_TRIP_FEE = 0.012;  // fallback: 0.6% taker × 2 sides
 const DEFAULT_COINS = ["BTC","ETH","SOL","DOGE","LINK","AVAX","UNI","AAVE"];
@@ -414,7 +415,9 @@ function StrategyDropdown({ tradingPreset, presets, presetCategories, onPresetCh
 
 function Dashboard() {
   const navigate = useNavigate();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, accessToken } = useAuth();
+  const getAuthHeaders = useAuthHeaders();
+  const getAuthQueryParam = useAuthQueryParam();
 
   // ── Connection ──────────────────────────────────────────────────────────────
   const [connected,   setConnected]   = useState(false);
@@ -576,7 +579,7 @@ function Dashboard() {
         try { ws.close(); } catch {}
       }
       setWsRetrying(true);
-      ws = new WebSocket(getBackendWsUrl());
+      ws = new WebSocket(getBackendWsUrl(accessToken));
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -660,7 +663,7 @@ function Dashboard() {
             const goal = profitGoalRef.current || 0;
             if (goal > 0 && pnl >= goal && !lastGoalReachedRef.current) {
               lastGoalReachedRef.current = true;
-              confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, colors: ["#D4AF37", "#B8860B", "#FFD700", "#C0392B"] });
+              confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, colors: [colors.gold, colors.goldDark, "#FFD700", colors.error] });
               setTimeout(() => confetti({ particleCount: 100, spread: 80, origin: { y: 0.5, x: 0.3 }, colors: ["#D4AF37", "#B8860B", "#FFD700"] }), 150);
               setTimeout(() => confetti({ particleCount: 100, spread: 80, origin: { y: 0.5, x: 0.7 }, colors: ["#D4AF37", "#B8860B", "#FFD700"] }), 300);
             }
@@ -678,9 +681,9 @@ function Dashboard() {
               const prevLatest = tradesRef.current[0];
               const isNewTrade = !prevLatest || latest.id !== prevLatest.id;
               if (isNewTrade && latest.win) {
-                confetti({ particleCount: 100, spread: 100, origin: { y: 0.6 }, colors: ["#D4AF37", "#B8860B", "#FFD700", "#00E676"] });
-                setTimeout(() => confetti({ particleCount: 60, spread: 80, origin: { y: 0.5, x: 0.3 }, colors: ["#D4AF37", "#FFD700"] }), 120);
-                setTimeout(() => confetti({ particleCount: 60, spread: 80, origin: { y: 0.5, x: 0.7 }, colors: ["#D4AF37", "#FFD700"] }), 240);
+                confetti({ particleCount: 100, spread: 100, origin: { y: 0.6 }, colors: [colors.gold, colors.goldDark, "#FFD700", colors.success] });
+                setTimeout(() => confetti({ particleCount: 60, spread: 80, origin: { y: 0.5, x: 0.3 }, colors: [colors.gold, "#FFD700"] }), 120);
+                setTimeout(() => confetti({ particleCount: 60, spread: 80, origin: { y: 0.5, x: 0.7 }, colors: [colors.gold, "#FFD700"] }), 240);
               } else if (isNewTrade && !latest.win) {
                 const sym = latest.symbol || "Position";
                 setLossToast({ msg: `${sym} closed — $${Math.abs(latest.pnl).toFixed(2)} loss` });
@@ -756,20 +759,18 @@ function Dashboard() {
       }
       wsRef.current = null;
     };
-  }, [log]);
+  }, [log, accessToken]);
 
   // ── Periodic account sync (failsafe so balance/P&L always reflect backend) ───
   useEffect(() => {
     if (!connected) return;
     const apiBase = BACKEND_BASE;
     const url = apiBase ? `${apiBase.replace(/\/$/, "")}/account` : "/account";
-    const headers = {};
-    if (API_SECRET) headers["x-bot-secret"] = API_SECRET;
     const sync = async () => {
       try {
         const ctrl = new AbortController();
         const to = setTimeout(() => ctrl.abort(), 5000);
-        const r = await fetch(url, { headers, signal: ctrl.signal });
+        const r = await fetch(url, { headers: getAuthHeaders(), signal: ctrl.signal });
         clearTimeout(to);
         if (!r.ok) return;
         const d = await r.json();
@@ -784,9 +785,11 @@ function Dashboard() {
       } catch {}
     };
     sync(); // immediate sync on connect
-    const id = setInterval(sync, 10000); // 10s — WS pushes account; REST is backup only
+    // 10k scale: 15s when idle (no positions), 10s when active — reduces aggregate REST load
+    const intervalMs = positions?.length > 0 ? 10000 : 15000;
+    const id = setInterval(sync, intervalMs);
     return () => clearInterval(id);
-  }, [connected]);
+  }, [connected, getAuthHeaders, positions?.length]);
 
   // ── Price fetch: backend first (Coinbase), then direct CoinGecko when backend fails ─
   const CG_IDS = { BTC:"bitcoin", ETH:"ethereum", SOL:"solana", DOGE:"dogecoin", LINK:"chainlink", AVAX:"avalanche-2", UNI:"uniswap", AAVE:"aave", XRP:"ripple", ADA:"cardano" };
@@ -815,7 +818,8 @@ function Dashboard() {
     const tickersUrl = base ? `${base}/api/coinbase/tickers` : "/api/coinbase/tickers";
     const headers = {};
     if (API_SECRET) headers["x-bot-secret"] = API_SECRET;
-    const PRICE_FALLBACK_MS = 2000;  // 2s — keeps header moving in real time; WS provides sub-second when Coinbase connected
+    // When cbLive (Coinbase WS): 8s polling — WS provides sub-second; REST is backup only
+    const PRICE_FALLBACK_MS = cbLive ? 8000 : 2000;
     const STALE_THRESHOLD_MS = 10000;  // Force refresh if no update in 10s (WS likely stalled)
 
     const fetchPrice = async () => {
@@ -924,13 +928,11 @@ function Dashboard() {
   useEffect(() => {
     const base = (BACKEND_BASE || "").replace(/\/$/, "");
     const url = base ? `${base}/api/exchange/tickers` : "/api/exchange/tickers";
-    const headers = {};
-    if (API_SECRET) headers["x-bot-secret"] = API_SECRET;
     async function fetchMarkets() {
       try {
         const ctrl = new AbortController();
         const to = setTimeout(() => ctrl.abort(), 15000);
-        const r = await fetch(`${url}?limit=500`, { headers, signal: ctrl.signal });
+        const r = await fetch(`${url}?limit=500`, { headers: getAuthHeaders(), signal: ctrl.signal });
         clearTimeout(to);
         if (!r.ok) return;
         const arr = await r.json();
@@ -948,9 +950,9 @@ function Dashboard() {
       } catch { /* non-critical, ticker works with coins/activeCoins fallback */ }
     }
     fetchMarkets();
-    const t = setInterval(fetchMarkets, 120000);
+    const t = setInterval(fetchMarkets, 180000); // 10k scale: 180s (was 120s) — reduces aggregate load
     return () => clearInterval(t);
-  }, []);
+  }, [getAuthHeaders]);
 
   // ── Ticker search: click outside to close dropdown ─────────────────────────
   useEffect(() => {
@@ -1012,13 +1014,13 @@ function Dashboard() {
   useEffect(() => {
     if (!connected) return;
     const url = BACKEND_BASE ? `${BACKEND_BASE}/api/presets` : "/api/presets";
-    fetch(url, { headers: authHeaders() }).then(r => r.ok && r.json()).then(d => {
+    fetch(url, { headers: getAuthHeaders() }).then(r => r.ok && r.json()).then(d => {
       if (d?.presets?.length) {
         setPresets(d.presets);
         setPresetCategories(d.categories || []);
       }
     }).catch(() => {});
-  }, [connected]);
+  }, [connected, getAuthHeaders]);
 
   // ── Midnight P&L reset (display) ────────────────────────────────────────────
   useEffect(() => {
@@ -1042,9 +1044,7 @@ function Dashboard() {
 
     try {
       const backendBase = BACKEND_BASE || `${window.location.protocol}//${window.location.hostname}:8000`;
-      const headers = {};
-      if (API_SECRET) headers["x-bot-secret"] = API_SECRET;
-      const res = await fetch(`${backendBase}/ask_claude`, { method: "POST", headers });
+      const res = await fetch(`${backendBase}/ask_claude`, { method: "POST", headers: getAuthHeaders() });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -1064,7 +1064,7 @@ function Dashboard() {
     } finally {
       setThinking(false);
     }
-  }, [log]);
+  }, [log, getAuthHeaders]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleStart = () => {
@@ -1178,7 +1178,7 @@ function Dashboard() {
     setTradeDetailTab("exit");
     try {
       const backendBase = BACKEND_BASE || `${window.location.protocol}//${window.location.hostname}:8000`;
-      const res = await fetch(`${backendBase}/api/trade/${tr.id}/context`, { headers: authHeaders() });
+      const res = await fetch(`${backendBase}/api/trade/${tr.id}/context`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setTradeDetail(prev => ({ ...prev, ...data, trade: data.trade || tr }));
@@ -1188,7 +1188,7 @@ function Dashboard() {
     } finally {
       setTradeDetailLoading(false);
     }
-  }, [log]);
+  }, [log, getAuthHeaders]);
 
   const closeTradeDetail = useCallback(() => {
     setTradeDetail(null);
@@ -1207,7 +1207,7 @@ function Dashboard() {
       if (filters.side)      params.set("side", filters.side);
       if (filters.result)    params.set("result", filters.result);
       if (filters.product_type) params.set("product_type", filters.product_type);
-      const res = await fetch(`${backendBase}/trades/history?${params}`, { headers: authHeaders() });
+      const res = await fetch(`${backendBase}/trades/history?${params}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setHistoryTrades(data.trades || []);
@@ -1219,7 +1219,7 @@ function Dashboard() {
     } finally {
       setHistoryLoading(false);
     }
-  }, [historyFilters, historyLimit, log]);
+  }, [historyFilters, historyLimit, log, getAuthHeaders]);
 
   const applyHistoryFilter = (key, value) => {
     const next = { ...historyFilters, [key]: value };
@@ -2442,7 +2442,7 @@ function Dashboard() {
                   const meta = ss?.meta;
                   const timeframes = ss?.timeframes || [];
                   const backendBase = BACKEND_BASE || `${window.location.protocol}//${window.location.hostname}:8000`;
-                  const secretParam = API_SECRET ? `?secret=${API_SECRET}` : "";
+                  const authParam = getAuthQueryParam();
 
                   if (!ss || timeframes.length === 0) {
                     return (
@@ -2526,7 +2526,7 @@ function Dashboard() {
                               <span style={{ fontSize:"9px", color:"#3a3a3a" }}>{tradeDetail.trade?.symbol || "BTC"}/USD</span>
                             </div>
                             <img
-                              src={`${backendBase}/api/trade/${tradeDetail.trade?.id}/screenshot/${phase}/${tf}${secretParam}`}
+                              src={`${backendBase}/api/trade/${tradeDetail.trade?.id}/screenshot/${phase}/${tf}${authParam}`}
                               alt={`${phase} chart ${tf}`}
                               style={{ width:"100%", display:"block" }}
                               onError={e => { e.target.style.display = "none"; e.target.nextSibling && (e.target.nextSibling.style.display = "block"); }}
@@ -2625,6 +2625,7 @@ function Dashboard() {
 // ─── Analytics Section (Equity Curve + Trade Analytics + Memory + Backtest) ────
 function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnabled, hasClaude, isLiveMode, agentKit, paperMode, directionBias, requireTradeApproval, price, priceAge, wsRetrying }) {
   const { user, profile, signOut } = useAuth();
+  const getAuthHeaders = useAuthHeaders();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("equity");
   const [equityData, setEquityData] = useState(null);
@@ -2642,7 +2643,7 @@ function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnabled, ha
     if (!connected) return;
     setLoading(true);
     try {
-      const headers = authHeaders();
+      const headers = getAuthHeaders();
       if (tab === "equity") {
         const r = await fetch(`${backendBase}/equity`, { headers });
         if (r.ok) setEquityData(await r.json());
@@ -2666,7 +2667,7 @@ function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnabled, ha
     } finally {
       setLoading(false);
     }
-  }, [connected, backendBase, log]);
+  }, [connected, backendBase, log, getAuthHeaders]);
 
   useEffect(() => { fetchData(activeTab); }, [activeTab, fetchData]);
 
@@ -2678,7 +2679,7 @@ function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnabled, ha
         tp_atr_mult: btParams.tp, sl_atr_mult: btParams.sl,
         min_confluence: btParams.confluence, min_rr: btParams.rr,
       });
-      const r = await fetch(`${backendBase}/backtest?${params}`, { method: "POST", headers: authHeaders() });
+      const r = await fetch(`${backendBase}/backtest?${params}`, { method: "POST", headers: getAuthHeaders() });
       if (r.ok) {
         const data = await r.json();
         setBacktestResult(data);

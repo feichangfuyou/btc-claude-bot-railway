@@ -1,12 +1,8 @@
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
-
-const GOLD = "#D4AF37";
-const DARK = "#0A0A0A";
-const CARD = "#111111";
-const BORDER = "#1A1A1A";
-const MUTED = "#5C5C5C";
-const GREEN = "#27AE60";
+import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
+import { colors, typography } from "../theme.js";
 
 const TIERS = [
   {
@@ -23,7 +19,7 @@ const TIERS = [
     price: "$79",
     period: "/mo",
     features: ["Up to 3 exchanges", "All strategies", "Smart order routing", "Priority AI", "Telegram alerts"],
-    color: GOLD,
+    color: colors.gold,
     popular: true,
   },
   {
@@ -32,18 +28,56 @@ const TIERS = [
     price: "$149",
     period: "/mo",
     features: ["All exchanges + on-chain", "Cross-exchange arbitrage", "DeFi integration", "Futures trading", "Dedicated support"],
-    color: GREEN,
+    color: colors.success,
   },
 ];
 
+const BACKEND_BASE = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || (import.meta.env.DEV ? "http://localhost:8000" : "");
+
 export default function Billing() {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const getAuthHeaders = useAuthHeaders();
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState(null);
   const currentTier = profile?.subscription_tier || "starter";
 
-  function handleSelectPlan(tierId) {
-    // Stripe Checkout integration will go here
-    alert(`Stripe checkout for ${tierId} plan coming soon!`);
+  useEffect(() => {
+    const success = searchParams.get("success");
+    const cancelled = searchParams.get("cancelled");
+    if (success === "true") {
+      setMessage({ type: "success", text: "Subscription activated. Welcome to your new plan!" });
+      refreshProfile?.();
+      setSearchParams({}, { replace: true });
+    } else if (cancelled === "true") {
+      setMessage({ type: "info", text: "Checkout cancelled." });
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
+
+  async function handleSelectPlan(tierId) {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const base = BACKEND_BASE || "";
+      const url = base ? `${base}/billing/checkout` : "/billing/checkout";
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ tier: tierId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setMessage({ type: "error", text: data.error || "Stripe checkout unavailable. Please try again." });
+    } catch (e) {
+      setMessage({ type: "error", text: "Network error. Please try again." });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -57,11 +91,24 @@ export default function Billing() {
         </div>
 
         <div style={styles.currentPlan}>
-          <span style={{ color: MUTED, fontSize: 11 }}>Current Plan:</span>
-          <span style={{ color: GOLD, fontFamily: "'Oswald', sans-serif", fontSize: 16, letterSpacing: 2, textTransform: "uppercase" }}>
+          <span style={{ color: colors.muted, fontSize: 11 }}>Current Plan:</span>
+          <span style={{ color: colors.gold, fontFamily: typography.fontButton, fontSize: 16, letterSpacing: 2, textTransform: "uppercase" }}>
             {currentTier}
           </span>
         </div>
+
+        {message && (
+          <div
+            style={{
+              ...styles.message,
+              background: message.type === "error" ? "rgba(192,57,43,0.15)" : message.type === "success" ? "rgba(39,174,96,0.15)" : "rgba(212,175,55,0.1)",
+              borderColor: message.type === "error" ? "rgba(192,57,43,0.5)" : message.type === "success" ? "rgba(39,174,96,0.5)" : "rgba(212,175,55,0.3)",
+              color: message.type === "error" ? colors.error : message.type === "success" ? colors.success : colors.gold,
+            }}
+          >
+            {message.text}
+          </div>
+        )}
 
         <div style={styles.tierGrid} className="tier-grid">
           {TIERS.map(tier => (
@@ -69,7 +116,7 @@ export default function Billing() {
               key={tier.id}
               style={{
                 ...styles.tierCard,
-                borderColor: tier.popular ? GOLD : BORDER,
+                borderColor: tier.popular ? colors.gold : colors.border,
                 ...(currentTier === tier.id ? { background: "rgba(212,175,55,0.03)" } : {}),
               }}
             >
@@ -82,15 +129,19 @@ export default function Billing() {
               <ul style={styles.featureList}>
                 {tier.features.map((f, i) => (
                   <li key={i} style={styles.featureItem}>
-                    <span style={{ color: GREEN }}>&#10003;</span> {f}
+                    <span style={{ color: colors.success }}>&#10003;</span> {f}
                   </li>
                 ))}
               </ul>
               {currentTier === tier.id ? (
                 <div style={styles.currentBadge}>Current Plan</div>
               ) : (
-                <button style={styles.selectBtn} onClick={() => handleSelectPlan(tier.id)}>
-                  {TIERS.findIndex(t => t.id === tier.id) > TIERS.findIndex(t => t.id === currentTier) ? "Upgrade" : "Downgrade"}
+                <button
+                  style={styles.selectBtn}
+                  onClick={() => handleSelectPlan(tier.id)}
+                  disabled={loading}
+                >
+                  {loading ? "Redirecting…" : TIERS.findIndex(t => t.id === tier.id) > TIERS.findIndex(t => t.id === currentTier) ? "Upgrade" : "Downgrade"}
                 </button>
               )}
             </div>
@@ -119,9 +170,9 @@ export default function Billing() {
 
 const styles = {
   container: {
-    fontFamily: "'Space Mono', monospace",
-    background: DARK,
-    color: "#D4D4D4",
+    fontFamily: typography.fontMono,
+    background: colors.dark,
+    color: colors.text,
     minHeight: "100dvh",
     padding: "20px 16px",
     paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
@@ -129,11 +180,11 @@ const styles = {
   page: { maxWidth: 800, margin: "0 auto" },
   header: { display: "flex", alignItems: "center", gap: 16, marginBottom: 24 },
   title: {
-    fontFamily: "'Bebas Neue', sans-serif",
+    fontFamily: typography.fontDisplay,
     fontSize: 28,
     fontWeight: 400,
     letterSpacing: 4,
-    color: GOLD,
+    color: colors.gold,
     margin: 0,
   },
   backBtn: {
@@ -145,7 +196,7 @@ const styles = {
     WebkitBackdropFilter: "blur(8px)",
     border: "1px solid rgba(255,255,255,0.06)",
     borderRadius: 8,
-    color: MUTED,
+    color: colors.muted,
     cursor: "pointer",
     transition: "all 0.2s ease",
   },
@@ -154,6 +205,13 @@ const styles = {
     alignItems: "center",
     gap: 10,
     marginBottom: 24,
+  },
+  message: {
+    padding: "12px 16px",
+    borderRadius: 10,
+    border: "1px solid",
+    fontSize: 12,
+    marginBottom: 20,
   },
   tierGrid: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 32 },
   tierCard: {
@@ -178,8 +236,8 @@ const styles = {
     fontSize: 9,
     letterSpacing: 2,
     padding: "3px 12px",
-    background: GOLD,
-    color: DARK,
+    background: colors.gold,
+    color: colors.dark,
     borderRadius: 10,
     fontWeight: 600,
     boxShadow: "0 4px 12px rgba(212,175,55,0.3)",
@@ -196,13 +254,13 @@ const styles = {
     fontSize: 36,
     letterSpacing: 2,
   },
-  pricePeriod: { fontSize: 12, color: MUTED },
+  pricePeriod: { fontSize: 12, color: colors.muted },
   featureList: { listStyle: "none", padding: 0, margin: "0 0 20px", flex: 1 },
   featureItem: { fontSize: 11, padding: "4px 0", display: "flex", gap: 6 },
   currentBadge: {
     textAlign: "center",
     fontSize: 11,
-    color: GREEN,
+    color: colors.success,
     padding: "8px 0",
     border: "1px solid rgba(39,174,96,0.3)",
     borderRadius: 8,
@@ -217,8 +275,8 @@ const styles = {
     border: "none",
     borderRadius: 10,
     cursor: "pointer",
-    background: `linear-gradient(180deg, ${GOLD}, #B8860B)`,
-    color: DARK,
+    background: `linear-gradient(180deg, ${colors.gold}, ${colors.goldDark})`,
+    color: colors.dark,
     textAlign: "center",
     boxShadow: "0 4px 20px rgba(212,175,55,0.2)",
     transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -234,7 +292,7 @@ const styles = {
   },
   faqItem: { marginBottom: 16 },
   faqQ: { fontSize: 12, fontWeight: 600, marginBottom: 4 },
-  faqA: { fontSize: 11, color: MUTED, lineHeight: 1.6 },
+  faqA: { fontSize: 11, color: colors.muted, lineHeight: 1.6 },
 };
 
 const responsiveCss = `

@@ -1,6 +1,8 @@
 .env
 .env.*
+.stripe_key
 !.env.example
+!.env.10k.example
 cdp_api_key.json
 cdp_wallet_secret.txt
 cdp_wallet_data.json

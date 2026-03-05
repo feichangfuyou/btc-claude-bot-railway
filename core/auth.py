@@ -64,6 +64,33 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
+def verify_token(token: str) -> bool:
+    """Verify a Supabase JWT. Returns True if valid, False otherwise."""
+    if not token:
+        return False
+    try:
+        sb = get_supabase()
+        user_resp = sb.auth.get_user(token)
+        return user_resp.user is not None
+    except Exception:
+        return False
+
+
+def get_user_from_token(token: str) -> Optional[tuple[str, str]]:
+    """Verify JWT and return (user_id, email) or None."""
+    if not token:
+        return None
+    try:
+        sb = get_supabase()
+        user_resp = sb.auth.get_user(token)
+        user = user_resp.user
+        if not user:
+            return None
+        return (user.id, user.email or "")
+    except Exception:
+        return None
+
+
 async def get_optional_user(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),

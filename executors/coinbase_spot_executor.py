@@ -9,6 +9,7 @@ from datetime import datetime
 
 from api.coinbase_api import create_spot_market_order, is_configured
 from core.config import AI_COST_PER_TRADE, ROUND_TRIP_FEE
+from core.key_resolution import resolve_exchange_keys
 from core.database import db_save_trade
 from learning.trade_memory import record_trade_memory, run_learning_cycle
 from utils.notifications import send_notification
@@ -26,17 +27,27 @@ async def execute_coinbase_spot(
     decision: dict,
 ):
     """Place spot market order on Coinbase and track position."""
-    if not is_configured():
+    keys = resolve_exchange_keys(
+        getattr(bot, "active_user_id", None),
+        getattr(bot, "active_user_email", None),
+        "coinbase",
+    )
+    if not keys and not is_configured():
         bot.add_log("⚠ Coinbase not configured — falling back to paper", "warning")
         _set_paper_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision)
         await bot.broadcast_trade_update()
         return
 
+    api_key, api_secret = keys or (None, None)
     try:
         if action == "buy":
-            order_id = await create_spot_market_order(symbol, "buy", quote_size_usd=usd_sz)
+            order_id = await create_spot_market_order(
+                symbol, "buy", quote_size_usd=usd_sz, api_key=api_key, api_secret=api_secret
+            )
         else:
-            order_id = await create_spot_market_order(symbol, "sell", base_size=coin_sz)
+            order_id = await create_spot_market_order(
+                symbol, "sell", base_size=coin_sz, api_key=api_key, api_secret=api_secret
+            )
 
         if not order_id:
             bot.add_log(
@@ -63,13 +74,23 @@ async def close_coinbase_spot(bot, pos: dict, reason: str = "⚡ COINBASE CLOSE"
     pos_symbol = pos.get("symbol", "BTC")
     coin_size = pos.get("coin_size", pos.get("btc_size", 0))
     current_price = bot.price_for(pos_symbol)
+    keys = resolve_exchange_keys(
+        getattr(bot, "active_user_id", None),
+        getattr(bot, "active_user_email", None),
+        "coinbase",
+    )
+    api_key, api_secret = keys or (None, None)
 
     try:
         if pos["side"] == "buy":
-            order_id = await create_spot_market_order(pos_symbol, "sell", base_size=coin_size)
+            order_id = await create_spot_market_order(
+                pos_symbol, "sell", base_size=coin_size, api_key=api_key, api_secret=api_secret
+            )
         else:
             usd_to_spend = coin_size * current_price
-            order_id = await create_spot_market_order(pos_symbol, "buy", quote_size_usd=usd_to_spend)
+            order_id = await create_spot_market_order(
+                pos_symbol, "buy", quote_size_usd=usd_to_spend, api_key=api_key, api_secret=api_secret
+            )
 
         if not order_id:
             bot.add_log(f"⚠ Coinbase close order failed [{pos_symbol}] — marking as closed", "error")

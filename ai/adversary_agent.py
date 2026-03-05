@@ -26,7 +26,8 @@ from datetime import datetime, timezone
 
 import httpx
 
-from core.config import ANTHROPIC_API_KEY
+from core.anthropic_keys import get_next_key
+from core.config import ANTHROPIC_API_KEY, ANTHROPIC_API_KEYS
 
 ADVERSARY_MODEL = "claude-haiku-4-5-20251001"
 ADVERSARY_TIMEOUT = 15
@@ -235,7 +236,7 @@ async def adversary_review(
             "size_modifier": 0.0-1.0,
         }
     """
-    if not ANTHROPIC_API_KEY:
+    if not ANTHROPIC_API_KEYS and not ANTHROPIC_API_KEY:
         return _default_pass("no API key")
 
     action = trade_decision.get("action", "wait")
@@ -255,7 +256,7 @@ async def adversary_review(
             r = await client.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
-                    "x-api-key": ANTHROPIC_API_KEY,
+                    "x-api-key": get_next_key(),
                     "anthropic-version": "2023-06-01",
                     "content-type": "application/json",
                 },

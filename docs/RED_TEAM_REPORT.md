@@ -106,3 +106,16 @@
 ### Summary
 
 When `BOT_API_SECRET` is **set**, `AuthMiddleware` protects all non-public endpoints. When **unset**, the entire API is open — by design for local development, but dangerous if deployed to a public host. **Action:** Never deploy without `BOT_API_SECRET`. Document this clearly in runbook and `.env.example`.
+
+---
+
+## 8. Security Hardening (Mar 5, 2026)
+
+| Fix | Status |
+|-----|--------|
+| **BOT_API_SECRET** | Documented in `.env.example` and RUNBOOK with generation command |
+| **Exchange key encryption** | Fernet encryption in `core/encryption.py`; keys encrypted before Supabase storage |
+| **Path traversal** | `serve_trade_screenshot` validates `timeframe` (5m/15m/60m) and enforces path containment |
+| **Exchange validate auth** | Moved to `/auth/exchange/validate`; requires Supabase JWT; rate limited (10/min) |
+| **Stripe webhook lifecycle** | `customer.subscription.updated` and `customer.subscription.deleted` now update profiles |
+| **TradingView XSS** | `getSymbol()` whitelist for short symbols and safe `exchange:symbol` format |

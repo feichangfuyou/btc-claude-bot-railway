@@ -1,15 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
+import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
 import { supabase } from "../supabaseClient.js";
-
-const GOLD = "#D4AF37";
-const DARK = "#0A0A0A";
-const CARD = "#111111";
-const BORDER = "#1A1A1A";
-const MUTED = "#5C5C5C";
-const GREEN = "#27AE60";
-const RED = "#C0392B";
+import { colors, typography } from "../theme.js";
 
 const PRESETS_FALLBACK = [
   { id: "default", name: "Default (Balanced)", category: "General" },
@@ -117,8 +111,11 @@ const PRESETS_FALLBACK = [
 
 const ALL_COINS = ["BTC", "ETH", "SOL", "LINK", "DOGE", "AVAX", "UNI", "AAVE", "XRP", "ADA", "BNB", "DOT"];
 
+const TIER_MAX_EXCHANGES = { starter: 1, pro: 3, elite: 10 };
+
 export default function Settings() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, accessToken } = useAuth();
+  const getAuthHeaders = useAuthHeaders();
   const navigate = useNavigate();
   const [prefs, setPrefs] = useState(null);
   const [exchanges, setExchanges] = useState([]);
@@ -135,17 +132,17 @@ export default function Settings() {
     if (!user) return;
     supabase.from("user_preferences").select("*").eq("user_id", user.id).single()
       .then(({ data }) => { if (data) setPrefs(data); });
-    supabase.from("user_exchanges").select("*").eq("user_id", user.id)
+    supabase.from("user_exchanges").select("exchange, connection_type, is_active").eq("user_id", user.id)
       .then(({ data }) => { if (data) setExchanges(data); });
   }, [user]);
 
   useEffect(() => {
     const base = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || "";
     const url = base ? `${base}/api/presets` : "/api/presets";
-    fetch(url).then(r => r.ok && r.json()).then(d => {
+    fetch(url, { headers: getAuthHeaders() }).then(r => r.ok && r.json()).then(d => {
       if (d?.presets?.length) setPresets(d.presets);
     }).catch(() => {});
-  }, []);
+  }, [getAuthHeaders]);
 
   function updatePref(key, value) {
     setPrefs(prev => ({ ...prev, [key]: value }));
@@ -180,12 +177,21 @@ export default function Settings() {
       setKeyError("Both API key and secret are required");
       return;
     }
+    if (!accessToken) {
+      setKeyError("Please sign in to add exchange keys");
+      return;
+    }
     try {
       const base = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || "";
-      const url = base ? `${base}/api/exchange/validate` : "/api/exchange/validate";
-      const res = await fetch(url, {
+      const validateUrl = base ? `${base}/auth/exchange/validate` : "/auth/exchange/validate";
+      const connectUrl = base ? `${base}/auth/exchanges/connect` : "/auth/exchanges/connect";
+      const headers = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`,
+      };
+      const res = await fetch(validateUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           exchange: keyModal,
           api_key: apiKey.trim(),
@@ -197,15 +203,21 @@ export default function Settings() {
         setKeyError(data.error || "Invalid API credentials — please check your key and secret");
         return;
       }
-      await supabase.from("user_exchanges").upsert({
-        user_id: user.id,
-        exchange: keyModal,
-        connection_type: "api_key",
-        api_key_enc: apiKey.trim(),
-        api_secret_enc: apiSecret.trim(),
-        is_active: true,
-      }, { onConflict: "user_id,exchange" });
-      const { data: exData } = await supabase.from("user_exchanges").select("*").eq("user_id", user.id);
+      const connectRes = await fetch(connectUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          exchange: keyModal,
+          connection_type: "api_key",
+          api_key: apiKey.trim(),
+          api_secret: apiSecret.trim(),
+        }),
+      });
+      if (!connectRes.ok) {
+        const errData = await connectRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to save exchange");
+      }
+      const { data: exData } = await supabase.from("user_exchanges").select("exchange, connection_type, is_active").eq("user_id", user.id);
       setExchanges(exData || []);
       setKeyModal(null);
       setApiKey("");
@@ -226,7 +238,7 @@ export default function Settings() {
       <>
         <style>{responsiveCss}</style>
         <div style={styles.container}>
-          <div style={{ color: MUTED, fontSize: 12 }}>Loading settings...</div>
+          <div style={{ color: colors.muted, fontSize: 12 }}>Loading settings...</div>
         </div>
       </>
     );
@@ -251,7 +263,7 @@ export default function Settings() {
           </div>
           <div style={styles.row}>
             <span style={styles.rowLabel}>Plan</span>
-            <span style={{ color: GOLD, textTransform: "capitalize" }}>{profile?.subscription_tier || "Starter"}</span>
+            <span style={{ color: colors.gold, textTransform: "capitalize" }}>{profile?.subscription_tier || "Starter"}</span>
           </div>
           <button style={styles.dangerBtn} onClick={signOut}>Sign Out</button>
         </section>
@@ -261,16 +273,23 @@ export default function Settings() {
           <h2 style={styles.sectionTitle}>Connected Exchanges</h2>
           {["coinbase", "kraken", "binance", "onchain"].map(ex => {
             const conn = exchanges.find(e => e.exchange === ex && e.is_active);
+            const connectedCount = exchanges.filter(e => e.is_active).length;
+            const maxExchanges = TIER_MAX_EXCHANGES[profile?.subscription_tier || "starter"] ?? 1;
+            const atLimit = !conn && connectedCount >= maxExchanges;
             return (
               <div key={ex} style={styles.exchangeRow}>
                 <div>
                   <div style={styles.exchangeName}>{ex.charAt(0).toUpperCase() + ex.slice(1)}</div>
-                  <div style={{ fontSize: 10, color: conn ? GREEN : MUTED }}>
+                  <div style={{ fontSize: 10, color: conn ? colors.success : colors.muted }}>
                     {conn ? `Connected (${conn.connection_type})` : "Not connected"}
                   </div>
                 </div>
                 {conn ? (
                   <button style={styles.disconnectBtn} onClick={() => handleDisconnect(ex)}>Disconnect</button>
+                ) : atLimit ? (
+                  <button style={styles.connectBtn} onClick={() => navigate("/billing")}>
+                    Upgrade to add more
+                  </button>
                 ) : (
                   <button style={styles.connectBtn} onClick={() => setKeyModal(ex)}>
                     {ex === "coinbase" ? "Connect" : "Add Key"}
@@ -336,13 +355,13 @@ export default function Settings() {
           <label style={styles.label}>Paper Trading</label>
           <div style={styles.riskRow}>
             <button
-              style={{ ...styles.riskBtn, ...(prefs.paper_trading ? { borderColor: GREEN, color: GREEN } : {}) }}
+              style={{ ...styles.riskBtn, ...(prefs.paper_trading ? { borderColor: colors.success, color: colors.success } : {}) }}
               onClick={() => updatePref("paper_trading", true)}
             >
               ON
             </button>
             <button
-              style={{ ...styles.riskBtn, ...(!prefs.paper_trading ? { borderColor: RED, color: RED } : {}) }}
+              style={{ ...styles.riskBtn, ...(!prefs.paper_trading ? { borderColor: colors.error, color: colors.error } : {}) }}
               onClick={() => updatePref("paper_trading", false)}
             >
               OFF (Live)
@@ -395,9 +414,9 @@ export default function Settings() {
 
 const styles = {
   container: {
-    fontFamily: "'Space Mono', monospace",
-    background: DARK,
-    color: "#D4D4D4",
+    fontFamily: typography.fontMono,
+    background: colors.dark,
+    color: colors.text,
     minHeight: "100dvh",
     padding: "20px 16px",
     paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
@@ -405,11 +424,11 @@ const styles = {
   page: { maxWidth: 600, margin: "0 auto" },
   header: { display: "flex", alignItems: "center", gap: 16, marginBottom: 24 },
   title: {
-    fontFamily: "'Bebas Neue', sans-serif",
+    fontFamily: typography.fontDisplay,
     fontSize: 28,
     fontWeight: 400,
     letterSpacing: 4,
-    color: GOLD,
+    color: colors.gold,
     margin: 0,
   },
   backBtn: {
@@ -421,7 +440,7 @@ const styles = {
     WebkitBackdropFilter: "blur(8px)",
     border: "1px solid rgba(255,255,255,0.06)",
     borderRadius: 8,
-    color: MUTED,
+    color: colors.muted,
     cursor: "pointer",
     transition: "all 0.2s ease",
   },
@@ -498,7 +517,7 @@ const styles = {
     textAlign: "center",
     transition: "all 0.2s ease",
   },
-  riskActive: { borderColor: "rgba(212,175,55,0.4)", color: GOLD, background: "rgba(212,175,55,0.05)" },
+  riskActive: { borderColor: `${colors.gold}66`, color: colors.gold, background: `${colors.gold}0D` },
   coinGrid: { display: "flex", flexWrap: "wrap", gap: 6 },
   coinBtn: {
     fontFamily: "'Space Mono', monospace",
@@ -513,7 +532,7 @@ const styles = {
     cursor: "pointer",
     transition: "all 0.2s ease",
   },
-  coinActive: { borderColor: "rgba(212,175,55,0.4)", color: GOLD, background: "rgba(212,175,55,0.05)" },
+  coinActive: { borderColor: `${colors.gold}66`, color: colors.gold, background: `${colors.gold}0D` },
   exchangeRow: {
     display: "flex",
     alignItems: "center",
@@ -530,7 +549,7 @@ const styles = {
     border: "1px solid rgba(212,175,55,0.3)",
     borderRadius: 6,
     background: "rgba(212,175,55,0.05)",
-    color: GOLD,
+    color: colors.gold,
     cursor: "pointer",
     transition: "all 0.2s ease",
   },
@@ -538,21 +557,21 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     fontSize: 10,
     padding: "5px 10px",
-    border: "1px solid rgba(192,57,43,0.3)",
+    border: `1px solid ${colors.error}4D`,
     borderRadius: 6,
-    background: "rgba(192,57,43,0.05)",
-    color: RED,
+    background: `${colors.error}0D`,
+    color: colors.error,
     cursor: "pointer",
     transition: "all 0.2s ease",
   },
   dangerBtn: {
-    fontFamily: "'Space Mono', monospace",
+    fontFamily: typography.fontMono,
     fontSize: 11,
     padding: "8px 16px",
-    border: "1px solid rgba(192,57,43,0.3)",
+    border: `1px solid ${colors.error}4D`,
     borderRadius: 8,
-    background: "rgba(192,57,43,0.05)",
-    color: RED,
+    background: `${colors.error}0D`,
+    color: colors.error,
     cursor: "pointer",
     marginTop: 12,
     transition: "all 0.2s ease",
@@ -567,7 +586,7 @@ const styles = {
     border: "none",
     borderRadius: 10,
     cursor: "pointer",
-    background: `linear-gradient(180deg, ${GOLD}, #B8860B)`,
+    background: `linear-gradient(180deg, ${colors.gold}, ${colors.goldDark})`,
     color: DARK,
     boxShadow: "0 4px 20px rgba(212,175,55,0.2)",
     transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -595,15 +614,15 @@ const styles = {
     boxShadow: "0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
   },
   modalTitle: {
-    fontFamily: "'Bebas Neue', sans-serif",
+    fontFamily: typography.fontDisplay,
     fontSize: 20,
     letterSpacing: 2,
-    color: GOLD,
+    color: colors.gold,
     margin: "0 0 16px",
   },
   error: {
     fontSize: 12,
-    color: RED,
+    color: colors.error,
     background: "rgba(192,57,43,0.08)",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",

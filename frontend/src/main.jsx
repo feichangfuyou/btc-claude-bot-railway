@@ -13,23 +13,15 @@ import AuthCallback from "./pages/AuthCallback.jsx";
 import "./suppress-warnings.js";
 import "./capacitor-init.js";
 import "./global.css";
+import "./styles/auth.css";
 
 function ProtectedRoute({ children }) {
   const { user, profile, loading } = useAuth();
 
   if (loading) {
     return (
-      <div style={{
-        fontFamily: "'Space Mono', monospace",
-        background: "#0A0A0A",
-        color: "#5C5C5C",
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 12,
-        letterSpacing: 1,
-      }}>
+      <div className="page-loading">
+        <span className="page-loading__spinner" />
         Loading...
       </div>
     );

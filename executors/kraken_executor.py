@@ -8,6 +8,7 @@ from datetime import datetime
 
 from api.kraken_api import add_market_order, add_market_order_by_quote, is_configured
 from core.config import AI_COST_PER_TRADE, ENABLE_KRAKEN, ROUND_TRIP_FEE
+from core.key_resolution import resolve_exchange_keys
 from core.database import db_save_trade
 from learning.trade_memory import record_trade_memory, run_learning_cycle
 from utils.notifications import send_notification
@@ -25,17 +26,23 @@ async def execute_kraken(
     decision: dict,
 ):
     """Place spot market order on Kraken and track position."""
-    if not ENABLE_KRAKEN or not is_configured():
+    keys = resolve_exchange_keys(
+        getattr(bot, "active_user_id", None),
+        getattr(bot, "active_user_email", None),
+        "kraken",
+    )
+    if not ENABLE_KRAKEN or (not keys and not is_configured()):
         bot.add_log("⚠ Kraken disabled or not configured — falling back to paper", "warning")
         _set_paper_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision)
         await bot.broadcast_trade_update()
         return
 
+    api_key, api_secret = keys or (None, None)
     try:
         if action == "buy":
-            txid = await add_market_order_by_quote(symbol, "buy", usd_sz)
+            txid = await add_market_order_by_quote(symbol, "buy", usd_sz, api_key, api_secret)
         else:
-            txid = await add_market_order(symbol, "sell", coin_sz)
+            txid = await add_market_order(symbol, "sell", coin_sz, api_key, api_secret)
 
         if not txid:
             bot.add_log(
@@ -62,12 +69,18 @@ async def close_kraken(bot, pos: dict, reason: str = "⚡ KRAKEN CLOSE"):
     pos_symbol = pos.get("symbol", "BTC")
     coin_size = pos.get("coin_size", pos.get("btc_size", 0))
     current_price = bot.price_for(pos_symbol)
+    keys = resolve_exchange_keys(
+        getattr(bot, "active_user_id", None),
+        getattr(bot, "active_user_email", None),
+        "kraken",
+    )
+    api_key, api_secret = (keys or (None, None))
 
     try:
         if pos["side"] == "buy":
-            txid = await add_market_order(pos_symbol, "sell", coin_size)
+            txid = await add_market_order(pos_symbol, "sell", coin_size, api_key, api_secret)
         else:
-            txid = await add_market_order(pos_symbol, "buy", coin_size)
+            txid = await add_market_order(pos_symbol, "buy", coin_size, api_key, api_secret)
 
         if not txid:
             bot.add_log(f"⚠ Kraken close order failed [{pos_symbol}] — marking as closed", "error")

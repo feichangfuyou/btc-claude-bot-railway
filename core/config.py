@@ -9,6 +9,10 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+# Multi-key pool for 10k scale: ANTHROPIC_API_KEYS=key1,key2,key3 (comma-separated)
+# Each key: 120 calls/hour. 10 keys = 1,200/hour. Falls back to ANTHROPIC_API_KEY if unset.
+_KEYS_RAW = os.getenv("ANTHROPIC_API_KEYS", "").strip()
+ANTHROPIC_API_KEYS = [k.strip() for k in _KEYS_RAW.split(",") if k.strip()] if _KEYS_RAW else ([ANTHROPIC_API_KEY] if ANTHROPIC_API_KEY else [])
 COINBASE_API_KEY = os.getenv("COINBASE_API_KEY", "")
 COINBASE_API_SECRET = os.getenv("COINBASE_API_SECRET", "")
 PAPER_TRADING = os.getenv("PAPER_TRADING", "true").lower() == "true"
@@ -115,6 +119,11 @@ PERP_PRODUCT_IDS = {
 
 COINBASE_REST_TICKER = "https://api.exchange.coinbase.com/products"
 
+# ─── Dev key fallback ────────────────────────────────────────────────────────
+# When this email logs in, use .env exchange keys instead of user_exchanges.
+# Lets the dev use personal keys without storing them in Supabase.
+DEV_USER_EMAIL = (os.getenv("DEV_USER_EMAIL") or "").strip()
+
 # ─── Kraken (spot CEX) ───────────────────────────────────────────────────────
 ENABLE_KRAKEN = os.getenv("ENABLE_KRAKEN", "false").lower() == "true"
 KRAKEN_API_KEY = os.getenv("KRAKEN_API_KEY", "")
@@ -139,6 +148,24 @@ KRAKEN_PAIRS = {
     "PEPE": "PEPEUSD",
     "SHIB": "SHIBUSD",
 }
+
+# ─── Binance (spot CEX) ─────────────────────────────────────────────────────
+ENABLE_BINANCE = os.getenv("ENABLE_BINANCE", "false").lower() == "true"
+BINANCE_API_KEY = os.getenv("BINANCE_API_KEY", "")
+BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "")
+
+# ─── 10k scale: always on (set SCALE_10K=false to disable) ───────────────────
+SCALE_10K = os.getenv("SCALE_10K", "true").lower() == "true"
+_10K_DEFAULT = "true" if SCALE_10K else "false"
+
+# ─── 10k scale: Celery AI queue (when True, enqueue AI to Celery worker) ───
+USE_CELERY_AI = os.getenv("USE_CELERY_AI", _10K_DEFAULT).lower() == "true"
+
+# ─── 10k scale: Postgres storage (when True, use Supabase app_* tables instead of SQLite) ───
+USE_SUPABASE_STORAGE = os.getenv("USE_SUPABASE_STORAGE", _10K_DEFAULT).lower() == "true"
+
+# ─── 10k scale: Redis connection pool (default 50; tune if Redis latency under load) ───
+REDIS_MAX_CONNECTIONS = int(os.getenv("REDIS_MAX_CONNECTIONS", "50"))
 
 # ─── Speed: fail fast, no hanging (crypto waits for no one) ─────────────────
 PRICE_FETCH_TIMEOUT = float(os.getenv("PRICE_FETCH_TIMEOUT", "4"))  # sec — price APIs

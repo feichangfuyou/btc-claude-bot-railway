@@ -2,14 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { supabase } from "../supabaseClient.js";
-
-const GOLD = "#D4AF37";
-const DARK = "#0A0A0A";
-const CARD = "#111111";
-const BORDER = "#1A1A1A";
-const MUTED = "#5C5C5C";
-const GREEN = "#27AE60";
-const RED = "#C0392B";
+import { colors, typography } from "../theme.js";
 
 export default function History() {
   const { user } = useAuth();
@@ -65,13 +58,13 @@ export default function History() {
           </div>
           <div style={styles.statCard}>
             <div style={styles.statLabel}>Win Rate</div>
-            <div style={{ ...styles.statValue, color: stats.wins / Math.max(stats.total, 1) >= 0.5 ? GREEN : RED }}>
+            <div style={{ ...styles.statValue, color: stats.wins / Math.max(stats.total, 1) >= 0.5 ? colors.success : colors.error }}>
               {stats.total > 0 ? ((stats.wins / stats.total) * 100).toFixed(1) : 0}%
             </div>
           </div>
           <div style={styles.statCard}>
             <div style={styles.statLabel}>Total P&L</div>
-            <div style={{ ...styles.statValue, color: stats.totalPnl >= 0 ? GREEN : RED }}>
+            <div style={{ ...styles.statValue, color: stats.totalPnl >= 0 ? colors.success : colors.error }}>
               {stats.totalPnl >= 0 ? "+" : ""}${stats.totalPnl.toFixed(2)}
             </div>
           </div>
@@ -98,9 +91,9 @@ export default function History() {
         {/* Trade Table */}
         <div style={styles.tableContainer}>
           {loading ? (
-            <div style={{ textAlign: "center", padding: 40, color: MUTED, fontSize: 12 }}>Loading trades...</div>
+            <div style={{ textAlign: "center", padding: 40, color: colors.muted, fontSize: 12 }}>Loading trades...</div>
           ) : trades.length === 0 ? (
-            <div style={{ textAlign: "center", padding: 40, color: MUTED, fontSize: 12 }}>No trades yet. Start the bot to begin trading.</div>
+            <div style={{ textAlign: "center", padding: 40, color: colors.muted, fontSize: 12 }}>No trades yet. Start the bot to begin trading.</div>
           ) : (
             <table style={styles.table}>
               <thead>
@@ -120,15 +113,15 @@ export default function History() {
                   <tr key={t.id} style={styles.tr}>
                     <td style={styles.td}>{new Date(t.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
                     <td style={{ ...styles.td, fontWeight: 600 }}>{t.symbol}</td>
-                    <td style={{ ...styles.td, color: t.side === "buy" ? GREEN : RED }}>{t.side?.toUpperCase()}</td>
+                    <td style={{ ...styles.td, color: t.side === "buy" ? colors.success : colors.error }}>{t.side?.toUpperCase()}</td>
                     <td style={styles.td}>${Number(t.entry).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td style={styles.td}>${Number(t.exit_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td style={styles.td}>${Number(t.usd_size).toFixed(2)}</td>
-                    <td style={{ ...styles.td, color: (t.pnl || 0) >= 0 ? GREEN : RED, fontWeight: 600 }}>
+                    <td style={{ ...styles.td, color: (t.pnl || 0) >= 0 ? colors.success : colors.error, fontWeight: 600 }}>
                       {(t.pnl || 0) >= 0 ? "+" : ""}${Number(t.pnl || 0).toFixed(2)}
                     </td>
                     <td style={styles.td}>
-                      <span style={{ color: t.win ? GREEN : RED, fontWeight: 600 }}>
+                      <span style={{ color: t.win ? colors.success : colors.error, fontWeight: 600 }}>
                         {t.win ? "WIN" : "LOSS"}
                       </span>
                     </td>
@@ -146,9 +139,9 @@ export default function History() {
 
 const styles = {
   container: {
-    fontFamily: "'Space Mono', monospace",
-    background: DARK,
-    color: "#D4D4D4",
+    fontFamily: typography.fontMono,
+    background: colors.dark,
+    color: colors.text,
     minHeight: "100dvh",
     padding: "20px 16px",
     paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
@@ -156,11 +149,11 @@ const styles = {
   page: { maxWidth: 900, margin: "0 auto" },
   header: { display: "flex", alignItems: "center", gap: 16, marginBottom: 24 },
   title: {
-    fontFamily: "'Bebas Neue', sans-serif",
+    fontFamily: typography.fontDisplay,
     fontSize: 28,
     fontWeight: 400,
     letterSpacing: 4,
-    color: GOLD,
+    color: colors.gold,
     margin: 0,
   },
   backBtn: {
@@ -172,7 +165,7 @@ const styles = {
     WebkitBackdropFilter: "blur(8px)",
     border: "1px solid rgba(255,255,255,0.06)",
     borderRadius: 8,
-    color: MUTED,
+    color: colors.muted,
     cursor: "pointer",
     transition: "all 0.2s ease",
   },
@@ -188,7 +181,7 @@ const styles = {
     boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
     transition: "border-color 0.3s ease, box-shadow 0.3s ease",
   },
-  statLabel: { fontSize: 10, color: MUTED, letterSpacing: 1, marginBottom: 4 },
+  statLabel: { fontSize: 10, color: colors.muted, letterSpacing: 1, marginBottom: 4 },
   statValue: { fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 2 },
   filterRow: { display: "flex", gap: 8, marginBottom: 16 },
   filterSelect: {
@@ -216,7 +209,7 @@ const styles = {
   th: {
     textAlign: "left",
     padding: "10px 12px",
-    color: MUTED,
+    color: colors.muted,
     fontSize: 10,
     letterSpacing: 1,
     borderBottom: "1px solid rgba(255,255,255,0.04)",

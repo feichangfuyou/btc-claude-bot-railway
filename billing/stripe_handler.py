@@ -104,13 +104,16 @@ def handle_webhook(payload: bytes, signature: str) -> dict:
         user_id = metadata.get("user_id")
         tier = metadata.get("tier")
         if user_id and tier:
-            _activate_subscription(user_id, tier, data.get("subscription"))
+            # Store customer ID for subscription.updated/deleted lookups
+            _activate_subscription(user_id, tier, data.get("customer"))
             return {"event": "activated", "user_id": user_id, "tier": tier}
 
     elif event_type == "customer.subscription.updated":
+        _handle_subscription_updated(data)
         return {"event": "updated", "subscription_id": data.get("id")}
 
     elif event_type == "customer.subscription.deleted":
+        _handle_subscription_deleted(data)
         return {"event": "cancelled", "subscription_id": data.get("id")}
 
     elif event_type == "invoice.payment_failed":
@@ -119,19 +122,80 @@ def handle_webhook(payload: bytes, signature: str) -> dict:
     return {"event": event_type, "handled": False}
 
 
-def _activate_subscription(user_id: str, tier: str, stripe_subscription_id: str = None):
-    """Update the user's subscription in Supabase."""
+def _tier_from_price_id(price_id: str) -> str:
+    """Map Stripe price ID to tier name."""
+    if not price_id:
+        return "starter"
+    rev = {v: k for k, v in TIER_PRICES.items() if v}
+    return rev.get(price_id, "starter")
+
+
+def _handle_subscription_updated(data: dict) -> None:
+    """Update profile when subscription changes (upgrade/downgrade)."""
     try:
         from core.supabase_client import get_supabase
+        from core.user_config import invalidate_user_config_cache
+
+        sb = get_supabase()
+        customer_id = data.get("customer")
+        status = data.get("status", "")
+        price_id = None
+        items_obj = data.get("items") or {}
+        item_list = items_obj.get("data", []) if isinstance(items_obj, dict) else []
+        if item_list:
+            price = item_list[0].get("price") or {}
+            price_id = price.get("id") if isinstance(price, dict) else None
+        tier = _tier_from_price_id(price_id)
+        # Find user by stripe_customer_id
+        if customer_id:
+            r = sb.table("profiles").select("id").eq("stripe_customer_id", customer_id).execute()
+            if r.data and len(r.data) > 0:
+                user_id = r.data[0]["id"]
+                sb.table("profiles").update(
+                    {"subscription_tier": tier, "subscription_status": status or "active"}
+                ).eq("id", user_id).execute()
+                invalidate_user_config_cache(user_id)
+                logger.info(f"Updated subscription for user {user_id[:8]} -> {tier}")
+    except Exception as e:
+        logger.error(f"Failed to handle subscription.updated: {e}")
+
+
+def _handle_subscription_deleted(data: dict) -> None:
+    """Downgrade profile when subscription is cancelled."""
+    try:
+        from core.supabase_client import get_supabase
+        from core.user_config import invalidate_user_config_cache
+
+        sb = get_supabase()
+        customer_id = data.get("customer")
+        if customer_id:
+            r = sb.table("profiles").select("id").eq("stripe_customer_id", customer_id).execute()
+            if r.data and len(r.data) > 0:
+                user_id = r.data[0]["id"]
+                sb.table("profiles").update(
+                    {"subscription_tier": "starter", "subscription_status": "cancelled"}
+                ).eq("id", user_id).execute()
+                invalidate_user_config_cache(user_id)
+                logger.info(f"Cancelled subscription for user {user_id[:8]}")
+    except Exception as e:
+        logger.error(f"Failed to handle subscription.deleted: {e}")
+
+
+def _activate_subscription(user_id: str, tier: str, stripe_customer_id: str = None):
+    """Update the user's subscription in Supabase. Stores customer ID for webhook lookups."""
+    try:
+        from core.supabase_client import get_supabase
+        from core.user_config import invalidate_user_config_cache
 
         sb = get_supabase()
         sb.table("profiles").update(
             {
                 "subscription_tier": tier,
                 "subscription_status": "active",
-                "stripe_customer_id": stripe_subscription_id,
+                "stripe_customer_id": stripe_customer_id,
             }
         ).eq("id", user_id).execute()
+        invalidate_user_config_cache(user_id)
         logger.info(f"Activated {tier} subscription for user {user_id[:8]}")
     except Exception as e:
         logger.error(f"Failed to activate subscription: {e}")

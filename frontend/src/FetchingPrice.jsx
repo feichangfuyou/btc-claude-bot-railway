@@ -4,6 +4,7 @@
  */
 import { useEffect, useRef } from "react";
 import { animate } from "animejs";
+import { colors } from "./theme.js";
 
 const DOTS = ["Warming up.", "Warming up..", "Warming up..."];
 
@@ -44,7 +45,7 @@ export default function FetchingPrice({ style = {} }) {
       style={{
         fontFamily: "'Bebas Neue', sans-serif",
         fontSize: "24px",
-        color: "#D4AF3766",
+        color: `${colors.gold}66`,
         letterSpacing: "3px",
         transformOrigin: "center",
         ...style,

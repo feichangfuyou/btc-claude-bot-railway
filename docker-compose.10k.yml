@@ -1,0 +1,12 @@
+# 10k+ scale override — run: docker compose -f docker-compose.yml -f docker-compose.10k.yml up -d
+# Sets SCALE_10K=true so USE_CELERY_AI and USE_SUPABASE_STORAGE default on.
+# 5 replicas for 10k; scale up: docker compose -f docker-compose.yml -f docker-compose.10k.yml up -d --scale claudebot=10
+# Still need .env: REDIS_URL, ANTHROPIC_API_KEYS, BOT_API_SECRET, DATABASE_URL, etc.
+
+services:
+  claudebot:
+    environment:
+      - SCALE_10K=true
+      - REDIS_URL=redis://redis:6379
+    deploy:
+      replicas: 5

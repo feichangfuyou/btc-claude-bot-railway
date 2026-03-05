@@ -7,6 +7,8 @@ import json
 import logging
 import os
 import sqlite3
+import threading
+from collections import deque
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
@@ -78,14 +80,61 @@ def _cleanup_old_backups(keep: int = 10):
             pass
 
 
+_POOL_MAX = 5
+_local = threading.local()
+
+
+def _get_pool() -> deque:
+    if not hasattr(_local, "pool"):
+        _local.pool = deque(maxlen=_POOL_MAX)
+    return _local.pool
+
+
+class _PooledConnection:
+    """Wraps sqlite3.Connection; close() returns to thread-local pool instead of closing."""
+
+    __slots__ = ("_conn", "_pool")
+
+    def __init__(self, conn, pool: deque):
+        self._conn = conn
+        self._pool = pool
+
+    def close(self):
+        try:
+            self._conn.rollback()
+        except Exception:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            return
+        if len(self._pool) < _POOL_MAX:
+            self._pool.append(self._conn)
+            return
+        try:
+            self._conn.close()
+        except Exception:
+            pass
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Return a connection from thread-local pool or create new. SQLite connections are thread-bound."""
+    pool = _get_pool()
+    if len(pool) > 0:
+        raw = pool.popleft()
+    else:
+        raw = sqlite3.connect(DB_PATH)
+        raw.execute("PRAGMA journal_mode=WAL")
+        raw.row_factory = sqlite3.Row
+    return _PooledConnection(raw, pool)
 
 
 def init_db():
+    if _use_postgres_storage():
+        return  # Postgres app_* tables created via migration
     conn = get_conn()
     try:
         c = conn.cursor()
@@ -1307,3 +1356,58 @@ def db_cleanup_old_audit_entries(retention_days: int = 365):
         file_log(f"Audit cleanup error: {e}", "error")
     finally:
         conn.close()
+
+
+# ─── 10k scale: Postgres router ─────────────────────────────────────────────
+# When USE_SUPABASE_STORAGE=true and DATABASE_URL/SUPABASE_DB_PASSWORD set, use app_* tables
+def _use_postgres_storage() -> bool:
+    try:
+        from core.config import USE_SUPABASE_STORAGE
+        if not USE_SUPABASE_STORAGE:
+            return False
+        from core.database_postgres import _pg_available
+        return _pg_available()
+    except Exception:
+        return False
+
+
+if _use_postgres_storage():
+    from core.database_postgres import (
+        db_save_trade,
+        db_load_trades,
+        db_save_state,
+        db_load_state,
+        db_save_account_snapshot,
+        db_load_all_trades,
+        db_save_trade_context,
+        db_save_pattern_outcomes,
+        db_update_strategy_stats,
+        db_save_market_snapshot,
+        db_update_session_stats,
+        db_save_learned_rule,
+        db_get_pattern_stats,
+        db_get_strategy_stats,
+        db_get_regime_performance,
+        db_get_hourly_performance,
+        db_get_coin_regime_matrix,
+        db_get_confidence_analysis,
+        db_get_confluence_analysis,
+        db_get_dow_performance,
+        db_get_fear_greed_performance,
+        db_get_hold_duration_analysis,
+        db_get_rr_analysis,
+        db_get_trades_for_vol_analysis,
+        db_get_recent_trade_contexts,
+        db_get_active_rules,
+        db_get_total_trade_count,
+        db_get_confidence_calibration,
+        db_get_equity_curve,
+        db_get_recent_wins,
+        db_get_recent_losses,
+        db_get_session_history,
+        db_save_audit_entry,
+        db_get_audit_log,
+        db_get_audit_by_hash,
+        db_cleanup_old_audit_entries,
+        db_save_log,
+    )

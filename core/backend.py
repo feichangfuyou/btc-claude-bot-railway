@@ -11,8 +11,13 @@ import asyncio
 import json
 import os
 import signal
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from functools import partial
 from pathlib import Path
+from typing import Optional
 
 import httpx
 from fastapi import Body, Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
@@ -23,12 +28,15 @@ from fastapi.staticfiles import StaticFiles
 from ai.claude_ai import call_claude, get_cost_tracker
 from api.agentkit_provider import agentkit
 from api.exchange_validate import validate_exchange_keys
-from billing.stripe_handler import create_checkout_session, handle_webhook
-from core.auth import AuthenticatedUser, get_current_user
+from billing.stripe_handler import create_checkout_session, get_max_exchanges, handle_webhook
+from core.auth import AuthenticatedUser, get_current_user, get_optional_user, get_user_from_token, verify_token
+from core.bot_manager import bot_manager
 from core.bot_state import BotState
+from core.ai_state_builder import build_ai_state
 from core.config import (
     ACTIVE_COINS,
     ANTHROPIC_API_KEY,
+    USE_CELERY_AI,
     API_PROXY_TIMEOUT,
     API_SECRET,
     CLAUDE_INTERVAL,
@@ -71,6 +79,29 @@ from core.database import (
     file_log,
     init_db,
 )
+from core.redis_client import (
+    ai_pending_check_and_increment,
+    cache_get,
+    cache_set,
+    is_redis_available,
+    publish,
+    rate_limit_check,
+    start_subscriber_thread,
+)
+
+# Celery AI: pending task_id -> Future for async result delivery
+_pending_ai_tasks: dict[str, asyncio.Future] = {}
+# WebSocket per-user routing (10k scale): ws -> user_id for user-specific broadcasts
+_ws_to_user: dict = {}
+# Reverse map for O(1) user-specific broadcast: user_id -> set of WebSockets
+_user_to_ws: dict[str, set] = {}
+# Dedicated executor for I/O-bound work (tickers, Stripe, external APIs) — avoids saturating default pool
+_io_executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="claudebot_io")
+from core.user_database import (
+    udb_get_equity_curve,
+    udb_load_all_trades,
+    udb_load_trades,
+)
 from core.user_config import (
     complete_onboarding,
     load_user_config,
@@ -99,12 +130,18 @@ FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 
 # ─── Broadcast helpers ───────────────────────────────────────────────────────
-async def broadcast(data: dict):
+async def broadcast(data: dict, user_id: str | None = None):
+    """Broadcast to all connected clients. If user_id set, only to that user's WS (O(1) via _user_to_ws)."""
     if not bot.clients:
         return
     dead = set()
     msg = json.dumps(data, default=str)
-    for ws in list(bot.clients):
+    targets = (
+        list(_user_to_ws.get(user_id, set()))
+        if user_id
+        else list(bot.clients)
+    )
+    for ws in targets:
         try:
             await ws.send_text(msg)
         except Exception:
@@ -121,24 +158,26 @@ async def broadcast_price(symbol: str = None):
     else:
         coins_data = {sym: cs.snapshot() for sym, cs in bot.coins.items()}
     btc = bot.coins.get("BTC")
-    await broadcast(
-        {
-            "type": "price_update",
-            "price": bot.price,
-            "price_change24h": bot.price_change24h,
-            "history": btc.price_history if btc else [],
-            "candles": (btc.candles if btc else [])[-5:],
-            "indicators": btc.indicators if btc else {},
-            "market_condition": btc.market_cond if btc else "ranging",
-            "coins": coins_data,
-            "open_position": bot.open_position,
-            "open_positions": bot.open_positions,
-            "account": bot.account,
-            "agentkit": agentkit.status_snapshot(),
-            "coinbase_connected": bot.coinbase_connected,
-            "kraken_enabled": getattr(bot, "kraken_enabled", False),
-        }
-    )
+    payload = {
+        "type": "price_update",
+        "price": bot.price,
+        "price_change24h": bot.price_change24h,
+        "history": btc.price_history if btc else [],
+        "candles": (btc.candles if btc else [])[-5:],
+        "indicators": btc.indicators if btc else {},
+        "market_condition": btc.market_cond if btc else "ranging",
+        "coins": coins_data,
+        "open_position": bot.open_position,
+        "open_positions": bot.open_positions,
+        "account": bot.account,
+        "agentkit": agentkit.status_snapshot(),
+        "coinbase_connected": bot.coinbase_connected,
+        "kraken_enabled": getattr(bot, "kraken_enabled", False),
+    }
+    await broadcast(payload)
+    # Redis pub/sub: other instances subscribe and broadcast to their local clients
+    if is_redis_available():
+        publish("price:update", payload)
 
 
 bot.set_broadcast(broadcast)
@@ -166,6 +205,43 @@ async def _safe_claude_call(skip_scout: bool = False):
         await call_claude(bot, broadcast_price, skip_scout=skip_scout)
     except Exception as e:
         bot.add_log(f"Claude call crashed: {str(e)[:80]}", "error")
+
+
+async def _celery_ask_claude(skip_scout: bool = False):
+    """Celery path for Ask Claude — enqueue to worker, apply result when received."""
+    import uuid
+    from workers.ai_tasks import run_ai_analysis
+
+    if bot.claude_thinking:
+        return
+    user_id = getattr(bot, "active_user_id", None) or "default"
+    if not ai_pending_check_and_increment(user_id):
+        bot.add_log("Please wait — analysis in progress (max 2 at a time)", "warning")
+        return
+    task_id = str(uuid.uuid4())
+    state = build_ai_state(bot)
+    cache_set(f"ai:state:{task_id}", state, ttl_sec=AI_STATE_TTL)
+    bot.claude_thinking = True
+    bot._last_claude_ts = time.time()
+    bot.last_claude_call = time.strftime("%H:%M:%S")
+    await broadcast({"type": "claude_thinking", "claude_thinking": True, "last_claude_call": bot.last_claude_call})
+
+    fut = asyncio.get_running_loop().create_future()
+    _pending_ai_tasks[task_id] = fut
+    run_ai_analysis.delay(task_id, skip_scout=skip_scout)
+
+    try:
+        data = await asyncio.wait_for(fut, timeout=120.0)
+        _apply_celery_decision(data)
+    except asyncio.TimeoutError:
+        _pending_ai_tasks.pop(task_id, None)
+        bot.add_log("AI analysis timed out", "warning")
+    except Exception as e:
+        _pending_ai_tasks.pop(task_id, None)
+        bot.add_log(f"Celery AI error: {str(e)[:60]}", "error")
+    finally:
+        bot.claude_thinking = False
+        await broadcast({"type": "claude_thinking", "claude_thinking": False})
 
 
 def _adaptive_interval() -> int:
@@ -223,19 +299,21 @@ async def bot_cycle():
 
 
 async def snapshot_cycle():
+    loop = asyncio.get_event_loop()
     while True:
         try:
             await asyncio.sleep(3600)
-            db_save_account_snapshot(bot.account)
+            await loop.run_in_executor(None, lambda: db_save_account_snapshot(bot.account))
         except Exception as e:
             bot.add_log(f"Snapshot cycle error: {str(e)[:60]}", "error")
             await asyncio.sleep(60)
 
 
 async def learning_cycle():
+    loop = asyncio.get_event_loop()
     await asyncio.sleep(30)
     try:
-        run_learning_cycle()
+        await loop.run_in_executor(None, run_learning_cycle)
         rules_count = len(db_get_active_rules())
         if rules_count:
             bot.add_log(f"🧠 Memory initialized — {rules_count} learned rules active", "info")
@@ -244,19 +322,20 @@ async def learning_cycle():
     while True:
         try:
             await asyncio.sleep(1800)
-            run_learning_cycle()
+            await loop.run_in_executor(None, run_learning_cycle)
         except Exception:
             pass
 
 
 async def backup_cycle():
     """Backup database every 6 hours."""
+    loop = asyncio.get_event_loop()
     await asyncio.sleep(60)
-    backup_database()
+    await loop.run_in_executor(None, backup_database)
     while True:
         await asyncio.sleep(6 * 3600)
         try:
-            backup_database()
+            await loop.run_in_executor(None, backup_database)
         except Exception as e:
             file_log(f"Backup cycle error: {e}", "error")
 
@@ -328,14 +407,37 @@ async def status_heartbeat():
 # ─── Lifespan ────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 10k scale: Sentry APM when SENTRY_DSN set
+    _sentry_dsn = os.getenv("SENTRY_DSN", "").strip()
+    if _sentry_dsn:
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+            sentry_sdk.init(
+                dsn=_sentry_dsn,
+                integrations=[FastApiIntegration()],
+                traces_sample_rate=0.1,
+                profiles_sample_rate=0.1,
+                environment=os.getenv("RAILWAY_ENVIRONMENT", "development"),
+            )
+            bot.add_log("  Sentry: ✅ APM enabled", "info")
+        except Exception:
+            pass
+
+    # Clear presets cache on startup so deploy picks up preset changes immediately
+    global _PRESETS_CACHE
+    _PRESETS_CACHE = None
+
     bot.add_log(
         f"🚀 ClaudeBot v7 starting... ({len(ACTIVE_COINS)} coins: {', '.join(ACTIVE_COINS)})",
         "info",
     )
-    bot.add_log(
-        f"  Claude:   {'✅ ready' if ANTHROPIC_API_KEY else '❌ no key in .env'}",
-        "info",
-    )
+    from core.anthropic_keys import pool_size
+
+    _key_count = pool_size()
+    _claude_status = f"✅ ready ({_key_count} key{'s' if _key_count > 1 else ''})" if _key_count else "❌ no key in .env"
+    bot.add_log(f"  Claude:   {_claude_status}", "info")
 
     if COINBASE_API_KEY and COINBASE_API_SECRET:
         bot.add_log("  Coinbase: ✅ authenticated WS", "info")
@@ -442,6 +544,35 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(coinbase_ws_loop(bot, broadcast, broadcast_price))
     asyncio.create_task(stats_refresh_cycle(bot, broadcast_price))
     asyncio.create_task(bot_cycle())
+
+    # Redis pub/sub: receive price updates from other instances, broadcast to local clients
+    if is_redis_available():
+        _loop = asyncio.get_running_loop()
+
+        def _on_redis_price(msg: dict):
+            asyncio.run_coroutine_threadsafe(broadcast(msg), _loop)
+
+        start_subscriber_thread("price:update", _on_redis_price)
+
+        # Celery AI: receive results from worker, complete pending futures
+        if USE_CELERY_AI:
+            def _on_ai_result(data: dict):
+                task_id = data.get("task_id")
+                if task_id and task_id in _pending_ai_tasks:
+                    fut = _pending_ai_tasks.pop(task_id, None)
+                    if fut and not fut.done():
+                        _loop.call_soon_threadsafe(fut.set_result, data)
+
+            start_subscriber_thread("ai:result", _on_ai_result)
+
+        # 10k scale: user state from other instances → push to this instance's WS clients
+        def _on_user_state(msg: dict):
+            uid = msg.get("user_id")
+            if uid:
+                payload = {"type": "user_state", "user_id": uid, **msg}
+                asyncio.run_coroutine_threadsafe(broadcast(payload, user_id=uid), _loop)
+
+        start_subscriber_thread("user_state", _on_user_state)
     asyncio.create_task(fear_greed_cycle(bot, broadcast))
     asyncio.create_task(snapshot_cycle())
     asyncio.create_task(learning_cycle())
@@ -461,6 +592,7 @@ async def lifespan(app: FastAPI):
     finally:
         bot.add_log("🛑 Shutting down — persisting state...", "warning")
         bot.persist_all()
+        bot_manager.persist_all()
 
 
 # ─── FastAPI app ─────────────────────────────────────────────────────────────
@@ -526,13 +658,45 @@ async def mark_onboarding_complete(user: AuthenticatedUser = Depends(get_current
     return {"ok": True}
 
 
-@app.post("/api/exchange/validate")
-async def validate_exchange_api_keys(request: Request):
+# Rate limit for exchange validate: 10 req/min per user
+# Uses Redis when REDIS_URL set (distributed); else in-memory fallback
+_exchange_validate_ratelimit: dict[str, list[float]] = {}
+_exchange_validate_lock = threading.Lock()
+
+
+def _check_exchange_validate_ratelimit(user_id: str) -> bool:
+    """Return True if under limit, False if rate limited."""
+    if is_redis_available():
+        return rate_limit_check(f"exchange_validate:{user_id}", max_per_window=10, window_sec=60)
+    # In-memory fallback (single-instance)
+    now = time.time()
+    window = 60.0
+    max_per_window = 10
+    with _exchange_validate_lock:
+        if user_id not in _exchange_validate_ratelimit:
+            _exchange_validate_ratelimit[user_id] = []
+        times = _exchange_validate_ratelimit[user_id]
+        times[:] = [t for t in times if now - t < window]
+        if len(times) >= max_per_window:
+            return False
+        if not times:
+            del _exchange_validate_ratelimit[user_id]
+        _exchange_validate_ratelimit.setdefault(user_id, []).append(now)
+        return True
+
+
+@app.post("/auth/exchange/validate")
+async def validate_exchange_api_keys(
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
     """
-    Validate exchange API keys before saving. Rejects invalid/fake keys.
+    Validate exchange API keys before saving. Requires auth. Rate limited (10/min).
     Body: { "exchange": "kraken"|"binance", "api_key": "...", "api_secret": "..." }
     Returns: { "valid": true } or { "valid": false, "error": "..." }
     """
+    if not _check_exchange_validate_ratelimit(user.id):
+        return {"valid": False, "error": "Rate limit exceeded. Try again in a minute."}
     try:
         body = await request.json()
     except Exception:
@@ -561,6 +725,13 @@ async def connect_exchange(
     connection_type = body.get("connection_type", "api_key")
     if not exchange:
         return {"error": "exchange is required"}, 400
+    config = load_user_config(user.id)
+    max_exchanges = get_max_exchanges(config.subscription_tier)
+    connected = config.connected_exchanges
+    if exchange not in connected and len(connected) >= max_exchanges:
+        return {
+            "error": f"Your {config.subscription_tier} plan allows up to {max_exchanges} exchange(s). Upgrade at /billing to add more.",
+        }, 403
     save_user_exchange(
         user.id,
         exchange,
@@ -598,13 +769,18 @@ async def billing_checkout(
     """Create a Stripe Checkout session for subscription."""
     body = await request.json()
     tier = body.get("tier", "pro")
-    base_url = str(request.base_url).rstrip("/")
-    url = create_checkout_session(
-        user_id=user.id,
-        email=user.email,
-        tier=tier,
-        success_url=f"{base_url}/billing?success=true",
-        cancel_url=f"{base_url}/billing?cancelled=true",
+    base_url = (os.getenv("APP_URL") or os.getenv("STRIPE_REDIRECT_BASE") or str(request.base_url)).rstrip("/")
+    loop = asyncio.get_event_loop()
+    url = await loop.run_in_executor(
+        _io_executor,
+        partial(
+            create_checkout_session,
+            user_id=user.id,
+            email=user.email,
+            tier=tier,
+            success_url=f"{base_url}/billing?success=true",
+            cancel_url=f"{base_url}/billing?cancelled=true",
+        ),
     )
     if url:
         return {"url": url}
@@ -614,9 +790,17 @@ async def billing_checkout(
 @app.post("/billing/webhook")
 async def billing_webhook(request: Request):
     """Handle Stripe webhook events."""
+    from fastapi.responses import JSONResponse
+
     payload = await request.body()
     signature = request.headers.get("stripe-signature", "")
-    result = handle_webhook(payload, signature)
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        _io_executor,
+        partial(handle_webhook, payload, signature),
+    )
+    if isinstance(result, dict) and result.get("error"):
+        return JSONResponse(result, status_code=400)
     return result
 
 
@@ -628,8 +812,8 @@ if API_SECRET:
     class AuthMiddleware(BaseHTTPMiddleware):
         OPEN_PATHS = {
             "/health",
-            "/metrics",
             "/readiness",
+            "/metrics",
             "/api/config",
             "/",
             "/index.html",
@@ -646,6 +830,9 @@ if API_SECRET:
 
         async def dispatch(self, request: StarletteRequest, call_next):
             path = request.url.path
+            # Reject path traversal attempts (.., /./, //)
+            if ".." in path or "/./" in path or path.startswith("//"):
+                return JSONResponse({"error": "not found"}, status_code=404)
             if request.method == "OPTIONS":
                 return await call_next(request)
             if path.startswith("/assets") or path in self.OPEN_PATHS:
@@ -653,10 +840,10 @@ if API_SECRET:
             if (
                 path.startswith("/api/coinbase")
                 or path.startswith("/api/alternative")
-                or path.startswith("/api/exchange")
                 or path.startswith("/api/prices")
             ):
                 return await call_next(request)
+            # /api/exchange/* removed from open paths — requires auth
             if path == "/ws":
                 return await call_next(request)
             # Auth + billing routes use Supabase JWT or Stripe signatures
@@ -665,10 +852,13 @@ if API_SECRET:
             # SPA routes — serve index.html for React Router
             if path in ("/login", "/signup", "/onboarding", "/dashboard", "/settings", "/history", "/billing"):
                 return await call_next(request)
-            token = request.headers.get("x-bot-secret") or request.query_params.get("secret")
-            # Accept either the shared secret OR a valid Authorization header
+            token = (request.headers.get("x-bot-secret") or request.query_params.get("secret") or "").strip()
+            jwt_token = (request.query_params.get("token") or "").strip()  # For img src etc. where headers can't be sent
             auth_header = request.headers.get("authorization", "")
-            if token != API_SECRET and not auth_header.startswith("Bearer "):
+            secret_ok = token == API_SECRET
+            bearer_ok = auth_header.startswith("Bearer ")
+            jwt_query_ok = jwt_token and verify_token(jwt_token)
+            if not secret_ok and not bearer_ok and not jwt_query_ok:
                 resp = JSONResponse({"error": "unauthorized"}, status_code=401)
                 origin = request.headers.get("origin")
                 if origin and origin in ALLOWED_ORIGINS:
@@ -682,14 +872,31 @@ if API_SECRET:
 # ─── WebSocket endpoint ─────────────────────────────────────────────────────
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
+    user_id, user_email = None, None
     if API_SECRET:
-        secret = ws.query_params.get("secret", "")
-        if secret != API_SECRET:
+        secret = (ws.query_params.get("secret") or "").strip()
+        token = (ws.query_params.get("token") or "").strip()
+        if secret == API_SECRET:
+            pass  # OK — shared secret (dev local mode)
+        elif token and verify_token(token):
+            user_info = get_user_from_token(token)
+            if user_info:
+                user_id, user_email = user_info
+        else:
             await ws.close(code=4001, reason="unauthorized")
             return
 
     await ws.accept()
     bot.clients.add(ws)
+    if user_id is not None:
+        bot.active_user_id = user_id
+        bot.active_user_email = user_email or ""
+        _ws_to_user[ws] = user_id
+        _user_to_ws.setdefault(user_id, set()).add(ws)
+    else:
+        # Secret-only: clear so we use DEV_USER_EMAIL fallback, not stale user
+        bot.active_user_id = None
+        bot.active_user_email = None
     bot.add_log(
         f"Dashboard connected ({len(bot.clients)} client{'s' if len(bot.clients) != 1 else ''})",
         "info",
@@ -735,6 +942,14 @@ async def ws_endpoint(ws: WebSocket):
     finally:
         ka_task.cancel()
         bot.clients.discard(ws)
+        uid = _ws_to_user.pop(ws, None)
+        if uid is not None and uid in _user_to_ws:
+            _user_to_ws[uid].discard(ws)
+            if not _user_to_ws[uid]:
+                del _user_to_ws[uid]
+        if bot.active_user_id and user_id == bot.active_user_id:
+            bot.active_user_id = None
+            bot.active_user_email = None
         bot.add_log(f"Dashboard disconnected ({len(bot.clients)} remaining)", "dim")
 
 
@@ -754,7 +969,11 @@ async def _handle_ws_command(msg: dict):
 
     elif cmd == "ask_claude":
         # direct=True (default): skip scout, full analysis when user manually asks
-        asyncio.create_task(_safe_claude_call(skip_scout=msg.get("direct", True)))
+        # When USE_CELERY_AI, REST /ask_claude handles it; WS triggers same flow via internal call
+        if USE_CELERY_AI and is_redis_available():
+            asyncio.create_task(_celery_ask_claude(skip_scout=msg.get("direct", True)))
+        else:
+            asyncio.create_task(_safe_claude_call(skip_scout=msg.get("direct", True)))
 
     elif cmd == "set_profit_goal":
         goal = msg.get("profit_goal", 0)
@@ -909,11 +1128,98 @@ async def _handle_ws_command(msg: dict):
 
 
 # ─── REST endpoints ─────────────────────────────────────────────────────────
+# Per-user AI rate limit: 6/min when authenticated (distributed via Redis when available)
+AI_ASK_LIMIT_PER_MIN = 6
+AI_STATE_TTL = 300
+
+
+def _apply_celery_decision(data: dict):
+    """Apply decision from Celery worker to bot and broadcast."""
+    dec = data.get("decision")
+    if not dec:
+        return
+    bot.claude_decision = dec
+    bot.claude_thinking = False
+    bot.execute_decision(dec)
+    cost_info = data.get("cost_tracker", {})
+    asyncio.create_task(
+        broadcast(
+            {
+                "type": "claude_decision",
+                "claude_decision": dec,
+                "last_claude_call": bot.last_claude_call,
+                "cost_tracker": cost_info,
+                "last_ai_block_reason": bot.last_ai_block_reason,
+            }
+        )
+    )
+    asyncio.create_task(broadcast_price())
+    asyncio.create_task(
+        broadcast(
+            {
+                "type": "trade_update",
+                "open_position": bot.open_position,
+                "open_positions": bot.open_positions,
+                "trades": bot.trades[:10],
+                "account": bot.account,
+            }
+        )
+    )
+
+
 @app.post("/ask_claude")
-async def ask_claude_rest(direct: bool = True):
+async def ask_claude_rest(
+    request: Request,
+    direct: bool = True,
+    user: Optional[AuthenticatedUser] = Depends(get_optional_user),
+):
     """Manual Ask Claude — always skips scout for full trade analysis."""
+    # Per-user rate limit when authenticated; fallback to IP for anonymous
+    rate_key = f"ai_ask:{user.id}" if user else f"ai_ask:ip:{request.client.host if request.client else 'unknown'}"
+    if not rate_limit_check(rate_key, max_per_window=AI_ASK_LIMIT_PER_MIN, window_sec=60):
+        return {"action": "wait", "reasoning": "Rate limit — try again in a minute"}
+
     if bot.claude_thinking:
         return {"action": "wait", "reasoning": "Claude is already thinking"}
+
+    # Celery AI path: enqueue to worker, wait for result via Redis
+    if USE_CELERY_AI and is_redis_available():
+        import uuid
+        from workers.ai_tasks import run_ai_analysis
+
+        task_id = str(uuid.uuid4())
+        state = build_ai_state(bot)
+        cache_set(f"ai:state:{task_id}", state, ttl_sec=AI_STATE_TTL)
+        bot.claude_thinking = True
+        bot._last_claude_ts = 0
+        bot.last_claude_call = time.strftime("%H:%M:%S")
+        asyncio.create_task(broadcast({"type": "claude_thinking", "claude_thinking": True, "last_claude_call": bot.last_claude_call}))
+
+        fut = asyncio.get_running_loop().create_future()
+        _pending_ai_tasks[task_id] = fut
+        run_ai_analysis.delay(task_id, skip_scout=direct)
+
+        try:
+            data = await asyncio.wait_for(fut, timeout=120.0)
+            _apply_celery_decision(data)
+            dec = data.get("decision")
+            if dec:
+                return dec
+        except asyncio.TimeoutError:
+            _pending_ai_tasks.pop(task_id, None)
+            bot.claude_thinking = False
+            asyncio.create_task(broadcast({"type": "claude_thinking", "claude_thinking": False}))
+            return {"action": "wait", "reasoning": "AI analysis timed out — try again"}
+        except Exception as e:
+            _pending_ai_tasks.pop(task_id, None)
+            bot.claude_thinking = False
+            asyncio.create_task(broadcast({"type": "claude_thinking", "claude_thinking": False}))
+            return {"action": "wait", "reasoning": str(e)[:80]}
+        finally:
+            bot.claude_thinking = False
+            asyncio.create_task(broadcast({"type": "claude_thinking", "claude_thinking": False}))
+
+    # Direct path (default)
     bot._last_claude_ts = 0
     prev = bot.claude_decision
     await call_claude(bot, broadcast_price, skip_scout=direct)
@@ -1022,18 +1328,40 @@ async def proxy_coinbase_tickers(symbols: str = "BTC,ETH,SOL,DOGE,LINK,AVAX,UNI,
     return {"coins": results}
 
 
+_EXCHANGE_TICKERS_CACHE: dict[int, tuple[float, list]] = {}
+_EXCHANGE_TICKERS_TTL = 120
+
+
+def _fetch_exchange_tickers_sync(limit: int):
+    """Sync helper for run_in_executor — avoids blocking event loop."""
+    from api.binance_api import fetch_top_tickers, fetch_top_tickers_kraken
+
+    tickers = fetch_top_tickers(limit=limit)
+    if tickers:
+        return tickers
+    return fetch_top_tickers_kraken(limit=limit)
+
+
 @app.get("/api/exchange/tickers")
 async def exchange_tickers(limit: int = 500):
     """All exchange symbols by 24h volume (up to 500). Binance first, Kraken fallback when Binance blocked."""
     limit = min(max(limit, 1), 500)
+    now = time.time()
+    # Redis cache (distributed)
+    cached = cache_get(f"exchange_tickers:{limit}", ttl_sec=_EXCHANGE_TICKERS_TTL)
+    if cached:
+        return cached
+    # In-memory fallback
+    if limit in _EXCHANGE_TICKERS_CACHE:
+        ts, data = _EXCHANGE_TICKERS_CACHE[limit]
+        if now - ts < _EXCHANGE_TICKERS_TTL and data:
+            return data
     try:
-        from api.binance_api import fetch_top_tickers, fetch_top_tickers_kraken
-
-        tickers = fetch_top_tickers(limit=limit)
+        loop = asyncio.get_event_loop()
+        tickers = await loop.run_in_executor(_io_executor, lambda: _fetch_exchange_tickers_sync(limit))
         if tickers:
-            return tickers
-        tickers = fetch_top_tickers_kraken(limit=limit)
-        if tickers:
+            cache_set(f"exchange_tickers:{limit}", tickers, ttl_sec=_EXCHANGE_TICKERS_TTL)
+            _EXCHANGE_TICKERS_CACHE[limit] = (now, tickers)
             return tickers
     except Exception:
         pass
@@ -1149,21 +1477,33 @@ _ALTERNATIVE_ALLOWED_PATHS = {"fng/", "fng", "v2/ticker/"}
 @app.get("/api/alternative/{path:path}")
 async def proxy_alternative(path: str, request: Request):
     """Proxy Alternative.me API (Fear & Greed, CORS bypass). Fast timeout."""
+    from fastapi.responses import JSONResponse
+
     normalized = path.split("?")[0].strip("/")
     if normalized not in {p.strip("/") for p in _ALTERNATIVE_ALLOWED_PATHS}:
-        from fastapi.responses import JSONResponse
-
         return JSONResponse({"error": "path not allowed"}, status_code=403)
     qs = str(request.url.query)
     url = f"https://api.alternative.me/{path}" + (f"?{qs}" if qs else "")
-    async with httpx.AsyncClient(timeout=API_PROXY_TIMEOUT) as client:
-        r = await client.get(url)
-        return r.json()
+    try:
+        async with httpx.AsyncClient(timeout=API_PROXY_TIMEOUT) as client:
+            r = await client.get(url)
+            r.raise_for_status()
+            return r.json()
+    except (httpx.HTTPError, httpx.TimeoutException) as e:
+        return JSONResponse(
+            {"error": "upstream unavailable", "detail": str(e)[:100]},
+            status_code=502,
+        )
+    except ValueError:
+        return JSONResponse(
+            {"error": "upstream returned invalid JSON"},
+            status_code=502,
+        )
 
 
 @app.get("/metrics", response_class=PlainTextResponse)
 def metrics():
-    """Prometheus-style metrics for monitoring."""
+    """Prometheus-style metrics for 10k scale monitoring."""
     from core.config import ACTIVE_COINS
 
     lines = [
@@ -1188,6 +1528,12 @@ def metrics():
         "# HELP claudebot_ws_clients Connected WebSocket clients",
         "# TYPE claudebot_ws_clients gauge",
         f"claudebot_ws_clients {len(bot.clients)}",
+        "# HELP claudebot_redis_connected 1 if Redis available (distributed mode)",
+        "# TYPE claudebot_redis_connected gauge",
+        f"claudebot_redis_connected {1 if is_redis_available() else 0}",
+        "# HELP claudebot_bot_manager_instances Per-user bot instances (10k scale)",
+        "# TYPE claudebot_bot_manager_instances gauge",
+        f"claudebot_bot_manager_instances {bot_manager.total_count()}",
     ]
     for sym in ACTIVE_COINS:
         cs = bot.coins.get(sym)
@@ -1224,11 +1570,16 @@ def health():
 
 
 @app.get("/trades")
-def get_trades():
-    wins = sum(1 for t in bot.trades if t.get("win"))
-    total = len(bot.trades)
+async def get_trades(user: Optional[AuthenticatedUser] = Depends(get_optional_user)):
+    if user:
+        instance = await bot_manager.get_or_create(user.id)
+        trades = instance.trades
+    else:
+        trades = bot.trades
+    wins = sum(1 for t in trades if t.get("win"))
+    total = len(trades)
     return {
-        "trades": bot.trades,
+        "trades": trades,
         "total": total,
         "wins": wins,
         "losses": total - wins,
@@ -1237,7 +1588,8 @@ def get_trades():
 
 
 @app.get("/trades/history")
-def get_trade_history(
+async def get_trade_history(
+    user: Optional[AuthenticatedUser] = Depends(get_optional_user),
     date_from: str = None,
     date_to: str = None,
     symbol: str = None,
@@ -1256,16 +1608,29 @@ def get_trade_history(
     elif result == "loss":
         win_only = False
 
-    trades, total = db_load_all_trades(
-        date_from=date_from,
-        date_to=date_to,
-        symbol=symbol or None,
-        side=side or None,
-        win_only=win_only,
-        product_type=product_type or None,
-        limit=min(limit, 500),
-        offset=offset,
-    )
+    if user:
+        trades, total = udb_load_all_trades(
+            user.id,
+            date_from=date_from,
+            date_to=date_to,
+            symbol=symbol or None,
+            side=side or None,
+            win_only=win_only,
+            product_type=product_type or None,
+            limit=min(limit, 500),
+            offset=offset,
+        )
+    else:
+        trades, total = db_load_all_trades(
+            date_from=date_from,
+            date_to=date_to,
+            symbol=symbol or None,
+            side=side or None,
+            win_only=win_only,
+            product_type=product_type or None,
+            limit=min(limit, 500),
+            offset=offset,
+        )
 
     pnls = [t["pnl"] for t in trades]
     wins = sum(1 for p in pnls if p > 0)
@@ -1286,7 +1651,14 @@ def get_trade_history(
 
 
 @app.get("/account")
-def get_account():
+async def get_account(user: Optional[AuthenticatedUser] = Depends(get_optional_user)):
+    if user:
+        instance = await bot_manager.get_or_create(user.id)
+        snap = instance.account_snapshot()
+        return {
+            **snap,
+            "trading_preset": instance.config.trading_preset,
+        }
     return {
         **bot.account,
         "start_balance": START_BALANCE,
@@ -1295,10 +1667,19 @@ def get_account():
     }
 
 
+_PRESETS_CACHE: tuple[float, dict] | None = None
+_PRESETS_CACHE_TTL = 300
+
 @app.get("/api/presets")
 def get_presets():
     """List all trading presets (top 100 trader strategies) with categories."""
-    return {"presets": list_presets(), "categories": list_preset_categories()}
+    global _PRESETS_CACHE
+    now = time.time()
+    if _PRESETS_CACHE and now - _PRESETS_CACHE[0] < _PRESETS_CACHE_TTL:
+        return _PRESETS_CACHE[1]
+    data = {"presets": list_presets(), "categories": list_preset_categories()}
+    _PRESETS_CACHE = (now, data)
+    return data
 
 
 @app.get("/api/preset")
@@ -1321,19 +1702,26 @@ def set_preset(body: dict = Body(default={})):
 
 
 @app.get("/stats")
-def get_stats():
-    pnls = [t["pnl"] for t in bot.trades]
+async def get_stats(user: Optional[AuthenticatedUser] = Depends(get_optional_user)):
+    if user:
+        instance = await bot_manager.get_or_create(user.id)
+        trades = instance.trades
+        account = instance.account_snapshot()
+    else:
+        trades = bot.trades
+        account = bot.account
+    pnls = [t["pnl"] for t in trades]
     wins = [p for p in pnls if p > 0]
     losses = [p for p in pnls if p < 0]
     return {
-        "total_trades": len(bot.trades),
+        "total_trades": len(trades),
         "win_rate": round(len(wins) / len(pnls) * 100, 1) if pnls else 0,
         "avg_win": round(sum(wins) / len(wins), 2) if wins else 0,
         "avg_loss": round(sum(losses) / len(losses), 2) if losses else 0,
         "best_trade": max(pnls) if pnls else 0,
         "worst_trade": min(pnls) if pnls else 0,
-        "total_pnl": bot.account["total_pnl"],
-        "balance": bot.account["balance"],
+        "total_pnl": account.get("total_pnl", 0),
+        "balance": account.get("balance", 0),
         "profit_factor": (abs(sum(wins) / sum(losses)) if losses and sum(losses) != 0 else 0),
     }
 
@@ -1402,10 +1790,16 @@ def get_calibration():
 
 
 @app.get("/equity")
-def get_equity():
+async def get_equity(user: Optional[AuthenticatedUser] = Depends(get_optional_user)):
+    if user:
+        curve = udb_get_equity_curve(user.id, limit=500)
+        sessions = []  # session history not yet migrated per-user
+    else:
+        curve = db_get_equity_curve(limit=500)
+        sessions = db_get_session_history(limit=30)
     return {
-        "curve": db_get_equity_curve(limit=500),
-        "sessions": db_get_session_history(limit=30),
+        "curve": curve,
+        "sessions": sessions,
     }
 
 
@@ -1475,6 +1869,35 @@ def get_api_config():
     }
 
 
+def _readiness_scale_10k() -> dict:
+    """10k scale readiness checks."""
+    from core.config import USE_SUPABASE_STORAGE, USE_CELERY_AI
+    pg_ok = False
+    if USE_SUPABASE_STORAGE:
+        try:
+            from core.database_postgres import _pg_available
+            pg_ok = _pg_available()
+        except Exception:
+            pass
+    pool_n = 1
+    try:
+        from core.anthropic_keys import pool_size
+        pool_n = pool_size()
+    except Exception:
+        pass
+    return {
+        "redis": is_redis_available(),
+        "celery_ai": USE_CELERY_AI,
+        "postgres_storage": pg_ok,
+        "multi_key_pool": pool_n > 1,
+        "ready": (
+            is_redis_available()
+            and (USE_CELERY_AI or pool_n >= 5)
+            and (pg_ok or not USE_SUPABASE_STORAGE)
+        ),
+    }
+
+
 @app.get("/readiness")
 def get_readiness():
     """2026 Readiness Scorecard: 0-100 with grade. Tracks all dimensions toward A+.
@@ -1492,6 +1915,8 @@ def get_readiness():
         COINBASE_API_SECRET,
         ENABLE_KRAKEN,
         TRAILING_STOP_PCT,
+        USE_CELERY_AI,
+        USE_SUPABASE_STORAGE,
     )
     from core.database import DB_PATH
 
@@ -1612,6 +2037,8 @@ def get_readiness():
             "solver_network": solver_network or "auto",
             "solver_fills": solver["filled"],
             "solver_savings": round(solver["total_slippage_saved"] + solver["total_gas_saved"], 4),
+            # 10k scale
+            "scale_10k": _readiness_scale_10k(),
         },
         "scorecard_2026": {
             "circuit_breaker": {"status": "✅ Built", "risk_if_missing": "Account Wipeout"},
@@ -1809,19 +2236,24 @@ def get_trade_screenshot_info(trade_id: int):
     return result
 
 
+# Valid screenshot timeframes (must match ai/trade_screenshots.py TIMEFRAMES_FOR_TRADE)
+_SCREENSHOT_TIMEFRAMES = frozenset({"5m", "15m", "60m"})
+
+
 @app.get("/api/trade/{trade_id}/screenshot/{phase}/{timeframe}")
 def serve_trade_screenshot(trade_id: int, phase: str, timeframe: str):
     """Serve a specific trade screenshot image (e.g. /api/trade/123/screenshot/entry/5m)."""
+    from fastapi.responses import JSONResponse
+
     from ai.trade_screenshots import SCREENSHOT_DIR
 
     if phase not in ("entry", "exit"):
-        from fastapi.responses import JSONResponse
-
         return JSONResponse({"error": "phase must be entry or exit"}, status_code=400)
-    img_path = SCREENSHOT_DIR / str(trade_id) / f"{phase}_{timeframe}.png"
-    if not img_path.exists():
-        from fastapi.responses import JSONResponse
-
+    if timeframe not in _SCREENSHOT_TIMEFRAMES:
+        return JSONResponse({"error": "timeframe must be 5m, 15m, or 60m"}, status_code=400)
+    img_path = (SCREENSHOT_DIR / str(trade_id) / f"{phase}_{timeframe}.png").resolve()
+    base_dir = SCREENSHOT_DIR.resolve()
+    if not img_path.is_relative_to(base_dir) or not img_path.exists():
         return JSONResponse({"error": "screenshot not found"}, status_code=404)
     return FileResponse(str(img_path), media_type="image/png")
 

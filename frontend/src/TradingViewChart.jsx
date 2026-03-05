@@ -1,4 +1,5 @@
 import { useEffect, useRef, memo } from "react";
+import { colors } from "./theme.js";
 
 // Coinbase symbols — same exchange as our price feed, so header price matches chart
 const SYMBOL_MAP = {
@@ -18,11 +19,20 @@ const SYMBOL_MAP = {
  * - Full format: "BINANCE:BTCUSDT", "COINBASE:ETHUSD", "KRAKEN:XBTUSD"
  * - Short format: "BTC", "ETH" → maps to COINBASE:XUSD
  */
+const VALID_SYMBOLS = new Set(Object.keys(SYMBOL_MAP));
+
+/** Sanitize symbol for TradingView. Whitelist prevents XSS via malicious symbol prop. */
 function getSymbol(symbol) {
   if (!symbol || typeof symbol !== "string") return "COINBASE:BTCUSD";
   const s = symbol.trim().toUpperCase();
-  if (s.includes(":")) return s; // Full exchange:symbol format
-  return SYMBOL_MAP[s] || `COINBASE:${s}USD`;
+  if (s.includes(":")) {
+    const [ex, sym] = s.split(":", 2);
+    if (/^[A-Z0-9]{1,20}$/.test(ex || "") && /^[A-Z0-9]{1,20}$/.test(sym || "")) {
+      return `${ex}:${sym}`;
+    }
+    return "COINBASE:BTCUSD";
+  }
+  return VALID_SYMBOLS.has(s) ? (SYMBOL_MAP[s] || `COINBASE:${s}USD`) : "COINBASE:BTCUSD";
 }
 
 function TradingViewChart({ symbol = "BTC" }) {
@@ -78,12 +88,12 @@ function TradingViewChart({ symbol = "BTC" }) {
             "paneProperties.background": "rgba(10, 10, 10, 1)",
             "paneProperties.vertGridProperties.color": "rgba(30, 30, 30, 0.3)",
             "paneProperties.horzGridProperties.color": "rgba(30, 30, 30, 0.3)",
-            "mainSeriesProperties.candleStyle.upColor": "#D4AF37",
-            "mainSeriesProperties.candleStyle.downColor": "#C0392B",
-            "mainSeriesProperties.candleStyle.borderUpColor": "#D4AF37",
-            "mainSeriesProperties.candleStyle.borderDownColor": "#C0392B",
-            "mainSeriesProperties.candleStyle.wickUpColor": "#D4AF37",
-            "mainSeriesProperties.candleStyle.wickDownColor": "#C0392B",
+            "mainSeriesProperties.candleStyle.upColor": colors.gold,
+            "mainSeriesProperties.candleStyle.downColor": colors.error,
+            "mainSeriesProperties.candleStyle.borderUpColor": colors.gold,
+            "mainSeriesProperties.candleStyle.borderDownColor": colors.error,
+            "mainSeriesProperties.candleStyle.wickUpColor": colors.gold,
+            "mainSeriesProperties.candleStyle.wickDownColor": colors.error,
           },
         });
 

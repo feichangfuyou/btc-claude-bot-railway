@@ -142,6 +142,17 @@ select {
 /* ─── Liquid Glass Design System ──────────────────────────────── */
 
 :root {
+  /* Semantic colors — use consistently */
+  --gold: #D4AF37;
+  --gold-dim: rgba(212, 175, 55, 0.5);
+  --success: #00E676;
+  --error: #FF1744;
+  --warning: #ff9900;
+  --dark: #0A0A0A;
+  --card: #111111;
+  --muted: #5C5C5C;
+  --text: #D4D4D4;
+  /* Glass system */
   --glass-bg: rgba(17, 17, 17, 0.55);
   --glass-bg-heavy: rgba(17, 17, 17, 0.72);
   --glass-bg-light: rgba(17, 17, 17, 0.35);
@@ -157,13 +168,18 @@ select {
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   --glass-shadow-elevated: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(212, 175, 55, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --glass-shadow-glow: 0 0 40px rgba(212, 175, 55, 0.08), 0 8px 32px rgba(0, 0, 0, 0.4);
-  --gold: #D4AF37;
-  --gold-dim: rgba(212, 175, 55, 0.5);
-  --dark: #0A0A0A;
-  --card: #111111;
   --surface: rgba(255, 255, 255, 0.03);
   --surface-hover: rgba(255, 255, 255, 0.06);
   --shimmer-angle: 135deg;
+}
+
+@keyframes theme-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 @keyframes glassShimmer {
@@ -308,4 +324,28 @@ select {
   background: linear-gradient(135deg, rgba(212, 175, 55, 0.04) 0%, transparent 40%, rgba(212, 175, 55, 0.02) 70%, transparent 100%);
   background-size: 200% 200%;
   animation: liquidShift 12s ease infinite;
+}
+
+/* Shared loading state */
+.page-loading {
+  font-family: 'Space Mono', monospace;
+  background: var(--dark);
+  color: var(--muted);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.page-loading__spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: theme-spin 0.6s linear infinite;
 }

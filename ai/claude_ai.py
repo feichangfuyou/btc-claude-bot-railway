@@ -22,10 +22,12 @@ from ai.adversary_agent import adversary_review
 from ai.claude_schema import validate_scout_response, validate_trade_decision
 from ai.vision_feed import ENABLE_VISION, get_vision_confirmation
 from api.agentkit_provider import agentkit
+from core.anthropic_keys import get_next_key, pool_size
 from core.config import (
     ACTIVE_COINS,
     AI_COST_PER_TRADE,
     ANTHROPIC_API_KEY,
+    ANTHROPIC_API_KEYS,
     CLAUDE_API_TIMEOUT,
     CLAUDE_COOLDOWN_SEC,
     GAS_COST_USD,
@@ -495,8 +497,9 @@ def _build_enhanced_coin_snapshot(cs, sym: str) -> dict:
 
 _claude_lock: asyncio.Lock | None = None
 _api_call_timestamps: list[float] = []
-MAX_API_CALLS_PER_MINUTE = 10
-MAX_API_CALLS_PER_HOUR = 120
+# Per-key limits: 10/min, 120/hour. Multi-key pool scales capacity.
+MAX_API_CALLS_PER_MINUTE = 10 * pool_size()
+MAX_API_CALLS_PER_HOUR = 120 * pool_size()
 
 
 ADVERSARY_COST_PER_CALL = round((2000 / 1_000_000) * 3.0 + (300 / 1_000_000) * 15.0, 5)
@@ -534,8 +537,11 @@ def _check_rate_limit() -> bool:
     return True
 
 
+
+
 async def _api_call(model: str, system: str, user_msg: str, max_tokens: int = 800) -> str:
-    """Single API call to Anthropic with multi-model fallback. Returns raw text response."""
+    """Single API call to Anthropic with multi-model fallback. Returns raw text response.
+    Retries on 429 (rate limit) with exponential backoff up to 3 times."""
     if not _check_rate_limit():
         raise Exception("Rate limit reached — too many API calls. Waiting for cooldown.")
     _api_call_timestamps.append(time.time())
@@ -544,39 +550,58 @@ async def _api_call(model: str, system: str, user_msg: str, max_tokens: int = 80
     if model_fallback.is_defensive():
         raise Exception("All AI models failed — defensive mode active. No new trades.")
 
+    api_key = get_next_key()
+    if not api_key:
+        raise Exception("No Anthropic API key configured.")
+
     timeout_sec = _api_timeout_for_model(effective_model)
-    try:
-        async with httpx.AsyncClient(timeout=timeout_sec) as client:
-            r = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": effective_model,
-                    "max_tokens": max_tokens,
-                    "system": system,
-                    "messages": [{"role": "user", "content": user_msg}],
-                },
-            )
-        data = r.json()
-        if "error" in data:
-            error_msg = data["error"].get("message", "Anthropic API error")
-            next_model = model_fallback.record_failure(effective_model, error_msg)
+    max_retries = 3
+    base_delay = 2.0
+
+    for attempt in range(max_retries + 1):
+        try:
+            async with httpx.AsyncClient(timeout=timeout_sec) as client:
+                r = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": api_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "model": effective_model,
+                        "max_tokens": max_tokens,
+                        "system": system,
+                        "messages": [{"role": "user", "content": user_msg}],
+                    },
+                )
+
+            if r.status_code == 429:
+                if attempt < max_retries:
+                    delay = base_delay * (2**attempt)
+                    retry_after = r.headers.get("retry-after")
+                    if retry_after and retry_after.isdigit():
+                        delay = min(float(retry_after), 60)
+                    await asyncio.sleep(delay)
+                    continue
+                raise Exception("Rate limit (429) — retries exhausted. Try again later.")
+
+            data = r.json()
+            if "error" in data:
+                error_msg = data["error"].get("message", "Anthropic API error")
+                next_model = model_fallback.record_failure(effective_model, error_msg)
+                if next_model and next_model != effective_model:
+                    return await _api_call(next_model, system, user_msg, max_tokens)
+                raise Exception(error_msg)
+
+            model_fallback.record_success(effective_model)
+            return "".join(b.get("text", "") for b in data.get("content", []))
+
+        except httpx.TimeoutException:
+            next_model = model_fallback.record_failure(effective_model, "timeout")
             if next_model and next_model != effective_model:
                 return await _api_call(next_model, system, user_msg, max_tokens)
-            raise Exception(error_msg)
-
-        model_fallback.record_success(effective_model)
-        return "".join(b.get("text", "") for b in data.get("content", []))
-
-    except httpx.TimeoutException:
-        next_model = model_fallback.record_failure(effective_model, "timeout")
-        if next_model and next_model != effective_model:
-            return await _api_call(next_model, system, user_msg, max_tokens)
-        raise
+            raise
 
 
 def _extract_json(raw: str) -> dict:
@@ -684,8 +709,8 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False):
     if _claude_lock is None:
         _claude_lock = asyncio.Lock()
 
-    if not ANTHROPIC_API_KEY:
-        bot.add_log("No ANTHROPIC_API_KEY in .env — Claude disabled", "warning")
+    if not ANTHROPIC_API_KEYS and not ANTHROPIC_API_KEY:
+        bot.add_log("No ANTHROPIC_API_KEY or ANTHROPIC_API_KEYS in .env — Claude disabled", "warning")
         return
     if bot.claude_thinking:
         return

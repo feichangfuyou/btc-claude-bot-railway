@@ -54,18 +54,25 @@ async def kraken_public_request(endpoint: str, params: dict = None) -> dict | No
         return None
 
 
-async def kraken_private_request(endpoint: str, data: dict = None) -> dict | None:
-    """Private Kraken API request (authenticated)."""
-    if not is_configured():
+async def kraken_private_request(
+    endpoint: str,
+    data: dict = None,
+    api_key: str = None,
+    api_secret: str = None,
+) -> dict | None:
+    """Private Kraken API request (authenticated). Uses provided keys or config."""
+    key = api_key or KRAKEN_API_KEY
+    secret = api_secret or KRAKEN_API_SECRET
+    if not key or not secret:
         return None
     urlpath = f"/0/private/{endpoint}"
     url = f"{KRAKEN_REST_URL}{urlpath}"
     data = dict(data or {})
     data["nonce"] = str(int(time.time() * 1000))
 
-    sig = _kraken_sign(urlpath, data, KRAKEN_API_SECRET)
+    sig = _kraken_sign(urlpath, data, secret)
     headers = {
-        "API-Key": KRAKEN_API_KEY,
+        "API-Key": key,
         "API-Sign": sig,
         "Content-Type": "application/x-www-form-urlencoded",
     }
@@ -128,6 +135,8 @@ async def add_market_order(
     symbol: str,
     side: str,
     volume: float,
+    api_key: str = None,
+    api_secret: str = None,
 ) -> str | None:
     """Place a market order on Kraken. Returns order txid on success."""
     pair = _kraken_pair(symbol)
@@ -139,7 +148,7 @@ async def add_market_order(
         "type": order_type,
         "volume": vol_str,
     }
-    result = await kraken_private_request("AddOrder", data)
+    result = await kraken_private_request("AddOrder", data, api_key, api_secret)
     if not result:
         return None
     txids = result.get("txid", [])
@@ -150,6 +159,8 @@ async def add_market_order_by_quote(
     symbol: str,
     side: str,
     volume_quote_usd: float,
+    api_key: str = None,
+    api_secret: str = None,
 ) -> str | None:
     """Place market order by quote (USD) amount. Kraken uses 'volume' in base.
     For buy: volume = volume_quote_usd / price. We need price first."""
@@ -158,4 +169,4 @@ async def add_market_order_by_quote(
         return None
     # Add 0.5% buffer for slippage
     volume_base = (volume_quote_usd / price) * 1.005
-    return await add_market_order(symbol, side, volume_base)
+    return await add_market_order(symbol, side, volume_base, api_key, api_secret)

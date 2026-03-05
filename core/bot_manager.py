@@ -15,6 +15,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+from core.redis_client import is_redis_available, publish
 from core.user_config import UserConfig, load_user_config
 from core.user_database import (
     udb_load_state,
@@ -24,6 +25,8 @@ from core.user_database import (
     udb_save_trade,
 )
 from executors.order_router import OrderRouter
+
+USER_STATE_CHANNEL = "user_state"
 
 logger = logging.getLogger("claudebot.manager")
 
@@ -64,28 +67,35 @@ class UserBotInstance:
             logger.warning(f"Failed to load state for user {self.user_id[:8]}: {e}")
 
     def persist_state(self):
-        """Save current state to Supabase."""
+        """Save current state to Supabase and broadcast to other instances (10k scale)."""
         try:
-            udb_save_state(
-                self.user_id,
-                "bot_state",
-                {
-                    "balance": self.balance,
-                    "daily_pnl": self.daily_pnl,
-                    "total_pnl": self.total_pnl,
-                    "open_positions": self.open_positions,
-                    "consecutive_losses": self.consecutive_losses,
-                },
-            )
+            state = {
+                "balance": self.balance,
+                "daily_pnl": self.daily_pnl,
+                "total_pnl": self.total_pnl,
+                "open_positions": self.open_positions,
+                "consecutive_losses": self.consecutive_losses,
+            }
+            udb_save_state(self.user_id, "bot_state", state)
+            if is_redis_available():
+                publish(
+                    USER_STATE_CHANNEL,
+                    {"user_id": self.user_id, "type": "state", "data": state},
+                )
         except Exception as e:
             logger.error(f"Failed to persist state for user {self.user_id[:8]}: {e}")
 
     def save_trade(self, trade: dict):
-        """Record a completed trade."""
+        """Record a completed trade and broadcast to other instances (10k scale)."""
         trade_id = udb_save_trade(self.user_id, trade)
         self.trades.insert(0, {**trade, "id": trade_id})
         if len(self.trades) > 50:
             self.trades = self.trades[:50]
+        if is_redis_available():
+            publish(
+                USER_STATE_CHANNEL,
+                {"user_id": self.user_id, "type": "trade", "data": {**trade, "id": trade_id}},
+            )
         return trade_id
 
     def save_snapshot(self):

@@ -161,14 +161,14 @@ class ExecutionAgent:
 
         if action in ("buy", "sell"):
             side = "buy" if action == "buy" else "sell"
-            result = add_market_order_by_quote(symbol, side, usd_size)
-            if result.get("error"):
-                raise Exception(f"Kraken error: {result['error']}")
+            txid = await add_market_order_by_quote(symbol, side, usd_size)
+            if not txid:
+                raise Exception("Kraken order failed")
             return {
-                "fill_price": result.get("price", 0),
-                "fill_size": result.get("vol", 0),
+                "fill_price": 0,
+                "fill_size": usd_size,
                 "fill_usd": usd_size,
-                "order_id": result.get("txid", ""),
+                "order_id": txid,
             }
 
         return {"error": f"Unsupported action: {action}"}

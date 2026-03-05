@@ -1,15 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
+import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
 import { supabase } from "../supabaseClient.js";
-
-const GOLD = "#D4AF37";
-const DARK = "#0A0A0A";
-const CARD = "#111111";
-const BORDER = "#1A1A1A";
-const MUTED = "#5C5C5C";
-const GREEN = "#27AE60";
-const RED = "#C0392B";
+import { colors, radii, typography } from "../theme.js";
 
 const EXCHANGES = [
   { id: "coinbase", name: "Coinbase", type: "oauth", desc: "OAuth — secure, no API key needed" },
@@ -123,7 +117,8 @@ const PRESETS_FALLBACK = [
 ];
 
 export default function Onboarding() {
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, accessToken } = useAuth();
+  const getAuthHeaders = useAuthHeaders();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [connected, setConnected] = useState({});
@@ -146,10 +141,10 @@ export default function Onboarding() {
   useEffect(() => {
     const base = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || "";
     const url = base ? `${base}/api/presets` : "/api/presets";
-    fetch(url).then(r => r.ok && r.json()).then(d => {
+    fetch(url, { headers: getAuthHeaders() }).then(r => r.ok && r.json()).then(d => {
       if (d?.presets?.length) setPresets(d.presets);
     }).catch(() => {});
-  }, []);
+  }, [getAuthHeaders]);
 
   function toggleCoin(c) {
     setCoins(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
@@ -169,10 +164,15 @@ export default function Onboarding() {
     setKeyError("");
     try {
       const base = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || "";
-      const url = base ? `${base}/api/exchange/validate` : "/api/exchange/validate";
-      const res = await fetch(url, {
+      const validateUrl = base ? `${base}/auth/exchange/validate` : "/auth/exchange/validate";
+      const connectUrl = base ? `${base}/auth/exchanges/connect` : "/auth/exchanges/connect";
+      const headers = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`,
+      };
+      const res = await fetch(validateUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           exchange: keyModal,
           api_key: apiKey.trim(),
@@ -185,15 +185,20 @@ export default function Onboarding() {
         setKeySaving(false);
         return;
       }
-      const { error } = await supabase.from("user_exchanges").upsert({
-        user_id: user.id,
-        exchange: keyModal,
-        connection_type: "api_key",
-        api_key_enc: apiKey.trim(),
-        api_secret_enc: apiSecret.trim(),
-        is_active: true,
-      }, { onConflict: "user_id,exchange" });
-      if (error) throw error;
+      const connectRes = await fetch(connectUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          exchange: keyModal,
+          connection_type: "api_key",
+          api_key: apiKey.trim(),
+          api_secret: apiSecret.trim(),
+        }),
+      });
+      if (!connectRes.ok) {
+        const errData = await connectRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to save exchange");
+      }
       setConnected(prev => ({ ...prev, [keyModal]: true }));
       setKeyModal(null);
       setApiKey("");
@@ -255,13 +260,13 @@ export default function Onboarding() {
                 <div key={ex.id} style={styles.exchangeRow}>
                   <div style={{ flex: 1 }}>
                     <div style={styles.exchangeName}>
-                      {connected[ex.id] && <span style={{ color: GREEN, marginRight: 6 }}>&#10003;</span>}
+                      {connected[ex.id] && <span style={{ color: colors.success, marginRight: 6 }}>&#10003;</span>}
                       {ex.name}
                     </div>
                     <div style={styles.exchangeDesc}>{ex.desc}</div>
                   </div>
                   {connected[ex.id] ? (
-                    <span style={{ color: GREEN, fontSize: 11, fontFamily: "'Space Mono', monospace" }}>Connected</span>
+                    <span style={{ color: colors.success, fontSize: 11, fontFamily: typography.fontMono }}>Connected</span>
                   ) : (
                     <button
                       style={styles.connectBtn}
@@ -407,7 +412,7 @@ export default function Onboarding() {
               </div>
               <div style={styles.summaryRow}>
                 <span style={styles.summaryLabel}>Mode</span>
-                <span style={{ color: paperMode ? GREEN : RED }}>
+                <span style={{ color: paperMode ? colors.success : colors.error }}>
                   {paperMode ? "Paper Trading" : "LIVE Trading"}
                 </span>
               </div>
@@ -447,10 +452,10 @@ export default function Onboarding() {
 
               <div style={styles.keyInfo}>
                 <div style={styles.keyInfoTitle}>Make sure your key has:</div>
-                <div style={styles.keyPerm}><span style={{ color: GREEN }}>&#10003;</span> Query Funds</div>
-                <div style={styles.keyPerm}><span style={{ color: GREEN }}>&#10003;</span> Query Orders & Trades</div>
-                <div style={styles.keyPerm}><span style={{ color: GREEN }}>&#10003;</span> Create & Modify Orders</div>
-                <div style={styles.keyPerm}><span style={{ color: RED }}>&#10007;</span> Withdraw Funds (leave OFF)</div>
+                <div style={styles.keyPerm}><span style={{ color: colors.success }}>&#10003;</span> Query Funds</div>
+                <div style={styles.keyPerm}><span style={{ color: colors.success }}>&#10003;</span> Query Orders & Trades</div>
+                <div style={styles.keyPerm}><span style={{ color: colors.success }}>&#10003;</span> Create & Modify Orders</div>
+                <div style={styles.keyPerm}><span style={{ color: colors.error }}>&#10007;</span> Withdraw Funds (leave OFF)</div>
               </div>
 
               <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
@@ -470,9 +475,9 @@ export default function Onboarding() {
 
 const styles = {
   container: {
-    fontFamily: "'Space Mono', monospace",
-    background: DARK,
-    color: "#D4D4D4",
+    fontFamily: typography.fontMono,
+    background: colors.dark,
+    color: colors.text,
     minHeight: "100dvh",
     display: "flex",
     alignItems: "center",
@@ -500,23 +505,23 @@ const styles = {
   },
   progressFill: {
     height: "100%",
-    background: GOLD,
+    background: colors.gold,
     transition: "width 0.3s ease",
     borderRadius: 2,
   },
-  stepLabel: { fontSize: 10, color: MUTED, letterSpacing: 1, marginBottom: 20 },
+  stepLabel: { fontSize: 10, color: colors.muted, letterSpacing: 1, marginBottom: 20 },
   heading: {
-    fontFamily: "'Bebas Neue', sans-serif",
+    fontFamily: typography.fontDisplay,
     fontSize: 24,
     fontWeight: 400,
     letterSpacing: 3,
-    color: GOLD,
+    color: colors.gold,
     margin: "0 0 8px",
   },
-  desc: { fontSize: 12, color: MUTED, lineHeight: 1.6, marginBottom: 20 },
+  desc: { fontSize: 12, color: colors.muted, lineHeight: 1.6, marginBottom: 20 },
   label: { fontSize: 11, color: "#888", letterSpacing: 1, display: "block", marginTop: 16, marginBottom: 8 },
   input: {
-    fontFamily: "'Space Mono', monospace",
+    fontFamily: typography.fontMono,
     fontSize: 13,
     padding: "10px 12px",
     background: "rgba(10,10,10,0.6)",
@@ -546,14 +551,14 @@ const styles = {
   exchangeName: { fontSize: 13, fontWeight: 600, color: "#D4D4D4" },
   exchangeDesc: { fontSize: 10, color: MUTED, marginTop: 2 },
   connectBtn: {
-    fontFamily: "'Oswald', sans-serif",
+    fontFamily: typography.fontButton,
     fontSize: 11,
     letterSpacing: 1,
     padding: "6px 14px",
     border: "1px solid rgba(212,175,55,0.3)",
     borderRadius: 6,
     background: "rgba(212,175,55,0.05)",
-    color: GOLD,
+    color: colors.gold,
     cursor: "pointer",
     whiteSpace: "nowrap",
     transition: "all 0.2s ease",
@@ -582,38 +587,38 @@ const styles = {
     scrollSnapAlign: "start",
     transition: "all 0.2s ease",
   },
-  presetActive: { borderColor: "rgba(212,175,55,0.4)", background: "rgba(212,175,55,0.06)" },
+  presetActive: { borderColor: `${colors.gold}66`, background: `${colors.gold}0F` },
   presetName: { fontSize: 12, fontWeight: 600 },
-  presetDesc: { fontSize: 10, color: MUTED, marginTop: 2 },
+  presetDesc: { fontSize: 10, color: colors.muted, marginTop: 2 },
   riskRow: { display: "flex", gap: 8 },
   riskBtn: {
     flex: 1,
-    fontFamily: "'Space Mono', monospace",
+    fontFamily: typography.fontMono,
     fontSize: 11,
     padding: "8px 0",
     background: "#0D0D0D",
-    border: `1px solid ${BORDER}`,
+    border: `1px solid ${colors.border}`,
     borderRadius: 4,
     color: "#D4D4D4",
     cursor: "pointer",
   },
-  riskActive: { borderColor: GOLD, color: GOLD },
+  riskActive: { borderColor: colors.gold, color: colors.gold },
   coinGrid: { display: "flex", flexWrap: "wrap", gap: 6 },
   coinBtn: {
-    fontFamily: "'Space Mono', monospace",
+    fontFamily: typography.fontMono,
     fontSize: 11,
     padding: "6px 12px",
     background: "#0D0D0D",
-    border: `1px solid ${BORDER}`,
+    border: `1px solid ${colors.border}`,
     borderRadius: 4,
     color: "#D4D4D4",
     cursor: "pointer",
   },
-  coinActive: { borderColor: GOLD, color: GOLD, background: "rgba(212,175,55,0.05)" },
+  coinActive: { borderColor: colors.gold, color: colors.gold, background: `${colors.gold}0D` },
   toggleRow: { display: "flex", gap: 8 },
   toggleBtn: {
     flex: 1,
-    fontFamily: "'Space Mono', monospace",
+    fontFamily: typography.fontMono,
     fontSize: 11,
     padding: "10px 8px",
     background: "rgba(10,10,10,0.5)",
@@ -628,8 +633,8 @@ const styles = {
     wordBreak: "break-word",
     transition: "all 0.2s ease",
   },
-  toggleActive: { borderColor: "rgba(39,174,96,0.4)", color: GREEN, background: "rgba(39,174,96,0.05)" },
-  toggleDanger: { borderColor: "rgba(192,57,43,0.4)", color: RED, background: "rgba(192,57,43,0.05)" },
+  toggleActive: { borderColor: `${colors.success}66`, color: colors.success, background: `${colors.success}0D` },
+  toggleDanger: { borderColor: `${colors.error}66`, color: colors.error, background: `${colors.error}0D` },
   summaryBox: {
     background: "rgba(10,10,10,0.4)",
     backdropFilter: "blur(8px)",
@@ -646,7 +651,7 @@ const styles = {
     padding: "6px 0",
     borderBottom: "1px solid rgba(255,255,255,0.04)",
   },
-  summaryLabel: { color: MUTED },
+  summaryLabel: { color: colors.muted },
   btnRow: {
     display: "flex",
     justifyContent: "space-between",
@@ -654,7 +659,7 @@ const styles = {
     gap: 12,
   },
   skipBtn: {
-    fontFamily: "'Space Mono', monospace",
+    fontFamily: typography.fontMono,
     fontSize: 12,
     padding: "10px 16px",
     background: "rgba(255,255,255,0.03)",
@@ -662,12 +667,12 @@ const styles = {
     WebkitBackdropFilter: "blur(8px)",
     border: "1px solid rgba(255,255,255,0.06)",
     borderRadius: 8,
-    color: MUTED,
+    color: colors.muted,
     cursor: "pointer",
     transition: "all 0.2s ease",
   },
   nextBtn: {
-    fontFamily: "'Oswald', sans-serif",
+    fontFamily: typography.fontButton,
     fontSize: 13,
     fontWeight: 600,
     letterSpacing: 2,
@@ -675,13 +680,13 @@ const styles = {
     border: "none",
     borderRadius: 10,
     cursor: "pointer",
-    background: `linear-gradient(180deg, ${GOLD}, #B8860B)`,
+    background: `linear-gradient(180deg, ${colors.gold}, ${colors.goldDark})`,
     color: DARK,
     boxShadow: "0 4px 20px rgba(212,175,55,0.2)",
     transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
   },
   launchBtn: {
-    fontFamily: "'Oswald', sans-serif",
+    fontFamily: typography.fontButton,
     fontSize: 14,
     fontWeight: 600,
     letterSpacing: 2,
@@ -689,7 +694,7 @@ const styles = {
     border: "none",
     borderRadius: 10,
     cursor: "pointer",
-    background: `linear-gradient(180deg, ${GREEN}, #1E8449)`,
+    background: `linear-gradient(180deg, ${colors.success}, #00C853)`,
     color: "#fff",
     boxShadow: "0 4px 20px rgba(39,174,96,0.2)",
     transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -719,10 +724,10 @@ const styles = {
     boxShadow: "0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
   },
   modalTitle: {
-    fontFamily: "'Bebas Neue', sans-serif",
+    fontFamily: typography.fontDisplay,
     fontSize: 20,
     letterSpacing: 2,
-    color: GOLD,
+    color: colors.gold,
     margin: "0 0 16px",
   },
   keyInfo: {
@@ -738,7 +743,7 @@ const styles = {
   keyPerm: { fontSize: 11, padding: "2px 0", display: "flex", gap: 6 },
   error: {
     fontSize: 12,
-    color: RED,
+    color: colors.error,
     background: "rgba(192,57,43,0.08)",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",

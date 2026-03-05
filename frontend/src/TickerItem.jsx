@@ -1,5 +1,6 @@
 import { useEffect, useRef, memo } from "react";
 import { animate } from "animejs";
+import { colors } from "./theme.js";
 
 function formatPrice(p) {
   if (!p || p <= 0) return "\u2014";
@@ -35,8 +36,8 @@ function TickerItem({
     prevPriceRef.current = coinPrice;
     if (!prev || !coinPrice || prev === coinPrice) return;
 
-    const color = coinPrice > prev ? "#D4AF37" : "#FF1744";
-    const glow = coinPrice > prev ? "0 0 8px #D4AF3766" : "0 0 8px #FF174466";
+    const color = coinPrice > prev ? colors.gold : colors.error;
+    const glow = coinPrice > prev ? `0 0 8px ${colors.gold}66` : `0 0 8px ${colors.error}66`;
     animate(el, {
       color: [color, "#D4D4D4"],
       textShadow: [glow, "0 0 0px transparent"],
@@ -53,7 +54,7 @@ function TickerItem({
     const isUp = pct > 0;
     const isDown = pct < 0;
     const arrow = isUp ? "\u25B2" : isDown ? "\u25BC" : "";
-    const color = isUp ? "#00E676" : isDown ? "#FF1744" : "#5C5C5C";
+    const color = isUp ? colors.success : isDown ? colors.error : colors.muted;
 
     el.textContent = pct !== 0 ? `${arrow} ${Math.abs(pct).toFixed(2)}%` : "";
     el.style.color = color;
@@ -86,13 +87,13 @@ function TickerItem({
         borderRadius: "6px",
         cursor: "pointer",
         border: isSelected
-          ? "1px solid #D4AF3766"
+          ? `1px solid ${colors.gold}66`
           : hasPosition
-            ? "1px solid #00E67644"
+            ? `1px solid ${colors.success}44`
             : "1px solid transparent",
-        background: isSelected ? "#D4AF3711" : "transparent",
-        color: isSelected ? "#fff" : "#D4D4D4",
-        borderBottom: isSelected ? "2px solid #D4AF37" : "none",
+        background: isSelected ? `${colors.gold}11` : "transparent",
+        color: isSelected ? "#fff" : colors.text,
+        borderBottom: isSelected ? `2px solid ${colors.gold}` : "none",
         transition: "border-color 0.3s, background 0.3s, color 0.15s",
         position: "relative",
         whiteSpace: "nowrap",
@@ -110,7 +111,7 @@ function TickerItem({
       <span style={{ letterSpacing: "1.5px" }}>{sym}</span>
       <span
         ref={priceElRef}
-        style={{ color: coinPrice > 0 ? "#D4D4D4" : "#5C5C5C" }}
+        style={{ color: coinPrice > 0 ? colors.text : colors.muted }}
       >
         {"$" + formatPrice(coinPrice)}
       </span>
@@ -120,13 +121,13 @@ function TickerItem({
           fontSize: "10px",
           fontWeight: 600,
           opacity: 0.85,
-          color: "#5C5C5C",
+          color: colors.muted,
           minWidth: "52px",
         }}
       />
       {hasPosition && (
         <span
-          style={{ fontSize: "9px", color: "#D4AF37", marginLeft: "2px" }}
+          style={{ fontSize: "9px", color: colors.gold, marginLeft: "2px" }}
         >
           🥊 OPEN
         </span>

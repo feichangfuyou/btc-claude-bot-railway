@@ -87,6 +87,8 @@ class BotState:
         self.trades: list = []
         self.logs: list = []
         self.bot_running = False
+        self.active_user_id: str | None = None
+        self.active_user_email: str | None = None
         self.claude_thinking = False
         self.last_claude_call = "--"
         self.countdown = CLAUDE_INTERVAL

@@ -40,7 +40,7 @@ docker compose up --build
 | `ANTHROPIC_API_KEY` | ✅ | — | Anthropic API key for Claude |
 | `COINBASE_API_KEY` | — | — | Coinbase auth (live prices) |
 | `COINBASE_API_SECRET` | — | — | Coinbase secret |
-| `BOT_API_SECRET` | — | — | API/auth secret (recommended prod) |
+| `BOT_API_SECRET` | ✅ prod | — | **Required for any public deployment.** API/auth secret. Generate: `openssl rand -hex 32` |
 | `PAPER_TRADING` | — | `true` | Paper vs live mode |
 | `START_BALANCE` | — | `1000` | Paper starting balance |
 | `TARGET_BALANCE` | — | `5000` | Profit target |
@@ -48,6 +48,29 @@ docker compose up --build
 | `REQUIRE_TRADE_APPROVAL` | — | `false` | Require approval per trade |
 
 See [`.env.example`](.env.example) for all options.
+
+---
+
+## Production Checklist
+
+Before deploying to a public host:
+
+1. **Set `BOT_API_SECRET`** — Without it, `/trades`, `/account`, `/emergency/stop`, and other sensitive endpoints are unprotected. Generate: `openssl rand -hex 32`
+2. **Set `EXCHANGE_KEYS_ENCRYPTION_KEY`** — Encrypts API keys in Supabase. Generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+3. **Apply Supabase migrations** — RLS and user tables. See [scripts/APPLY_MIGRATION_INSTRUCTIONS.md](scripts/APPLY_MIGRATION_INSTRUCTIONS.md)
+4. **Configure `CORS_ORIGINS`** — Restrict to your frontend domain(s)
+5. **Stripe webhooks** — Use live webhook secrets in production
+6. **Start with `PAPER_TRADING=true`** — Validate behavior before enabling live trading
+
+---
+
+## Security
+
+- **API auth:** When `BOT_API_SECRET` is set, `AuthMiddleware` protects all non-public endpoints. Use `x-bot-secret` header or `?secret=` query param, or Supabase JWT via `Authorization: Bearer <token>`.
+- **Emergency stop:** When secret is unset, `/emergency/stop` only accepts requests from localhost.
+- **Exchange keys:** Stored encrypted in Supabase; frontend never fetches key columns.
+- **RLS:** Supabase `user_exchanges` uses Row Level Security so users only access their own rows.
+- **Rate limiting:** 120 req/min per IP; exchange validate limited to 10/min per user.
 
 ---
 
@@ -108,6 +131,7 @@ docs/                           → Runbook, scorecards, plans
 |----------|--------|-------------|
 | `/health` | GET | Health + balance, positions |
 | `/readiness` | GET | Readiness scorecard (0–100, grade) |
+| `/metrics` | GET | Prometheus-style metrics (10k scale) |
 | `/metrics` | GET | Prometheus-style metrics |
 | `/trades` | GET | Recent trades |
 | `/account` | GET | Account state |
