@@ -587,7 +587,7 @@ const styles = {
     borderRadius: 10,
     cursor: "pointer",
     background: `linear-gradient(180deg, ${colors.gold}, ${colors.goldDark})`,
-    color: DARK,
+    color: colors.dark,
     boxShadow: "0 4px 20px rgba(212,175,55,0.2)",
     transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
   },
