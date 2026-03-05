@@ -15,8 +15,6 @@ Run: BOT_API_SECRET=testsecret python -m pytest tests/test_red_team_bottleneck.p
 Backend must be running for integration tests (or use TestClient for unit-style).
 """
 
-import json
-import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -41,6 +39,16 @@ pytestmark = pytest.mark.skipif(
     not API_SECRET,
     reason="Red team tests require BOT_API_SECRET. Run: BOT_API_SECRET=testsecret pytest ...",
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_global_rate_limits():
+    """Reset in-memory rate limit counters between tests to prevent cross-test 429s."""
+    from core.redis_client import _rate_limit_memory
+
+    _rate_limit_memory.clear()
+    yield
+    _rate_limit_memory.clear()
 
 
 @pytest.fixture
@@ -95,6 +103,7 @@ def test_ai_pending_per_user_limit():
 
 def test_concurrent_health_flood(client, secret):
     """100 concurrent /health requests — no crash, all return 200."""
+
     def fetch():
         return client.get("/health")
 
@@ -107,6 +116,7 @@ def test_concurrent_health_flood(client, secret):
 
 def test_concurrent_ticker_flood(client, secret):
     """50 concurrent /api/exchange/tickers — IO executor should handle."""
+
     def fetch():
         return client.get("/api/exchange/tickers?limit=10", headers={"x-bot-secret": secret})
 
@@ -119,6 +129,7 @@ def test_concurrent_ticker_flood(client, secret):
 
 def test_concurrent_account_flood(client, secret):
     """30 concurrent /account — auth + DB should handle."""
+
     def fetch():
         return client.get("/account", headers={"x-bot-secret": secret})
 
@@ -308,6 +319,7 @@ def test_readiness_after_flood(client, secret):
 
 def test_health_responds_during_blocking_work(client):
     """Health should respond even when other endpoints are busy (non-blocking)."""
+
     # Fire ticker request (slow external API) and immediately hit health
     def slow_ticker():
         return client.get("/api/exchange/tickers?limit=500")
@@ -353,6 +365,6 @@ def test_content_type_confusion(client, secret):
     r = client.post(
         "/billing/checkout",
         content='{"tier":"elite"}',
-        headers={"Content-Type": "text/plain", "Authorization": f"Bearer x"},
+        headers={"Content-Type": "text/plain", "Authorization": "Bearer x"},
     )
     assert r.status_code in (401, 422, 415)

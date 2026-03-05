@@ -1,0 +1,162 @@
+import { useRef, useState, useEffect } from "react";
+import TradingViewChart from "../TradingViewChart.jsx";
+import AnimatedNumber from "../AnimatedNumber.jsx";
+
+const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL
+  || (import.meta.env.DEV ? "http://localhost:8000" : "");
+const API_SECRET = import.meta.env.DEV ? (import.meta.env.VITE_BOT_API_SECRET || "") : "";
+
+export function ChartSection({
+  chartSymbol, setChartSymbol, selectedCoin, positions, price,
+  marketTickers, multiExchangePrices, setMultiExchangePrices,
+}) {
+  const [tickerSearch, setTickerSearch] = useState("");
+  const [tickerSearchOpen, setTickerSearchOpen] = useState(false);
+  const tickerSearchRef = useRef(null);
+
+  useEffect(() => {
+    if (!tickerSearchOpen) return;
+    const handler = (e) => {
+      if (tickerSearchRef.current && !tickerSearchRef.current.contains(e.target)) setTickerSearchOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [tickerSearchOpen]);
+
+  useEffect(() => {
+    if (!tickerSearchOpen) return;
+    const q = tickerSearch.trim().toUpperCase();
+    const matches = q
+      ? marketTickers.filter(t => (t.sym || "").toUpperCase().includes(q)).slice(0, 8)
+      : marketTickers.slice(0, 6);
+    let syms = [...new Set(matches.map(t => (t.sym || "").toUpperCase()).filter(Boolean))];
+    if (q && !syms.includes(q)) syms.push(q);
+    if (syms.length === 0) syms = ["BTC", "ETH", "SOL", "XRP", "DOGE"];
+    const base = (BACKEND_BASE || "").replace(/\/$/, "");
+    const url = base ? `${base}/api/prices/multi` : "/api/prices/multi";
+    const headers = {};
+    if (API_SECRET) headers["x-bot-secret"] = API_SECRET;
+    fetch(`${url}?symbols=${encodeURIComponent(syms.join(","))}`, { headers })
+      .then(r => r.ok && r.json())
+      .then(d => d && typeof d === "object" && setMultiExchangePrices(d))
+      .catch(() => {});
+  }, [tickerSearchOpen, tickerSearch, marketTickers, setMultiExchangePrices]);
+
+  return (
+    <div className="card chart-card" style={{ height:"65vh", minHeight:"500px", maxHeight:"700px", display:"flex", flexDirection:"column", marginBottom:"16px", padding:"12px", position:"relative", zIndex:1, overflow:"hidden" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px", padding:"0 4px", flexWrap:"wrap", gap:"10px" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"10px", flexWrap:"wrap" }}>
+          <span style={{ fontFamily:"'Oswald',sans-serif", fontSize:"14px", color:"#D4D4D4", fontWeight:"600", letterSpacing:"3px" }}>
+            {chartSymbol.includes(":")
+              ? (() => { const [, pair] = chartSymbol.split(":"); const base = (pair || "").replace(/USDT?$/i,""); return `${base} / ${(pair||"").includes("USDT") ? "USDT" : "USD"}`; })()
+              : `${chartSymbol} / USD`}
+          </span>
+          <span style={{ fontSize:"9px", color:"#5C5C5C", letterSpacing:"1px" }}>TRADINGVIEW PRO</span>
+          {/* Ticker search */}
+          <div ref={tickerSearchRef} style={{ position:"relative" }}>
+            <div style={{ display:"flex", alignItems:"center", background:"#111111", border:"1px solid #1e1e1e", borderRadius:"6px", padding:"2px 8px", gap:"6px" }}>
+              <span style={{ fontSize:"10px", color:"#5C5C5C" }}>🔍</span>
+              <input
+                type="text"
+                placeholder="Search ticker..."
+                value={tickerSearch}
+                onChange={(e) => { setTickerSearch(e.target.value); setTickerSearchOpen(true); }}
+                onFocus={() => setTickerSearchOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const q = tickerSearch.trim().toUpperCase();
+                    if (q.includes(":")) setChartSymbol(q);
+                    else if (q) setChartSymbol(`BINANCE:${q}USDT`);
+                    setTickerSearchOpen(false);
+                    setTickerSearch("");
+                  } else if (e.key === "Escape") { setTickerSearchOpen(false); setTickerSearch(""); }
+                }}
+                style={{ width:"140px", fontFamily:"'Space Mono',monospace", fontSize:"11px", background:"transparent", border:"none", color:"#D4D4D4", outline:"none" }}
+              />
+            </div>
+            {tickerSearchOpen && (
+              <div
+                style={{
+                  position:"absolute", top:"100%", left:0, marginTop:"4px", minWidth:"min(300px, calc(100vw - 32px))", maxHeight:"320px", overflowY:"auto",
+                  background:"#111111", border:"1px solid #1a1f2e", borderRadius:"6px", boxShadow:"0 8px 24px rgba(0,0,0,0.4)", zIndex:100,
+                }}
+              >
+                {(() => {
+                  const q = tickerSearch.trim().toUpperCase();
+                  const matches = q
+                    ? marketTickers.filter(t => (t.sym || "").toUpperCase().includes(q)).slice(0, 8)
+                    : marketTickers.slice(0, 6);
+                  const opts = [];
+                  for (const t of matches) {
+                    const sym = (t.sym || "").toUpperCase();
+                    if (!sym) continue;
+                    opts.push({ label: `${sym} — Binance`, symbol: `BINANCE:${sym}USDT`, exchange: "binance", sym });
+                    opts.push({ label: `${sym} — Coinbase`, symbol: `COINBASE:${sym}USD`, exchange: "coinbase", sym });
+                    opts.push({ label: `${sym} — Kraken`, symbol: `KRAKEN:${sym}USD`, exchange: "kraken", sym });
+                  }
+                  if (q && !matches.some(t => (t.sym || "").toUpperCase() === q)) {
+                    opts.push({ label: `${q} — Binance`, symbol: `BINANCE:${q}USDT`, exchange: "binance", sym: q });
+                    opts.push({ label: `${q} — Coinbase`, symbol: `COINBASE:${q}USD`, exchange: "coinbase", sym: q });
+                    opts.push({ label: `${q} — Kraken`, symbol: `KRAKEN:${q}USD`, exchange: "kraken", sym: q });
+                  }
+                  if (opts.length === 0) {
+                    for (const sym of ["BTC", "ETH", "SOL", "XRP", "DOGE"]) {
+                      opts.push({ label: `${sym} — Binance`, symbol: `BINANCE:${sym}USDT`, exchange: "binance", sym });
+                      opts.push({ label: `${sym} — Coinbase`, symbol: `COINBASE:${sym}USD`, exchange: "coinbase", sym });
+                      opts.push({ label: `${sym} — Kraken`, symbol: `KRAKEN:${sym}USD`, exchange: "kraken", sym });
+                    }
+                  }
+                  return opts;
+                })().map((opt) => {
+                  const px = multiExchangePrices[opt.sym]?.[opt.exchange];
+                  const priceStr = px != null && px > 0
+                    ? (px < 0.0001 ? px.toFixed(8) : px < 0.01 ? px.toFixed(6) : px < 10 ? px.toFixed(4) : px < 1000 ? px.toFixed(2) : px.toLocaleString())
+                    : null;
+                  return (
+                    <button
+                      key={opt.symbol}
+                      type="button"
+                      onClick={() => { setChartSymbol(opt.symbol); setTickerSearch(""); setTickerSearchOpen(false); }}
+                      style={{
+                        display:"flex", width:"100%", justifyContent:"space-between", alignItems:"center", padding:"8px 12px",
+                        fontFamily:"'Space Mono',monospace", fontSize:"10px", background:"transparent", border:"none",
+                        color:"#D4D4D4", cursor:"pointer", whiteSpace:"nowrap", gap:"12px",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "#1e1e1e"; e.currentTarget.style.color = "#fff"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#D4D4D4"; }}
+                    >
+                      <span>{opt.label}</span>
+                      <span style={{ color: priceStr ? "#D4AF37" : "#5C5C5C", fontSize:"11px", fontWeight: priceStr ? "700" : "400" }}>
+                        {priceStr != null ? `$${priceStr}` : "—"}
+                      </span>
+                    </button>
+                  );
+                })}
+                {tickerSearch && (
+                  <div style={{ padding:"6px 12px", fontSize:"9px", color:"#5C5C5C", borderTop:"1px solid #1e1e1e" }}>
+                    Available on Binance, Coinbase & Kraken — pick your exchange
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        {positions.length > 0 && (
+          <div style={{ display:"flex", gap:"10px", fontSize:"9px", alignItems:"center", flexWrap:"wrap" }}>
+            {positions.filter(p => p.symbol === selectedCoin).map(pos => (
+              <div key={pos.id} style={{ display:"flex", gap:"8px", padding:"2px 6px", borderRadius:"3px", background: pos.side==="buy"?"#00E67608":"#FF174408" }}>
+                <span style={{ color: pos.side==="buy"?"#00E676":"#FF1744", fontWeight:"700" }}>{pos.side?.toUpperCase()}</span>
+                <span style={{ color:"#D4AF37" }}>E $<AnimatedNumber value={pos.entry||0} format={(v)=>v.toLocaleString()} duration={150} /></span>
+                <span style={{ color:"#00E676" }}>TP $<AnimatedNumber value={pos.tp||0} format={(v)=>v.toLocaleString()} duration={150} /></span>
+                <span style={{ color:"#FF1744" }}>SL $<AnimatedNumber value={pos.sl||0} format={(v)=>v.toLocaleString()} duration={150} /></span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <TradingViewChart symbol={chartSymbol} />
+      </div>
+    </div>
+  );
+}

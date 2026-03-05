@@ -48,7 +48,7 @@ def record_trade_memory(trade: dict, position: dict, coin_state, fear_greed: int
     pnl = trade.get("pnl", 0)
     win = pnl > 0
 
-    hold_sec = 0
+    hold_sec: float = 0
     if position and position.get("open_ts"):
         try:
             opened = datetime.strptime(position["open_ts"], "%H:%M:%S")
@@ -449,7 +449,7 @@ def _learn_from_volatility_regime():
     rows = db_get_trades_for_vol_analysis()
     if len(rows) < 5:
         return
-    vol_buckets = {"low_vol": [], "normal_vol": [], "high_vol": []}
+    vol_buckets: dict[str, list] = {"low_vol": [], "normal_vol": [], "high_vol": []}
     for r in rows:
         try:
             ind = json.loads(r.get("indicators_json", "{}"))
@@ -585,7 +585,7 @@ def _learn_from_recent_wins():
         return
     from collections import Counter
 
-    combos = Counter()
+    combos: Counter[str] = Counter()
     best_pnl = 0
     best_setup = None
     for w in wins:
@@ -841,10 +841,10 @@ def build_memory_briefing() -> dict:
 
     recent = db_get_recent_trade_contexts(limit=10)
     if recent:
-        recent_wins = sum(1 for t in recent if t["win"])
+        recent_win_count = sum(1 for t in recent if t["win"])
         recent_pnl = sum(t["pnl"] for t in recent)
         briefing["recent_performance"] = {
-            "last_10_win_rate": round(recent_wins / len(recent) * 100, 1),
+            "last_10_win_rate": round(recent_win_count / len(recent) * 100, 1),
             "last_10_pnl": round(recent_pnl, 2),
             "trending": "improving" if recent_pnl > 0 else "declining",
         }

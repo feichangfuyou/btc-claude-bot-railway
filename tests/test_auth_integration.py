@@ -15,6 +15,16 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.fixture(autouse=True)
+def _clear_global_rate_limits():
+    """Reset in-memory rate limit counters between tests so the global IP limiter doesn't cause 429s."""
+    from core.redis_client import _rate_limit_memory
+
+    _rate_limit_memory.clear()
+    yield
+    _rate_limit_memory.clear()
+
+
 @pytest.fixture
 def client():
     return TestClient(app)
@@ -96,12 +106,11 @@ def test_secret_query_param_wrong_rejected(client):
     assert r.status_code == 401
 
 
-# ─── Bearer token (any value passes middleware; /auth/* validates JWT) ───────
-def test_bearer_token_passes_middleware(client):
-    """Authorization: Bearer <anything> passes AuthMiddleware gate."""
+# ─── Bearer token (must be a valid JWT to pass middleware) ───────────────────
+def test_bearer_token_invalid_rejected(client):
+    """Authorization: Bearer <invalid> is rejected — middleware validates the JWT."""
     r = client.get("/account", headers={"Authorization": "Bearer fake-jwt-for-gate-test"})
-    # Middleware only checks prefix; actual route may return 200 or other
-    assert r.status_code != 401, "Bearer prefix should pass middleware"
+    assert r.status_code == 401, "Invalid Bearer token should be rejected by middleware"
 
 
 # ─── ?token= query param (requires valid Supabase JWT) ─────────────────────────

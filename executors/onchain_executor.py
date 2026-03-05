@@ -231,7 +231,7 @@ def _set_onchain_position(
     bot.add_log(
         f"{emoji} ON-CHAIN {action.upper()} {symbol} @ ${entry:,.2f} | "
         f"TP ${tp:,.2f} | SL ${sl:,.2f} | ${usd_sz:.2f} | "
-        f"Wallet: {agentkit.wallet_address[:10]}...",
+        f"Wallet: {(agentkit.wallet_address or '')[:10]}...",
         "success" if action == "buy" else "sell",
     )
 

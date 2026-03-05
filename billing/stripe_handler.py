@@ -78,7 +78,8 @@ def create_checkout_session(
             cancel_url=cancel_url,
             metadata={"user_id": user_id, "tier": tier},
         )
-        return session.url
+        url: str | None = session.url
+        return url
     except Exception as e:
         logger.error(f"Stripe checkout error: {e}")
         return None
@@ -145,15 +146,15 @@ def _handle_subscription_updated(data: dict) -> None:
         if item_list:
             price = item_list[0].get("price") or {}
             price_id = price.get("id") if isinstance(price, dict) else None
-        tier = _tier_from_price_id(price_id)
+        tier = _tier_from_price_id(price_id or "")
         # Find user by stripe_customer_id
         if customer_id:
             r = sb.table("profiles").select("id").eq("stripe_customer_id", customer_id).execute()
             if r.data and len(r.data) > 0:
                 user_id = r.data[0]["id"]
-                sb.table("profiles").update(
-                    {"subscription_tier": tier, "subscription_status": status or "active"}
-                ).eq("id", user_id).execute()
+                sb.table("profiles").update({"subscription_tier": tier, "subscription_status": status or "active"}).eq(
+                    "id", user_id
+                ).execute()
                 invalidate_user_config_cache(user_id)
                 logger.info(f"Updated subscription for user {user_id[:8]} -> {tier}")
     except Exception as e:
@@ -172,16 +173,16 @@ def _handle_subscription_deleted(data: dict) -> None:
             r = sb.table("profiles").select("id").eq("stripe_customer_id", customer_id).execute()
             if r.data and len(r.data) > 0:
                 user_id = r.data[0]["id"]
-                sb.table("profiles").update(
-                    {"subscription_tier": "starter", "subscription_status": "cancelled"}
-                ).eq("id", user_id).execute()
+                sb.table("profiles").update({"subscription_tier": "starter", "subscription_status": "cancelled"}).eq(
+                    "id", user_id
+                ).execute()
                 invalidate_user_config_cache(user_id)
                 logger.info(f"Cancelled subscription for user {user_id[:8]}")
     except Exception as e:
         logger.error(f"Failed to handle subscription.deleted: {e}")
 
 
-def _activate_subscription(user_id: str, tier: str, stripe_customer_id: str = None):
+def _activate_subscription(user_id: str, tier: str, stripe_customer_id: str | None = None):
     """Update the user's subscription in Supabase. Stores customer ID for webhook lookups."""
     try:
         from core.supabase_client import get_supabase
@@ -204,7 +205,7 @@ def _activate_subscription(user_id: str, tier: str, stripe_customer_id: str = No
 def check_tier_limit(tier: str, feature: str) -> bool:
     """Check if a feature is available for a given tier."""
     limits = TIER_LIMITS.get(tier, TIER_LIMITS["starter"])
-    return limits.get(feature, False)
+    return bool(limits.get(feature, False))
 
 
 def get_max_exchanges(tier: str) -> int:

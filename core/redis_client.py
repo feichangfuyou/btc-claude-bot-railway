@@ -27,7 +27,9 @@ def _get_redis():
         return None
     try:
         import redis
+
         from core.config import REDIS_MAX_CONNECTIONS
+
         _redis_client = redis.from_url(
             url,
             decode_responses=True,
@@ -120,7 +122,7 @@ def rate_limit_check(key: str, max_per_window: int, window_sec: int) -> bool:
             pipe.incr(full_key)
             pipe.expire(full_key, window_sec)
             count, _ = pipe.execute()
-            return count <= max_per_window
+            return bool(count <= max_per_window)
         except Exception as e:
             logger.debug(f"Redis rate limit error: {e}")
             return True  # Fail open
@@ -191,13 +193,14 @@ def ai_pending_decrement(user_id: str) -> None:
 
 # ─── Pub/Sub (for future WebSocket broadcast across instances) ───────────────
 
+
 def publish(channel: str, message: dict) -> int:
     """Publish message to channel. Returns number of subscribers (0 if no Redis)."""
     r = _get_redis()
     if not r:
         return 0
     try:
-        return r.publish(channel, json.dumps(message, default=str))
+        return int(r.publish(channel, json.dumps(message, default=str)))
     except Exception as e:
         logger.debug(f"Redis publish error: {e}")
         return 0

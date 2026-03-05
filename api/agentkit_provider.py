@@ -100,7 +100,7 @@ def get_token_address(symbol: str) -> Optional[str]:
     """Resolve a coin symbol to its Base network contract address."""
     entry = TOKEN_REGISTRY.get(symbol.upper())
     if entry:
-        return entry["address"]
+        return str(entry["address"])
     return None
 
 
@@ -114,7 +114,8 @@ def get_coingecko_id(symbol: str) -> Optional[str]:
         return result
     entry = TOKEN_REGISTRY.get(symbol.upper())
     if entry:
-        return entry.get("coingecko_id")
+        cg_id = entry.get("coingecko_id")
+        return str(cg_id) if cg_id is not None else None
     return None
 
 
@@ -186,7 +187,7 @@ class CdpWalletProvider:
             loop.close()
 
     async def _async_initialize(self) -> bool:
-        from cdp import CdpClient
+        from cdp import CdpClient  # type: ignore[attr-defined]
 
         self._cdp = CdpClient(
             api_key_id=CDP_API_KEY_ID,
@@ -228,7 +229,7 @@ class CdpWalletProvider:
     async def _ensure_client(self):
         """Re-initialize client if needed (e.g. after close)."""
         if self._cdp is None:
-            from cdp import CdpClient
+            from cdp import CdpClient  # type: ignore[attr-defined]
 
             self._cdp = CdpClient(
                 api_key_id=CDP_API_KEY_ID,
@@ -240,8 +241,9 @@ class CdpWalletProvider:
 
     async def async_get_token_balances(self) -> list:
         await self._ensure_client()
+        assert self._account is not None
         balances = await self._account.list_token_balances(network=NETWORK_ID)
-        return balances
+        return list(balances)
 
     async def async_get_balance_by_symbol(self, symbol: str) -> str:
         """Get balance for any token by its registry symbol (ETH, BTC, SOL, etc.)."""
@@ -274,16 +276,16 @@ class CdpWalletProvider:
         return await self.async_get_balance_by_symbol("BTC")
 
     def get_eth_balance(self) -> str:
-        return self._run_async(self.async_get_eth_balance())
+        return str(self._run_async(self.async_get_eth_balance()))
 
     def get_usdc_balance(self) -> str:
-        return self._run_async(self.async_get_usdc_balance())
+        return str(self._run_async(self.async_get_usdc_balance()))
 
     def get_wbtc_balance(self) -> str:
-        return self._run_async(self.async_get_wbtc_balance())
+        return str(self._run_async(self.async_get_wbtc_balance()))
 
     def get_balance(self, symbol: str) -> str:
-        return self._run_async(self.async_get_balance_by_symbol(symbol))
+        return str(self._run_async(self.async_get_balance_by_symbol(symbol)))
 
     # ── Swap methods ─────────────────────────────────────────────────────────
 
@@ -292,6 +294,7 @@ class CdpWalletProvider:
         await self._ensure_client()
         from cdp.actions.evm.swap import AccountSwapOptions
 
+        assert self._account is not None
         result = await self._account.swap(
             AccountSwapOptions(
                 network=_swap_network(NETWORK_ID),
@@ -344,6 +347,7 @@ class CdpWalletProvider:
     async def async_get_swap_price(self, from_token: str, to_token: str, amount: str) -> dict:
         """Get a swap price quote without executing."""
         await self._ensure_client()
+        assert self._cdp is not None
         network = _swap_network(NETWORK_ID)
         price = await self._cdp.evm.get_swap_price(
             from_token=from_token,
@@ -363,6 +367,7 @@ class CdpWalletProvider:
     async def async_transfer(self, to: str, amount: str, token: str = "eth") -> str:
         """Transfer tokens to an address."""
         await self._ensure_client()
+        assert self._account is not None
         tx_hash = await self._account.transfer(
             to=to,
             amount=int(amount) if amount.isdigit() else amount,
@@ -372,10 +377,10 @@ class CdpWalletProvider:
         return str(tx_hash)
 
     def transfer_eth(self, to: str, amount: str) -> str:
-        return self._run_async(self.async_transfer(to, amount, "eth"))
+        return str(self._run_async(self.async_transfer(to, amount, "eth")))
 
     def transfer_usdc(self, to: str, amount: str) -> str:
-        return self._run_async(self.async_transfer(to, amount, "usdc"))
+        return str(self._run_async(self.async_transfer(to, amount, "usdc")))
 
     # ── Wallet details ───────────────────────────────────────────────────────
 

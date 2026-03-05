@@ -5,6 +5,8 @@ strategy performance without risking real money.
 Uses exchange APIs (Binance, Coinbase) — same source as live trading.
 """
 
+from typing import Any
+
 import httpx
 
 from core.config import AI_COST_PER_TRADE, COINBASE_REST_TICKER, ROUND_TRIP_FEE, coinbase_product_id
@@ -104,9 +106,9 @@ def run_backtest(
         return {"error": "Not enough historical data", "candles": len(candles)}
 
     balance = initial_balance
-    trades = []
-    raw_prices = []
-    raw_volumes = []
+    trades: list[dict] = []
+    raw_prices: list[float] = []
+    raw_volumes: list[float] = []
     position = None
     peak_balance = initial_balance
     max_drawdown = 0.0
@@ -271,7 +273,7 @@ def _compute_indicators(raw_prices: list, raw_volumes: list, current_price: floa
     """Compute all indicators from raw price history."""
     from strategy.indicators import find_support_resistance
 
-    indicators = {}
+    indicators: dict[str, Any] = {}
     indicators["_price"] = current_price
 
     ema9 = calc_ema(raw_prices, 9)

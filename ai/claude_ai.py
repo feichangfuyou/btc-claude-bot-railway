@@ -340,7 +340,7 @@ def _build_trade_analytics(trades: list) -> dict:
     total = len(trades)
     win_rate = len(wins) / total * 100 if total else 0
 
-    coin_performance = {}
+    coin_performance: dict[str, dict[str, int | float]] = {}
     for t in trades:
         sym = t.get("symbol", "BTC")
         if sym not in coin_performance:
@@ -355,8 +355,12 @@ def _build_trade_analytics(trades: list) -> dict:
     for sym, perf in coin_performance.items():
         perf["win_rate"] = round(perf["wins"] / perf["trades"] * 100, 1) if perf["trades"] else 0
 
-    best_coin = max(coin_performance.items(), key=lambda x: x[1]["total_pnl"], default=(None, {}))
-    worst_coin = min(coin_performance.items(), key=lambda x: x[1]["total_pnl"], default=(None, {}))
+    best_coin: tuple[str | None, dict] = max(
+        coin_performance.items(), key=lambda x: x[1]["total_pnl"], default=(None, {})
+    )
+    worst_coin: tuple[str | None, dict] = min(
+        coin_performance.items(), key=lambda x: x[1]["total_pnl"], default=(None, {})
+    )
 
     side_performance = {"buy": {"wins": 0, "losses": 0, "pnl": 0}, "sell": {"wins": 0, "losses": 0, "pnl": 0}}
     for t in trades:
@@ -537,8 +541,6 @@ def _check_rate_limit() -> bool:
     return True
 
 
-
-
 async def _api_call(model: str, system: str, user_msg: str, max_tokens: int = 800) -> str:
     """Single API call to Anthropic with multi-model fallback. Returns raw text response.
     Retries on 429 (rate limit) with exponential backoff up to 3 times."""
@@ -603,6 +605,8 @@ async def _api_call(model: str, system: str, user_msg: str, max_tokens: int = 80
                 return await _api_call(next_model, system, user_msg, max_tokens)
             raise
 
+    raise Exception("API call failed — all retries exhausted.")
+
 
 def _extract_json(raw: str) -> dict:
     """Extract first valid JSON object from raw API response text.
@@ -631,15 +635,14 @@ def _extract_json(raw: str) -> dict:
     for start in starts:
         try:
             obj, _ = decoder.raw_decode(raw[start:])
-            return obj
+            return dict(obj)
         except json.JSONDecodeError as e:
             last_err = e
-            # For "Unterminated string", try repairing truncated JSON
             if "Unterminated" in str(e):
                 repaired = _try_repair_truncated(raw[start:])
                 if repaired:
                     try:
-                        return json.loads(repaired)
+                        return dict(json.loads(repaired))
                     except json.JSONDecodeError:
                         pass
             continue
@@ -881,7 +884,7 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False):
             else:
                 break
 
-        anti_overtrade = {
+        anti_overtrade: dict[str, int | float | bool | str] = {
             "recent_5_losses": recent_losses,
             "current_losing_streak": losing_streak,
             "heightened_caution": losing_streak >= 2,

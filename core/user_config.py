@@ -25,7 +25,6 @@ def _evict_oldest_if_needed() -> None:
     """Evict oldest entries when cache exceeds max size (prevents unbounded memory growth)."""
     if len(_USER_CONFIG_CACHE) <= _USER_CONFIG_CACHE_MAX:
         return
-    now = time.time()
     # Sort by timestamp ascending (oldest first), evict until under 80% of max
     target = int(_USER_CONFIG_CACHE_MAX * 0.8)
     entries = [(uid, ts) for uid, (ts, _) in _USER_CONFIG_CACHE.items()]
@@ -275,7 +274,7 @@ def get_user_exchange_keys(user_id: str, exchange: str) -> Optional[dict]:
         dec = decrypt_ciphertext(api_secret)
         if dec is not None:
             data = {**data, "api_secret_enc": dec}
-    return data
+    return dict(data)
 
 
 def save_user_exchange(user_id: str, exchange: str, connection_type: str, **kwargs) -> bool:

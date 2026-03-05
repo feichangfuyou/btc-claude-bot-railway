@@ -3,7 +3,9 @@
 Apply app tables migration for 10k scale (USE_SUPABASE_STORAGE).
 Uses DATABASE_URL from .env, or SUPABASE_DB_PASSWORD + SUPABASE_URL.
 """
+
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -11,8 +13,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Reuse DATABASE_URL logic from apply_user_tables_migration
-import re
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     password = os.getenv("SUPABASE_DB_PASSWORD")
@@ -20,6 +20,7 @@ if not DATABASE_URL:
     match = re.search(r"https://([a-z0-9]+)\.supabase\.co", supabase_url)
     if match and password:
         from urllib.parse import quote_plus
+
         encoded = quote_plus(password)
         DATABASE_URL = f"postgresql://postgres:{encoded}@db.{match.group(1)}.supabase.co:5432/postgres"
     else:
@@ -30,8 +31,10 @@ MIGRATION_PATH = os.path.join(
     os.path.dirname(__file__), "..", "supabase", "migrations", "20260305300000_app_tables.sql"
 )
 
+
 def main():
     import psycopg2
+
     with open(MIGRATION_PATH) as f:
         sql = f.read()
     conn = psycopg2.connect(DATABASE_URL)
@@ -45,6 +48,7 @@ def main():
         sys.exit(1)
     finally:
         conn.close()
+
 
 if __name__ == "__main__":
     main()

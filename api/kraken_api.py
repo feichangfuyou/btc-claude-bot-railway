@@ -39,7 +39,7 @@ def is_configured() -> bool:
     return bool(KRAKEN_API_KEY and KRAKEN_API_SECRET)
 
 
-async def kraken_public_request(endpoint: str, params: dict = None) -> dict | None:
+async def kraken_public_request(endpoint: str, params: dict | None = None) -> dict | None:
     """Public Kraken API request (no auth)."""
     url = f"{KRAKEN_REST_URL}/0/public/{endpoint}"
     try:
@@ -49,16 +49,17 @@ async def kraken_public_request(endpoint: str, params: dict = None) -> dict | No
             data = r.json()
             if data.get("error"):
                 return None
-            return data.get("result")
+            result = data.get("result")
+            return dict(result) if isinstance(result, dict) else None
     except Exception:
         return None
 
 
 async def kraken_private_request(
     endpoint: str,
-    data: dict = None,
-    api_key: str = None,
-    api_secret: str = None,
+    data: dict | None = None,
+    api_key: str | None = None,
+    api_secret: str | None = None,
 ) -> dict | None:
     """Private Kraken API request (authenticated). Uses provided keys or config."""
     key = api_key or KRAKEN_API_KEY
@@ -84,7 +85,8 @@ async def kraken_private_request(
             resp = r.json()
             if resp.get("error"):
                 return None
-            return resp.get("result")
+            result = resp.get("result")
+            return dict(result) if isinstance(result, dict) else None
     except Exception:
         return None
 
@@ -135,8 +137,8 @@ async def add_market_order(
     symbol: str,
     side: str,
     volume: float,
-    api_key: str = None,
-    api_secret: str = None,
+    api_key: str | None = None,
+    api_secret: str | None = None,
 ) -> str | None:
     """Place a market order on Kraken. Returns order txid on success."""
     pair = _kraken_pair(symbol)
@@ -159,8 +161,8 @@ async def add_market_order_by_quote(
     symbol: str,
     side: str,
     volume_quote_usd: float,
-    api_key: str = None,
-    api_secret: str = None,
+    api_key: str | None = None,
+    api_secret: str | None = None,
 ) -> str | None:
     """Place market order by quote (USD) amount. Kraken uses 'volume' in base.
     For buy: volume = volume_quote_usd / price. We need price first."""

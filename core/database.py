@@ -87,7 +87,8 @@ _local = threading.local()
 def _get_pool() -> deque:
     if not hasattr(_local, "pool"):
         _local.pool = deque(maxlen=_POOL_MAX)
-    return _local.pool
+    pool: deque = _local.pool
+    return pool
 
 
 class _PooledConnection:
@@ -1290,7 +1291,7 @@ def db_save_audit_entry(entry: dict):
         conn.close()
 
 
-def db_get_audit_log(limit: int = 50, symbol: str = None, action: str = None) -> list[dict]:
+def db_get_audit_log(limit: int = 50, symbol: str | None = None, action: str | None = None) -> list[dict]:
     """Query the decision audit log with optional filters."""
     conn = get_conn()
     try:
@@ -1363,51 +1364,15 @@ def db_cleanup_old_audit_entries(retention_days: int = 365):
 def _use_postgres_storage() -> bool:
     try:
         from core.config import USE_SUPABASE_STORAGE
+
         if not USE_SUPABASE_STORAGE:
             return False
         from core.database_postgres import _pg_available
+
         return _pg_available()
     except Exception:
         return False
 
 
 if _use_postgres_storage():
-    from core.database_postgres import (
-        db_save_trade,
-        db_load_trades,
-        db_save_state,
-        db_load_state,
-        db_save_account_snapshot,
-        db_load_all_trades,
-        db_save_trade_context,
-        db_save_pattern_outcomes,
-        db_update_strategy_stats,
-        db_save_market_snapshot,
-        db_update_session_stats,
-        db_save_learned_rule,
-        db_get_pattern_stats,
-        db_get_strategy_stats,
-        db_get_regime_performance,
-        db_get_hourly_performance,
-        db_get_coin_regime_matrix,
-        db_get_confidence_analysis,
-        db_get_confluence_analysis,
-        db_get_dow_performance,
-        db_get_fear_greed_performance,
-        db_get_hold_duration_analysis,
-        db_get_rr_analysis,
-        db_get_trades_for_vol_analysis,
-        db_get_recent_trade_contexts,
-        db_get_active_rules,
-        db_get_total_trade_count,
-        db_get_confidence_calibration,
-        db_get_equity_curve,
-        db_get_recent_wins,
-        db_get_recent_losses,
-        db_get_session_history,
-        db_save_audit_entry,
-        db_get_audit_log,
-        db_get_audit_by_hash,
-        db_cleanup_old_audit_entries,
-        db_save_log,
-    )
+    pass

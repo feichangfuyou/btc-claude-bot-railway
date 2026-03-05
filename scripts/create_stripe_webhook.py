@@ -20,6 +20,7 @@ root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root))
 try:
     from dotenv import load_dotenv
+
     load_dotenv(root / ".env", override=True)
 except ImportError:
     pass

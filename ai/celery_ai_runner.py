@@ -8,6 +8,7 @@ import json
 import logging
 from types import SimpleNamespace
 
+from ai.adversary_agent import adversary_review
 from ai.claude_ai import (
     MODEL_MAX_TOKENS,
     SCOUT_MAX_TOKENS,
@@ -20,7 +21,6 @@ from ai.claude_ai import (
     validate_scout_response,
     validate_trade_decision,
 )
-from ai.adversary_agent import adversary_review
 from core.config import (
     ACTIVE_COINS,
     MAX_CONCURRENT_POSITIONS,
@@ -202,7 +202,9 @@ async def run_ai_analysis_from_state(state: dict, skip_scout: bool = False) -> d
             verdict = adv.get("verdict", "pass")
             if verdict == "veto":
                 dec["action"] = "wait"
-                dec["reasoning"] = f"[ADVERSARY VETO] {adv.get('critical_flaw_reason', '')}. " + dec.get("reasoning", "")
+                dec["reasoning"] = f"[ADVERSARY VETO] {adv.get('critical_flaw_reason', '')}. " + dec.get(
+                    "reasoning", ""
+                )
             elif verdict == "kill":
                 dec["action"] = "wait"
                 dec["reasoning"] = f"[ADVERSARY KILL] {adv.get('reasoning', '')[:100]}. " + dec.get("reasoning", "")

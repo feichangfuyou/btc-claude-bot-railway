@@ -3,6 +3,7 @@
 Apply user tables migration for 10k scale.
 Uses DATABASE_URL from .env, or prompts for DB password and builds URL from SUPABASE_URL.
 """
+
 import os
 import re
 import sys

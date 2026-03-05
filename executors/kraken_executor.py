@@ -8,8 +8,8 @@ from datetime import datetime
 
 from api.kraken_api import add_market_order, add_market_order_by_quote, is_configured
 from core.config import AI_COST_PER_TRADE, ENABLE_KRAKEN, ROUND_TRIP_FEE
-from core.key_resolution import resolve_exchange_keys
 from core.database import db_save_trade, file_log
+from core.key_resolution import resolve_exchange_keys
 from learning.trade_memory import record_trade_memory, run_learning_cycle
 from utils.notifications import send_notification
 
@@ -74,7 +74,7 @@ async def close_kraken(bot, pos: dict, reason: str = "⚡ KRAKEN CLOSE"):
         getattr(bot, "active_user_email", None),
         "kraken",
     )
-    api_key, api_secret = (keys or (None, None))
+    api_key, api_secret = keys or (None, None)
 
     try:
         if pos["side"] == "buy":

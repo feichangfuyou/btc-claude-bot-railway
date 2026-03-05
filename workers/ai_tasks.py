@@ -17,6 +17,7 @@ AI_STATE_TTL = 300  # 5 min
 def _get_redis():
     """Get Redis client for state storage."""
     import redis
+
     url = os.getenv("REDIS_URL", "").strip()
     if not url:
         return None
@@ -59,6 +60,7 @@ def run_ai_analysis(self, task_id: str, skip_scout: bool = False):
         logger.exception("AI analysis failed for %s", task_id[:8])
         r.delete(state_key)
         from core.redis_client import ai_pending_decrement
+
         ai_pending_decrement(user_id)
         raise self.retry(exc=e)
 

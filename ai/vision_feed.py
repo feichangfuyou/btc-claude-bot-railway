@@ -199,8 +199,8 @@ async def analyze_chart_vision(
     if not charts:
         return _default_vision_result("no charts captured")
 
-    content_blocks = []
-    timeframes_analyzed = []
+    content_blocks: list[dict] = []
+    timeframes_analyzed: list[str] = []
 
     for tf, img_bytes in charts.items():
         tf_label = TIMEFRAMES.get(tf, {}).get("label", tf)
@@ -292,7 +292,7 @@ def _extract_vision_json(raw: str) -> dict | None:
         try:
             obj, _ = decoder.raw_decode(raw[start:])
             if "structure" in obj or "conviction" in obj:
-                return obj
+                return dict(obj)
         except json.JSONDecodeError:
             continue
     return None

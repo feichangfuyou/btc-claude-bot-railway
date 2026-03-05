@@ -67,7 +67,7 @@ def get_bot_key_hash() -> str:
     global _bot_did_key_hash
     if _bot_did_key_hash is None:
         get_bot_did()
-    return _bot_did_key_hash
+    return _bot_did_key_hash or ""
 
 
 def hash_reasoning(decision: dict) -> str:

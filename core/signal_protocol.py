@@ -63,7 +63,7 @@ class ExecutionResult:
         return cls(**{k: v for k, v in d.items() if k in valid_fields})
 
 
-def create_signal_from_decision(decision: dict, exchange: str = None) -> TradeSignal:
+def create_signal_from_decision(decision: dict, exchange: str | None = None) -> TradeSignal | None:
     """Convert a Claude AI decision into a TradeSignal."""
     action = decision.get("action", "wait")
     if action == "wait":

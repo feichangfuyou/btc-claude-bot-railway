@@ -1082,7 +1082,7 @@ def get_sl_tp_for_regime(preset_id: str | None, regime: str) -> tuple[float, flo
 
 def get_min_rr(preset_id: str | None) -> float:
     """Return minimum R:R for the preset."""
-    return get_preset(preset_id).get("min_rr", 1.5)
+    return float(get_preset(preset_id).get("min_rr", 1.5))
 
 
 PRESET_CATEGORIES = {

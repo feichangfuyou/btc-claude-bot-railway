@@ -3,6 +3,7 @@ Futures executor — paper and live perpetual futures execution.
 Supports Coinbase INTX perpetuals alongside spot trading.
 """
 
+import asyncio
 import time
 from datetime import datetime
 
@@ -108,8 +109,6 @@ def close_futures_position(bot, pos: dict, exit_price: float, reason: str):
     # Live mode: close on exchange first
     if FUTURES_LIVE and product_id and coin_size > 0:
         try:
-            import asyncio
-
             from api.coinbase_api import close_perpetual_position
 
             loop = asyncio.get_running_loop()

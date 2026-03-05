@@ -5,6 +5,7 @@ No API keys required for price data.
 """
 
 import json
+from typing import Any
 
 import httpx
 
@@ -147,11 +148,11 @@ def fetch_top_tickers_kraken(limit: int = 500) -> list[dict]:
         if not isinstance(tickers, dict):
             return []
 
-        rows = []
+        rows: list[dict[str, Any]] = []
         for pair, t in tickers.items():
             if not isinstance(t, dict):
                 continue
-            alt = pair_to_alt.get(pair, pair)
+            alt = str(pair_to_alt.get(pair, pair) or pair)
             if "USD" not in alt and "USDT" not in alt:
                 continue
             v = t.get("v") or [0, 0]
@@ -175,18 +176,30 @@ def fetch_top_tickers_kraken(limit: int = 500) -> list[dict]:
         priority = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "LINK", "DOT"]
         result = []
         for s in priority:
-            for r in rows:
-                if r["sym"] == s and s not in seen:
+            for row in rows:
+                if row["sym"] == s and s not in seen:
                     seen.add(s)
                     result.append(
-                        {"sym": r["sym"], "symbol": r["sym"], "price": r["price"], "chg24h": r["chg"], "image": None}
+                        {
+                            "sym": row["sym"],
+                            "symbol": row["sym"],
+                            "price": row["price"],
+                            "chg24h": row["chg"],
+                            "image": None,
+                        }
                     )
                     break
-        for r in rows:
-            if r["sym"] not in seen and len(result) < limit:
-                seen.add(r["sym"])
+        for row in rows:
+            if row["sym"] not in seen and len(result) < limit:
+                seen.add(row["sym"])
                 result.append(
-                    {"sym": r["sym"], "symbol": r["sym"], "price": r["price"], "chg24h": r["chg"], "image": None}
+                    {
+                        "sym": row["sym"],
+                        "symbol": row["sym"],
+                        "price": row["price"],
+                        "chg24h": row["chg"],
+                        "image": None,
+                    }
                 )
         return result[:limit]
     except Exception:

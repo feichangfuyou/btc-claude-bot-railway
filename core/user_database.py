@@ -7,7 +7,7 @@ The old SQLite database.py remains for backward compatibility / single-user mode
 import json
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from core.supabase_client import get_supabase
 
@@ -36,7 +36,8 @@ def udb_save_trade(user_id: str, trade: dict) -> Optional[int]:
     }
     result = sb.table("user_trades").insert(data).execute()
     if result.data:
-        return result.data[0].get("id")
+        row_id = result.data[0].get("id")
+        return int(row_id) if row_id is not None else None
     return None
 
 
@@ -54,12 +55,12 @@ def udb_load_trades(user_id: str, limit: int = 50) -> list[dict]:
 
 def udb_load_all_trades(
     user_id: str,
-    date_from: str = None,
-    date_to: str = None,
-    symbol: str = None,
-    side: str = None,
-    win_only: bool = None,
-    product_type: str = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    symbol: str | None = None,
+    side: str | None = None,
+    win_only: bool | None = None,
+    product_type: str | None = None,
     limit: int = 500,
     offset: int = 0,
 ) -> tuple[list, int]:
@@ -224,7 +225,8 @@ def udb_create_signal(user_id: str, signal: dict) -> Optional[str]:
     }
     result = sb.table("trade_signals").insert(data).execute()
     if result.data:
-        return result.data[0].get("id")
+        sig_id = result.data[0].get("id")
+        return str(sig_id) if sig_id is not None else None
     return None
 
 
@@ -242,10 +244,10 @@ def udb_get_pending_signals(user_id: str) -> list[dict]:
     return result.data or []
 
 
-def udb_update_signal_status(signal_id: str, status: str, execution_result: dict = None):
+def udb_update_signal_status(signal_id: str, status: str, execution_result: dict | None = None):
     """Update a signal's status after execution."""
     sb = get_supabase()
-    data = {"status": status}
+    data: dict[str, Any] = {"status": status}
     if execution_result:
         data["execution_result"] = execution_result
     if status == "executed":

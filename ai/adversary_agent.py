@@ -339,7 +339,7 @@ def _extract_verdict(raw: str) -> dict | None:
         try:
             obj, _ = decoder.raw_decode(raw[start:])
             if "verdict" in obj:
-                return obj
+                return dict(obj)
         except json.JSONDecodeError:
             continue
     return None

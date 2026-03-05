@@ -99,7 +99,7 @@ class OrderRouter:
         symbol: str,
         side: str,
         usd_size: float,
-        prices: dict[str, float] = None,
+        prices: dict[str, float] | None = None,
     ) -> RouteDecision:
         """Decide which exchange(s) to route an order to.
 
@@ -158,7 +158,7 @@ class OrderRouter:
                 reason=f"No valid prices; defaulting to {preferred}",
             )
 
-        price_diff_pct = 0
+        price_diff_pct: float = 0
         if prices and len(prices) > 1:
             all_prices = [p for p in prices.values() if p]
             if all_prices:

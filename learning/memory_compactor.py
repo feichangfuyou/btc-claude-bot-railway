@@ -207,7 +207,7 @@ def _extract_rules_json(raw: str) -> dict | None:
         try:
             obj, _ = decoder.raw_decode(raw[start:])
             if "rules" in obj:
-                return obj
+                return dict(obj)
         except json.JSONDecodeError:
             continue
     return None

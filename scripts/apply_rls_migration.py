@@ -3,6 +3,7 @@
 Apply RLS migration to user_exchanges.
 Requires DATABASE_URL in .env (from Supabase Dashboard → Connect → URI).
 """
+
 import os
 import sys
 

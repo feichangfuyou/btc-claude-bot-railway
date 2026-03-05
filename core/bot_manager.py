@@ -44,8 +44,8 @@ class UserBotInstance:
         self.balance = config.start_balance
         self.daily_pnl = 0.0
         self.total_pnl = 0.0
-        self.open_positions = {}
-        self.trades = []
+        self.open_positions: dict[str, dict] = {}
+        self.trades: list[dict] = []
         self.consecutive_losses = 0
         self.last_trade_time = None
         self.created_at = datetime.now()

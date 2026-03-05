@@ -6,15 +6,13 @@ v2 — Enhanced with Stochastic RSI, OBV, Ichimoku Cloud,
 multi-timeframe analysis, Heikin-Ashi, and regime-weighted confluence.
 """
 
-from typing import Optional
 
-
-def calc_ema(prices: list, period: int) -> Optional[float]:
+def calc_ema(prices: list, period: int) -> float | None:
     if len(prices) < 2:
         return None
     n = min(period, len(prices))
     k = 2 / (n + 1)
-    ema = sum(prices[:n]) / n
+    ema: float = sum(prices[:n]) / n
     for p in prices[n:]:
         ema = p * k + ema * (1 - k)
     return round(ema, 2)
@@ -235,7 +233,7 @@ def calc_atr(prices: list, period: int = 14) -> float:
         return 0.0
     trs = [abs(prices[i] - prices[i - 1]) for i in range(1, len(prices))]
     recent = trs[-period:]
-    return round(sum(recent) / len(recent), 2)
+    return float(round(sum(recent) / len(recent), 2))
 
 
 def calc_bb(prices: list, period: int = 20) -> dict:
@@ -253,13 +251,13 @@ def calc_bb(prices: list, period: int = 20) -> dict:
     }
 
 
-def calc_vwap(prices: list, volumes: list) -> Optional[float]:
+def calc_vwap(prices: list, volumes: list) -> float | None:
     if not volumes or not prices or len(prices) != len(volumes):
         return None
     total_vol = sum(volumes)
     if total_vol == 0:
         return None
-    return round(sum(p * v for p, v in zip(prices, volumes)) / total_vol, 2)
+    return float(round(sum(p * v for p, v in zip(prices, volumes)) / total_vol, 2))
 
 
 def calc_macd(prices: list, fast: int = 12, slow: int = 26, signal: int = 9) -> dict:
@@ -273,7 +271,7 @@ def calc_macd(prices: list, fast: int = 12, slow: int = 26, signal: int = 9) -> 
         ef = calc_ema(prices[: i + 1], fast) or 0
         es = calc_ema(prices[: i + 1], slow) or 0
         macd_series.append(ef - es)
-    sig_val = 0
+    sig_val: float = 0
     if len(macd_series) >= signal:
         k = 2 / (signal + 1)
         sig_val = sum(macd_series[:signal]) / signal
@@ -283,13 +281,13 @@ def calc_macd(prices: list, fast: int = 12, slow: int = 26, signal: int = 9) -> 
     return {"macd": macd_val, "signal": sig_val, "histogram": round(macd_val - sig_val, 2)}
 
 
-def calc_momentum(prices: list, period: int = 10) -> Optional[float]:
+def calc_momentum(prices: list, period: int = 10) -> float | None:
     if len(prices) < period + 1:
         return None
-    return round(((prices[-1] - prices[-period - 1]) / prices[-period - 1]) * 100, 4)
+    return float(round(((prices[-1] - prices[-period - 1]) / prices[-period - 1]) * 100, 4))
 
 
-def calc_ema_slope(prices: list, period: int = 9, lookback: int = 5) -> Optional[float]:
+def calc_ema_slope(prices: list, period: int = 9, lookback: int = 5) -> float | None:
     """Rate of change of EMA over lookback periods, as % per period."""
     if len(prices) < period + lookback:
         return None
@@ -307,7 +305,7 @@ def calc_volume_ratio(volumes: list, period: int = 20) -> float:
     avg = sum(volumes[-period - 1 : -1]) / period
     if avg == 0:
         return 1.0
-    return round(volumes[-1] / avg, 2)
+    return float(round(volumes[-1] / avg, 2))
 
 
 def find_support_resistance(prices: list, window: int = 20) -> dict:
@@ -327,7 +325,7 @@ def find_support_resistance(prices: list, window: int = 20) -> dict:
     return {"support": support, "resistance": resistance}
 
 
-def calc_rsi_divergence(prices: list, period: int = 14, lookback: int = 20) -> Optional[str]:
+def calc_rsi_divergence(prices: list, period: int = 14, lookback: int = 20) -> str | None:
     """Detect bullish/bearish RSI divergence over lookback window."""
     if len(prices) < period + lookback:
         return None
@@ -353,7 +351,7 @@ def calc_multi_timeframe_ema(prices: list) -> dict:
     ema21 = calc_ema(prices, 21)
     ema50 = calc_ema(prices, 50)
 
-    if not all([ema5, ema9, ema21, ema50]):
+    if ema5 is None or ema9 is None or ema21 is None or ema50 is None:
         return {"alignment": "neutral", "trend_strength": 0}
 
     if ema5 > ema9 > ema21 > ema50:
@@ -771,7 +769,7 @@ def detect_regime(prices: list, indicators: dict, previous_regime: str = "rangin
 
 def detect_price_patterns(prices: list, tolerance: float = 0.003) -> list[str]:
     """Detect chart patterns from raw price history."""
-    patterns = []
+    patterns: list[str] = []
     if len(prices) < 20:
         return patterns
 

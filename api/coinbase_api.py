@@ -49,26 +49,30 @@ def _get_client():
         return None
 
 
-def _extract_order_id(resp) -> str | None:
+def _extract_order_id(resp) -> str | None:  # type: ignore[return]
     """Extract order_id from CreateOrderResponse (object or dict)."""
     if resp is None:
         return None
     if isinstance(resp, dict):
         if resp.get("success") and resp.get("success_response"):
-            return resp["success_response"].get("order_id")
+            result = resp["success_response"].get("order_id")
+            return str(result) if result is not None else None
         return None
     if getattr(resp, "success", False) and hasattr(resp, "success_response"):
         sr = resp.success_response
         if hasattr(sr, "order_id"):
-            return sr.order_id
+            result = sr.order_id
+            return str(result) if result is not None else None
         if isinstance(sr, dict):
-            return sr.get("order_id")
+            result = sr.get("order_id")
+            return str(result) if result is not None else None
     if hasattr(resp, "order_id"):
-        return resp.order_id
+        result = resp.order_id
+        return str(result) if result is not None else None
     return None
 
 
-def _get_client_with_keys(api_key: str = None, api_secret: str = None):
+def _get_client_with_keys(api_key: str | None = None, api_secret: str | None = None):
     """Get REST client. Uses provided keys if given, else global client."""
     if api_key and api_secret:
         try:
@@ -87,10 +91,10 @@ def _get_client_with_keys(api_key: str = None, api_secret: str = None):
 async def create_spot_market_order(
     symbol: str,
     side: str,
-    quote_size_usd: float = None,
-    base_size: float = None,
-    api_key: str = None,
-    api_secret: str = None,
+    quote_size_usd: float | None = None,
+    base_size: float | None = None,
+    api_key: str | None = None,
+    api_secret: str | None = None,
 ) -> str | None:
     """
     Create a spot market order on Coinbase Advanced Trade.
@@ -222,7 +226,7 @@ async def close_perpetual_position(
         return False
 
 
-async def list_perpetuals_positions(portfolio_uuid: str = None) -> list:
+async def list_perpetuals_positions(portfolio_uuid: str | None = None) -> list:
     """
     List open perpetual positions from Coinbase. Requires portfolio UUID.
     Returns a list of position dicts in bot.open_positions format for merge.
@@ -249,7 +253,7 @@ async def list_perpetuals_positions(portfolio_uuid: str = None) -> list:
         return []
 
     positions = getattr(resp, "positions", None) or []
-    out = []
+    out: list[dict] = []
 
     for p in positions:
         product_id = getattr(p, "product_id", None) or p.get("product_id") if isinstance(p, dict) else None

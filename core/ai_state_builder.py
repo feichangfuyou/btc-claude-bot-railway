@@ -5,15 +5,9 @@ Used when USE_CELERY_AI=true — backend builds state, worker runs analysis.
 
 from ai.claude_ai import _build_enhanced_coin_snapshot, _build_trade_analytics
 from core.config import (
-    AI_COST_PER_TRADE,
-    GAS_COST_USD,
-    ONCHAIN_SLIPPAGE,
-    PAPER_TRADING,
     PROFIT_TO_TARGET,
-    ROUND_TRIP_FEE,
     START_BALANCE,
 )
-from api.agentkit_provider import agentkit
 from learning.trade_memory import build_memory_briefing, get_pattern_verdict
 
 
@@ -25,7 +19,6 @@ def build_ai_state(bot) -> dict:
             coins_snapshot[sym] = _build_enhanced_coin_snapshot(cs, sym)
 
     ok, block_reason = bot.can_trade()
-    open_symbols = [p.get("symbol", "BTC") for p in bot.open_positions]
     trade_analytics = _build_trade_analytics(bot.trades[:30])
     memory_briefing = build_memory_briefing()
 
@@ -44,10 +37,6 @@ def build_ai_state(bot) -> dict:
     progress_pct = round(progress / max(user_profit_goal, 1) * 100, 1)
     balance = bot.account.get("balance", START_BALANCE)
 
-    is_live = not PAPER_TRADING and agentkit.ready
-    fee_pct = ROUND_TRIP_FEE + (ONCHAIN_SLIPPAGE if is_live else 0)
-    fixed_cost = AI_COST_PER_TRADE + (GAS_COST_USD * 2 if is_live else 0)
-
     recent_trades = bot.trades[:5]
     recent_losses = sum(1 for t in recent_trades if t.get("pnl", 0) <= 0)
     losing_streak = 0
@@ -57,7 +46,7 @@ def build_ai_state(bot) -> dict:
         else:
             break
 
-    anti_overtrade = {
+    anti_overtrade: dict[str, int | float | bool | str] = {
         "recent_5_losses": recent_losses,
         "current_losing_streak": losing_streak,
         "heightened_caution": losing_streak >= 2,

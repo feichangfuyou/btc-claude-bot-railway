@@ -12,7 +12,11 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 # Multi-key pool for 10k scale: ANTHROPIC_API_KEYS=key1,key2,key3 (comma-separated)
 # Each key: 120 calls/hour. 10 keys = 1,200/hour. Falls back to ANTHROPIC_API_KEY if unset.
 _KEYS_RAW = os.getenv("ANTHROPIC_API_KEYS", "").strip()
-ANTHROPIC_API_KEYS = [k.strip() for k in _KEYS_RAW.split(",") if k.strip()] if _KEYS_RAW else ([ANTHROPIC_API_KEY] if ANTHROPIC_API_KEY else [])
+ANTHROPIC_API_KEYS = (
+    [k.strip() for k in _KEYS_RAW.split(",") if k.strip()]
+    if _KEYS_RAW
+    else ([ANTHROPIC_API_KEY] if ANTHROPIC_API_KEY else [])
+)
 COINBASE_API_KEY = os.getenv("COINBASE_API_KEY", "")
 COINBASE_API_SECRET = os.getenv("COINBASE_API_SECRET", "")
 PAPER_TRADING = os.getenv("PAPER_TRADING", "true").lower() == "true"
@@ -177,8 +181,8 @@ FALLBACK_POLL_SEC = int(os.getenv("FALLBACK_POLL_SEC", "4"))  # fallback poll wh
 def coingecko_url_for_coins(symbols: list[str]) -> str:
     from strategy.symbol_registry import get_coingecko_id
 
-    ids = [get_coingecko_id(s) for s in symbols if get_coingecko_id(s)]
+    ids = [cg_id for s in symbols if (cg_id := get_coingecko_id(s))]
     if not ids:
-        ids = ["bitcoin"]  # fallback so we never hit empty-ids API call
+        ids = ["bitcoin"]
     ids_str = ",".join(ids)
     return f"{COINGECKO_BASE_URL}?ids={ids_str}&vs_currencies=usd&include_24hr_change=true"

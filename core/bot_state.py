@@ -6,6 +6,7 @@ import asyncio
 import os
 import time
 from datetime import datetime
+from typing import Any
 
 from fastapi import WebSocket
 
@@ -68,7 +69,7 @@ class BotState:
         for sym in ACTIVE_COINS:
             self.coins[sym] = CoinState(sym)
 
-        self.fear_greed = {"value": 50, "label": "Neutral"}
+        self.fear_greed: dict[str, Any] = {"value": 50, "label": "Neutral"}
 
         saved_account = db_load_state("account")
         self.account = saved_account or {
@@ -136,6 +137,7 @@ class BotState:
             asyncio.create_task(capture_trade_screenshot(trade_id, symbol, phase, trade_info))
         except Exception as e:
             from core.database import file_log
+
             file_log(f"Screenshot capture error [{symbol}]: {e}", "warning")
 
     def _available_spot_exchanges(self) -> list[str]:
@@ -459,12 +461,13 @@ class BotState:
         )
 
         coin_state = self.coins.get(pos_symbol)
+        fg_value = int(self.fear_greed.get("value", 50))
         try:
             record_trade_memory(
                 trade,
                 pos,
                 coin_state,
-                self.fear_greed.get("value", 50),
+                fg_value,
                 self.account["balance"],
             )
         except Exception as e:
@@ -488,6 +491,7 @@ class BotState:
                 self.add_log("📉 Loss recorded — learning cycle run to internalize mistake", "dim")
             except Exception as e:
                 from core.database import file_log
+
                 file_log(f"Post-loss learning cycle error [{pos_symbol}]: {e}", "warning")
         color = "success" if net >= 0 else "error"
         self.add_log(
@@ -556,16 +560,18 @@ class BotState:
         )
 
         coin_state = self.coins.get(pos_symbol)
+        fg_value = int(self.fear_greed.get("value", 50))
         try:
             record_trade_memory(
                 trade,
                 pos,
                 coin_state,
-                self.fear_greed.get("value", 50),
+                fg_value,
                 self.account["balance"],
             )
         except Exception as e:
             from core.database import file_log
+
             file_log(f"Trade memory record error [{pos_symbol}]: {e}", "warning")
 
         self.remove_position(pos)
@@ -586,6 +592,7 @@ class BotState:
                 self.add_log("📉 Loss recorded — learning cycle run", "dim")
             except Exception as e:
                 from core.database import file_log
+
                 file_log(f"Post-loss learning cycle error [{pos_symbol}]: {e}", "warning")
 
         log_level = "warning" if net < 0 else "success"
@@ -726,7 +733,7 @@ class BotState:
         )
 
     # ── Trade eligibility ─────────────────────────────────────────────────
-    def can_trade(self, symbol: str = None) -> tuple[bool, str]:
+    def can_trade(self, symbol: str | None = None) -> tuple[bool, str]:
         if self._drawdown_killed:
             return False, "max drawdown kill switch triggered — bot permanently stopped"
         if self._emergency_stopped:
@@ -772,7 +779,7 @@ class BotState:
                 f"daily loss limit hit (${abs(effective_daily):.2f} incl. unrealized, limit ${loss_limit:.2f})",
             )
 
-        fg_val = self.fear_greed.get("value", 50)
+        fg_val = int(self.fear_greed.get("value", 50))
         if fg_val <= 5 or fg_val >= 95:
             zone = "Extreme Fear" if fg_val <= 5 else "Extreme Greed"
             return (
@@ -1043,12 +1050,13 @@ class BotState:
         )
 
         coin_state = self.coins.get(pos_symbol)
+        fg_value = int(self.fear_greed.get("value", 50))
         try:
             record_trade_memory(
                 trade,
                 pos,
                 coin_state,
-                self.fear_greed.get("value", 50),
+                fg_value,
                 self.account["balance"],
             )
         except Exception as e:
@@ -1072,6 +1080,7 @@ class BotState:
                 self.add_log("📉 Loss recorded — learning cycle run to internalize mistake", "dim")
             except Exception as e:
                 from core.database import file_log
+
                 file_log(f"Post-loss learning cycle error [{pos_symbol}]: {e}", "warning")
         ex_label = f" ({pos.get('exchange', 'paper').upper()})" if pos.get("exchange") else ""
         self.add_log(
@@ -1509,7 +1518,7 @@ class BotState:
             for sym, cs in self.coins.items():
                 if cs.price > 0:
                     try:
-                        record_market_snapshot(cs, self.fear_greed.get("value", 50))
+                        record_market_snapshot(cs, int(self.fear_greed.get("value", 50)))
                     except Exception:
                         pass
 

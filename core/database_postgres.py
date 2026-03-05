@@ -35,6 +35,7 @@ def _get_database_url() -> Optional[str]:
     match = re.search(r"https://([a-z0-9]+)\.supabase\.co", supabase_url)
     if match and password:
         from urllib.parse import quote_plus
+
         encoded = quote_plus(password)
         return f"postgresql://postgres:{encoded}@db.{match.group(1)}.supabase.co:5432/postgres"
     return None
@@ -50,6 +51,7 @@ def _pg_available() -> bool:
         return False
     try:
         import psycopg2
+
         conn = psycopg2.connect(url)
         conn.close()
         _PG_AVAILABLE = True
@@ -162,6 +164,7 @@ def db_save_trade(trade: dict):
 
 def db_save_state(key: str, value: Any):
     import psycopg2.extras
+
     with _conn() as conn:
         cur = conn.cursor()
         cur.execute(
@@ -346,10 +349,15 @@ def db_update_strategy_stats(symbol: str, side: str, regime: str, pnl: float, wi
                 total_trades = %s, wins = %s, total_pnl = %s, avg_pnl = %s, best_pnl = %s,
                 worst_pnl = %s, avg_hold_sec = %s, last_updated = %s WHERE strategy_key = %s""",
                 (
-                    total, wins, round(total_pnl, 2), round(total_pnl / total, 2),
-                    max(row["best_pnl"], pnl), min(row["worst_pnl"], pnl),
+                    total,
+                    wins,
+                    round(total_pnl, 2),
+                    round(total_pnl / total, 2),
+                    max(row["best_pnl"], pnl),
+                    min(row["worst_pnl"], pnl),
                     round((row["avg_hold_sec"] * row["total_trades"] + hold_sec) / total, 1),
-                    ts, key,
+                    ts,
+                    key,
                 ),
             )
         else:
@@ -433,9 +441,7 @@ def db_get_pattern_stats(min_samples: int = 3) -> list[dict]:
 def db_get_strategy_stats() -> list[dict]:
     with _conn() as conn:
         cur = conn.cursor()
-        cur.execute(
-            """SELECT * FROM app_strategy_stats WHERE total_trades >= 2 ORDER BY avg_pnl DESC"""
-        )
+        cur.execute("""SELECT * FROM app_strategy_stats WHERE total_trades >= 2 ORDER BY avg_pnl DESC""")
         return [dict(r) for r in cur.fetchall()]
 
 
@@ -522,8 +528,13 @@ def db_get_recent_trade_contexts(limit: int = 20) -> list[dict]:
 
 
 def db_save_learned_rule(
-    rule_type: str, rule_key: str, description: str,
-    confidence: float, sample_size: int, win_rate: float, avg_pnl: float,
+    rule_type: str,
+    rule_key: str,
+    description: str,
+    confidence: float,
+    sample_size: int,
+    win_rate: float,
+    avg_pnl: float,
 ):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with _conn() as conn:
@@ -772,7 +783,7 @@ def db_save_audit_entry(entry: dict):
         file_log(f"Audit log save error: {e}", "error")
 
 
-def db_get_audit_log(limit: int = 50, symbol: str = None, action: str = None) -> list[dict]:
+def db_get_audit_log(limit: int = 50, symbol: str | None = None, action: str | None = None) -> list[dict]:
     with _conn() as conn:
         cur = conn.cursor()
         where, params = [], []
@@ -821,6 +832,7 @@ def db_get_audit_by_hash(reasoning_hash: str) -> dict | None:
 def db_cleanup_old_audit_entries(retention_days: int = 365):
     try:
         from datetime import timedelta
+
         cutoff = (datetime.now() - timedelta(days=retention_days)).strftime("%Y-%m-%d %H:%M:%S")
         with _conn() as conn:
             cur = conn.cursor()
