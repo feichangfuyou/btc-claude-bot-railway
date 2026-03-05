@@ -1,15 +1,18 @@
-"""
-Binance Spot REST API — public market data only (no auth).
-Used for instant bootstrap and fallback; Binance has highest liquidity and uptime.
-No API keys required for price data.
-"""
-
+import hmac
+import hashlib
+import time
 import json
-from typing import Any
+import urllib.parse
+from typing import Any, Optional
 
 import httpx
 
-from core.config import ACTIVE_COINS, PRICE_FETCH_TIMEOUT
+from core.config import (
+    ACTIVE_COINS, 
+    PRICE_FETCH_TIMEOUT,
+    BINANCE_API_KEY,
+    BINANCE_API_SECRET
+)
 
 BINANCE_REST_URL = "https://api.binance.com"
 # Alternative: data-api.binance.vision (EU/US-friendly)
@@ -18,6 +21,17 @@ BINANCE_REST_URL = "https://api.binance.com"
 def _binance_symbol(s: str) -> str:
     """BTC -> BTCUSDT, ETH -> ETHUSDT."""
     return f"{s.upper()}USDT"
+
+
+def _binance_sign(params: dict, secret: str) -> str:
+    """Generate Binance HMAC SHA256 signature."""
+    query = urllib.parse.urlencode(params)
+    return hmac.new(secret.encode("utf-8"), query.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def is_configured() -> bool:
+    """Return True if Binance API keys are set."""
+    return bool(BINANCE_API_KEY and BINANCE_API_SECRET)
 
 
 async def fetch_binance_prices(bot, only_fill_missing: bool = False) -> bool:
@@ -204,3 +218,86 @@ def fetch_top_tickers_kraken(limit: int = 500) -> list[dict]:
         return result[:limit]
     except Exception:
         return []
+
+
+async def binance_private_request(
+    endpoint: str,
+    method: str = "GET",
+    params: dict | None = None,
+    api_key: str | None = None,
+    api_secret: str | None = None,
+) -> Any:
+    """Make an authenticated request to Binance."""
+    key = api_key or BINANCE_API_KEY
+    secret = api_secret or BINANCE_API_SECRET
+    if not key or not secret:
+        return None
+
+    url = f"{BINANCE_REST_URL}{endpoint}"
+    full_params = dict(params or {})
+    full_params["timestamp"] = int(time.time() * 1000)
+    full_params["recvWindow"] = 5000
+    full_params["signature"] = _binance_sign(full_params, secret)
+
+    headers = {"X-MBX-APIKEY": key}
+    try:
+        async with httpx.AsyncClient(timeout=PRICE_FETCH_TIMEOUT) as client:
+            if method.upper() == "GET":
+                r = await client.get(url, headers=headers, params=full_params)
+            else:
+                # Binance requires params for auth in POST too if not in body
+                r = await client.post(url, headers=headers, params=full_params)
+            r.raise_for_status()
+            return r.json()
+    except Exception:
+        return None
+
+
+async def get_balance_usd() -> float:
+    """Get Binance account total balance in USDT."""
+    res = await binance_private_request("/api/v3/account")
+    if not res or "balances" not in res:
+        return 0.0
+    # Simplification: return USDT balance
+    for b in res["balances"]:
+        if b["asset"] == "USDT":
+            return float(b["free"]) + float(b["locked"])
+    return 0.0
+
+
+async def add_market_order(
+    symbol: str, 
+    side: str, 
+    quantity: float,
+    api_key: str | None = None,
+    api_secret: str | None = None,
+) -> dict | None:
+    """Place market order on Binance. quantity is in base asset."""
+    params = {
+        "symbol": _binance_symbol(symbol),
+        "side": side.upper(),
+        "type": "MARKET",
+        "quantity": f"{quantity:.8f}".rstrip("0").rstrip("."),
+    }
+    return await binance_private_request(
+        "/api/v3/order", method="POST", params=params, api_key=api_key, api_secret=api_secret
+    )
+
+
+async def add_market_order_by_quote(
+    symbol: str,
+    side: str,
+    quote_order_qty: float,
+    api_key: str | None = None,
+    api_secret: str | None = None,
+) -> dict | None:
+    """Place market order by quote (USDT) amount."""
+    params = {
+        "symbol": _binance_symbol(symbol),
+        "side": side.upper(),
+        "type": "MARKET",
+        "quoteOrderQty": f"{quote_order_qty:.2f}",
+    }
+    return await binance_private_request(
+        "/api/v3/order", method="POST", params=params, api_key=api_key, api_secret=api_secret
+    )

@@ -39,12 +39,13 @@ def _readiness_scale_10k() -> dict:
         pool_n = pool_size()
     except Exception:
         pass
+    ready = (is_redis_available() and (USE_CELERY_AI or pool_n >= 5) and (pg_ok or not USE_SUPABASE_STORAGE))
     return {
         "redis": is_redis_available(),
         "celery_ai": USE_CELERY_AI,
         "postgres_storage": pg_ok,
         "multi_key_pool": pool_n > 1,
-        "ready": (is_redis_available() and (USE_CELERY_AI or pool_n >= 5) and (pg_ok or not USE_SUPABASE_STORAGE)),
+        "ready": bool(ready),
     }
 
 

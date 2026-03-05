@@ -13,14 +13,17 @@ from typing import Any, Optional
 logger = logging.getLogger("claudebot.redis")
 
 _redis_client: Optional[Any] = None
-_redis_available = False
+_redis_available: Optional[bool] = None
 
 
 def _get_redis():
     """Lazy init Redis connection. Returns None if REDIS_URL unset."""
     global _redis_client, _redis_available
-    if _redis_client is not None or _redis_available is False:
+    if _redis_client is not None:
         return _redis_client
+    if _redis_available is False:
+        return None  # Already tried and failed in this process
+
     url = os.getenv("REDIS_URL", "").strip()
     if not url:
         _redis_available = False

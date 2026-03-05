@@ -122,6 +122,7 @@ export default function Settings() {
   const [presets, setPresets] = useState(PRESETS_FALLBACK);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const [keyModal, setKeyModal] = useState(null);
   const [apiKey, setApiKey] = useState("");
@@ -130,10 +131,22 @@ export default function Settings() {
 
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      if (!cancelled) setLoadError(true);
+    }, 6000);
     supabase.from("user_preferences").select("*").eq("user_id", user.id).single()
-      .then(({ data }) => { if (data) setPrefs(data); });
+      .then(({ data }) => {
+        if (!cancelled) {
+          clearTimeout(timer);
+          if (data) setPrefs(data);
+          else setLoadError(true);
+        }
+      })
+      .catch(() => { if (!cancelled) setLoadError(true); });
     supabase.from("user_exchanges").select("exchange, connection_type, is_active").eq("user_id", user.id)
-      .then(({ data }) => { if (data) setExchanges(data); });
+      .then(({ data }) => { if (!cancelled && data) setExchanges(data); });
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [user]);
 
   useEffect(() => {
@@ -141,7 +154,7 @@ export default function Settings() {
     const url = base ? `${base}/api/presets` : "/api/presets";
     fetch(url, { headers: getAuthHeaders() }).then(r => r.ok && r.json()).then(d => {
       if (d?.presets?.length) setPresets(d.presets);
-    }).catch(() => {});
+    }).catch(() => { });
   }, [getAuthHeaders]);
 
   function updatePref(key, value) {
@@ -233,6 +246,21 @@ export default function Settings() {
     setExchanges(prev => prev.map(e => e.exchange === exchange ? { ...e, is_active: false } : e));
   }
 
+  if (loadError) {
+    return (
+      <>
+        <style>{responsiveCss}</style>
+        <div style={styles.container}>
+          <div style={{ color: "#C0392B", fontSize: 12, textAlign: "center", paddingTop: 60 }}>
+            Could not load settings. Check your connection and try again.
+            <br /><br />
+            <button style={styles.saveBtn} onClick={() => window.location.reload()}>Retry</button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   if (!prefs) {
     return (
       <>
@@ -246,168 +274,168 @@ export default function Settings() {
 
   return (
     <>
-    <style>{responsiveCss}</style>
-    <div style={styles.container}>
-      <div style={styles.page} className="settings-page">
-        <div style={styles.header}>
-          <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>&larr; Dashboard</button>
-          <h1 style={styles.title}>SETTINGS</h1>
-        </div>
-
-        {/* Account */}
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Account</h2>
-          <div style={styles.row}>
-            <span style={styles.rowLabel}>Email</span>
-            <span>{profile?.email || user?.email}</span>
+      <style>{responsiveCss}</style>
+      <div style={styles.container}>
+        <div style={styles.page} className="settings-page">
+          <div style={styles.header}>
+            <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>&larr; Dashboard</button>
+            <h1 style={styles.title}>SETTINGS</h1>
           </div>
-          <div style={styles.row}>
-            <span style={styles.rowLabel}>Plan</span>
-            <span style={{ color: colors.gold, textTransform: "capitalize" }}>{profile?.subscription_tier || "Starter"}</span>
-          </div>
-          <button style={styles.dangerBtn} onClick={signOut}>Sign Out</button>
-        </section>
 
-        {/* Connected Exchanges */}
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Connected Exchanges</h2>
-          {["coinbase", "kraken", "binance", "onchain"].map(ex => {
-            const conn = exchanges.find(e => e.exchange === ex && e.is_active);
-            const connectedCount = exchanges.filter(e => e.is_active).length;
-            const maxExchanges = TIER_MAX_EXCHANGES[profile?.subscription_tier || "starter"] ?? 1;
-            const atLimit = !conn && connectedCount >= maxExchanges;
-            return (
-              <div key={ex} style={styles.exchangeRow}>
-                <div>
-                  <div style={styles.exchangeName}>{ex.charAt(0).toUpperCase() + ex.slice(1)}</div>
-                  <div style={{ fontSize: 10, color: conn ? colors.success : colors.muted }}>
-                    {conn ? `Connected (${conn.connection_type})` : "Not connected"}
+          {/* Account */}
+          <section style={styles.section}>
+            <h2 style={styles.sectionTitle}>Account</h2>
+            <div style={styles.row}>
+              <span style={styles.rowLabel}>Email</span>
+              <span>{profile?.email || user?.email}</span>
+            </div>
+            <div style={styles.row}>
+              <span style={styles.rowLabel}>Plan</span>
+              <span style={{ color: colors.gold, textTransform: "capitalize" }}>{profile?.subscription_tier || "Starter"}</span>
+            </div>
+            <button style={styles.dangerBtn} onClick={signOut}>Sign Out</button>
+          </section>
+
+          {/* Connected Exchanges */}
+          <section style={styles.section}>
+            <h2 style={styles.sectionTitle}>Connected Exchanges</h2>
+            {["coinbase", "kraken", "binance", "onchain"].map(ex => {
+              const conn = exchanges.find(e => e.exchange === ex && e.is_active);
+              const connectedCount = exchanges.filter(e => e.is_active).length;
+              const maxExchanges = TIER_MAX_EXCHANGES[profile?.subscription_tier || "starter"] ?? 1;
+              const atLimit = !conn && connectedCount >= maxExchanges;
+              return (
+                <div key={ex} style={styles.exchangeRow}>
+                  <div>
+                    <div style={styles.exchangeName}>{ex.charAt(0).toUpperCase() + ex.slice(1)}</div>
+                    <div style={{ fontSize: 10, color: conn ? colors.success : colors.muted }}>
+                      {conn ? `Connected (${conn.connection_type})` : "Not connected"}
+                    </div>
                   </div>
+                  {conn ? (
+                    <button style={styles.disconnectBtn} onClick={() => handleDisconnect(ex)}>Disconnect</button>
+                  ) : atLimit ? (
+                    <button style={styles.connectBtn} onClick={() => navigate("/billing")}>
+                      Upgrade to add more
+                    </button>
+                  ) : (
+                    <button style={styles.connectBtn} onClick={() => setKeyModal(ex)}>
+                      {ex === "coinbase" ? "Connect" : "Add Key"}
+                    </button>
+                  )}
                 </div>
-                {conn ? (
-                  <button style={styles.disconnectBtn} onClick={() => handleDisconnect(ex)}>Disconnect</button>
-                ) : atLimit ? (
-                  <button style={styles.connectBtn} onClick={() => navigate("/billing")}>
-                    Upgrade to add more
-                  </button>
-                ) : (
-                  <button style={styles.connectBtn} onClick={() => setKeyModal(ex)}>
-                    {ex === "coinbase" ? "Connect" : "Add Key"}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </section>
+              );
+            })}
+          </section>
 
-        {/* Trading Preferences */}
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Trading</h2>
+          {/* Trading Preferences */}
+          <section style={styles.section}>
+            <h2 style={styles.sectionTitle}>Trading</h2>
 
-          <label style={styles.label}>Strategy Preset</label>
-          <select value={prefs.trading_preset} onChange={e => updatePref("trading_preset", e.target.value)} style={styles.select}>
-            {presets.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.name} {p.category ? `(${p.category})` : ""}
-              </option>
-            ))}
-          </select>
+            <label style={styles.label}>Strategy Preset</label>
+            <select value={prefs.trading_preset} onChange={e => updatePref("trading_preset", e.target.value)} style={styles.select}>
+              {presets.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.name} {p.category ? `(${p.category})` : ""}
+                </option>
+              ))}
+            </select>
 
-          <label style={styles.label}>Risk Level</label>
-          <div style={styles.riskRow}>
-            {["conservative", "moderate", "aggressive"].map(r => (
+            <label style={styles.label}>Risk Level</label>
+            <div style={styles.riskRow}>
+              {["conservative", "moderate", "aggressive"].map(r => (
+                <button
+                  key={r}
+                  style={{ ...styles.riskBtn, ...(prefs.risk_level === r ? styles.riskActive : {}) }}
+                  onClick={() => updatePref("risk_level", r)}
+                >
+                  {r.charAt(0).toUpperCase() + r.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            <label style={styles.label}>Direction Bias</label>
+            <div style={styles.riskRow}>
+              {["long", "short", "both"].map(d => (
+                <button
+                  key={d}
+                  style={{ ...styles.riskBtn, ...(prefs.direction_bias === d ? styles.riskActive : {}) }}
+                  onClick={() => updatePref("direction_bias", d)}
+                >
+                  {d.charAt(0).toUpperCase() + d.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            <label style={styles.label}>Coins</label>
+            <div style={styles.coinGrid}>
+              {ALL_COINS.map(c => (
+                <button
+                  key={c}
+                  style={{ ...styles.coinBtn, ...((prefs.coins || []).includes(c) ? styles.coinActive : {}) }}
+                  onClick={() => toggleCoin(c)}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+
+            <label style={styles.label}>Paper Trading</label>
+            <div style={styles.riskRow}>
               <button
-                key={r}
-                style={{ ...styles.riskBtn, ...(prefs.risk_level === r ? styles.riskActive : {}) }}
-                onClick={() => updatePref("risk_level", r)}
+                style={{ ...styles.riskBtn, ...(prefs.paper_trading ? { borderColor: colors.success, color: colors.success } : {}) }}
+                onClick={() => updatePref("paper_trading", true)}
               >
-                {r.charAt(0).toUpperCase() + r.slice(1)}
+                ON
               </button>
-            ))}
-          </div>
-
-          <label style={styles.label}>Direction Bias</label>
-          <div style={styles.riskRow}>
-            {["long", "short", "both"].map(d => (
               <button
-                key={d}
-                style={{ ...styles.riskBtn, ...(prefs.direction_bias === d ? styles.riskActive : {}) }}
-                onClick={() => updatePref("direction_bias", d)}
+                style={{ ...styles.riskBtn, ...(!prefs.paper_trading ? { borderColor: colors.error, color: colors.error } : {}) }}
+                onClick={() => updatePref("paper_trading", false)}
               >
-                {d.charAt(0).toUpperCase() + d.slice(1)}
+                OFF (Live)
               </button>
-            ))}
-          </div>
+            </div>
 
-          <label style={styles.label}>Coins</label>
-          <div style={styles.coinGrid}>
-            {ALL_COINS.map(c => (
+            <label style={styles.label}>Trade Approval Required</label>
+            <div style={styles.riskRow}>
               <button
-                key={c}
-                style={{ ...styles.coinBtn, ...((prefs.coins || []).includes(c) ? styles.coinActive : {}) }}
-                onClick={() => toggleCoin(c)}
+                style={{ ...styles.riskBtn, ...(prefs.require_trade_approval ? styles.riskActive : {}) }}
+                onClick={() => updatePref("require_trade_approval", true)}
               >
-                {c}
+                Yes
               </button>
-            ))}
-          </div>
+              <button
+                style={{ ...styles.riskBtn, ...(!prefs.require_trade_approval ? styles.riskActive : {}) }}
+                onClick={() => updatePref("require_trade_approval", false)}
+              >
+                No
+              </button>
+            </div>
 
-          <label style={styles.label}>Paper Trading</label>
-          <div style={styles.riskRow}>
-            <button
-              style={{ ...styles.riskBtn, ...(prefs.paper_trading ? { borderColor: colors.success, color: colors.success } : {}) }}
-              onClick={() => updatePref("paper_trading", true)}
-            >
-              ON
-            </button>
-            <button
-              style={{ ...styles.riskBtn, ...(!prefs.paper_trading ? { borderColor: colors.error, color: colors.error } : {}) }}
-              onClick={() => updatePref("paper_trading", false)}
-            >
-              OFF (Live)
-            </button>
-          </div>
+            <div style={styles.saveRow}>
+              <button style={styles.saveBtn} onClick={handleSave} disabled={saving}>
+                {saving ? "Saving..." : saved ? "\u2713 Saved" : "Save Changes"}
+              </button>
+            </div>
+          </section>
 
-          <label style={styles.label}>Trade Approval Required</label>
-          <div style={styles.riskRow}>
-            <button
-              style={{ ...styles.riskBtn, ...(prefs.require_trade_approval ? styles.riskActive : {}) }}
-              onClick={() => updatePref("require_trade_approval", true)}
-            >
-              Yes
-            </button>
-            <button
-              style={{ ...styles.riskBtn, ...(!prefs.require_trade_approval ? styles.riskActive : {}) }}
-              onClick={() => updatePref("require_trade_approval", false)}
-            >
-              No
-            </button>
-          </div>
-
-          <div style={styles.saveRow}>
-            <button style={styles.saveBtn} onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : saved ? "\u2713 Saved" : "Save Changes"}
-            </button>
-          </div>
-        </section>
-
-        {/* API Key Modal */}
-        {keyModal && (
-          <div style={styles.modalOverlay} onClick={() => setKeyModal(null)}>
-            <div style={styles.modal} className="settings-modal" onClick={e => e.stopPropagation()}>
-              <h3 style={styles.modalTitle}>Add {keyModal.charAt(0).toUpperCase() + keyModal.slice(1)} API Key</h3>
-              {keyError && <div style={styles.error}>{keyError}</div>}
-              <input type="text" placeholder="API Key" value={apiKey} onChange={e => setApiKey(e.target.value)} style={styles.input} />
-              <input type="password" placeholder="API Secret" value={apiSecret} onChange={e => setApiSecret(e.target.value)} style={{ ...styles.input, marginTop: 8 }} />
-              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                <button style={styles.backBtn} onClick={() => { setKeyModal(null); setKeyError(""); }}>Cancel</button>
-                <button style={styles.saveBtn} onClick={handleAddKey}>Save Key</button>
+          {/* API Key Modal */}
+          {keyModal && (
+            <div style={styles.modalOverlay} onClick={() => setKeyModal(null)}>
+              <div style={styles.modal} className="settings-modal" onClick={e => e.stopPropagation()}>
+                <h3 style={styles.modalTitle}>Add {keyModal.charAt(0).toUpperCase() + keyModal.slice(1)} API Key</h3>
+                {keyError && <div style={styles.error}>{keyError}</div>}
+                <input type="text" placeholder="API Key" value={apiKey} onChange={e => setApiKey(e.target.value)} style={styles.input} />
+                <input type="password" placeholder="API Secret" value={apiSecret} onChange={e => setApiSecret(e.target.value)} style={{ ...styles.input, marginTop: 8 }} />
+                <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                  <button style={styles.backBtn} onClick={() => { setKeyModal(null); setKeyError(""); }}>Cancel</button>
+                  <button style={styles.saveBtn} onClick={handleAddKey}>Save Key</button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
     </>
   );
 }

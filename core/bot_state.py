@@ -20,6 +20,7 @@ from core.config import (
     BREAKEVEN_TRIGGER_PCT,
     CLAUDE_INTERVAL,
     DIRECTION_BIAS,
+    ENABLE_BINANCE,
     ENABLE_FUTURES,
     ENABLE_KRAKEN,
     FUTURES_LEVERAGE,
@@ -150,12 +151,12 @@ class BotState:
                 exchanges.append("coinbase")
         except Exception:
             pass
-        if ENABLE_KRAKEN:
+        if ENABLE_BINANCE:
             try:
-                from api.kraken_api import is_configured as kraken_configured
+                from api.binance_api import is_configured as binance_configured
 
-                if kraken_configured():
-                    exchanges.append("kraken")
+                if binance_configured():
+                    exchanges.append("binance")
             except Exception:
                 pass
         return exchanges
@@ -303,6 +304,15 @@ class BotState:
 
                 self.add_log(f"{reason} [{pos_symbol}] — closing on-chain position...", "warning")
                 asyncio.create_task(close_onchain(self, pos, reason=reason))
+                continue
+
+            if not PAPER_TRADING and pos.get("exchange") == "binance":
+                from executors.binance_executor import BinanceExecutor
+
+                ex = BinanceExecutor()
+                self.add_log(f"{reason} [{pos_symbol}] — closing Binance position...", "warning")
+                asyncio.create_task(ex.execute_trade(pos_symbol, "sell" if pos["side"] == "buy" else "buy", pos["usd_size"]))
+                self._finalize_close(pos, pos_symbol, coin_size, pnl, reason)
                 continue
 
             if not PAPER_TRADING and pos.get("exchange") == "kraken":
@@ -993,6 +1003,15 @@ class BotState:
             asyncio.create_task(close_onchain(self, pos))
             return
 
+        if not PAPER_TRADING and pos.get("exchange") == "binance":
+            from executors.binance_executor import BinanceExecutor
+
+            ex = BinanceExecutor()
+            asyncio.create_task(ex.execute_trade(pos_symbol, "sell" if pos["side"] == "buy" else "buy", pos["usd_size"]))
+            # we finalize locally for paper compatibility and safety in this bot
+            self._finalize_close(pos, pos_symbol, coin_size, current_price, reason)
+            return
+
         if not PAPER_TRADING and pos.get("exchange") == "kraken":
             from executors.kraken_executor import close_kraken
 
@@ -1311,6 +1330,35 @@ class BotState:
         # Paper mode: create paper positions tagged with the exchange for tracking
         spot_exchange = self._next_spot_exchange()
 
+        if not PAPER_TRADING and spot_exchange == "binance":
+            from executors.binance_executor import BinanceExecutor
+
+            self.last_ai_block_reason = None
+            ex = BinanceExecutor()
+            asyncio.create_task(ex.execute_trade(symbol, action, usd_sz))
+            # Paper-ish tracking for the bot's state
+            self.account["balance"] = round(self.account["balance"] - usd_sz, 2)
+            new_pos = {
+                "id": int(time.time() * 1000),
+                "symbol": symbol,
+                "side": action,
+                "entry": entry,
+                "tp": tp,
+                "sl": sl,
+                "coin_size": coin_sz,
+                "btc_size": coin_sz,
+                "usd_size": usd_sz,
+                "open_ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "confidence": decision.get("confidence", 0),
+                "patterns": decision.get("patterns_detected", []),
+                "exchange": "binance",
+            }
+            self.open_positions.append(new_pos)
+            self.persist_position()
+            self.persist_account()
+            self.add_log(f"🟢 {action.upper()} {symbol} [BINANCE] @ ${entry:,.2f}", "success")
+            return
+
         if not PAPER_TRADING and spot_exchange == "kraken":
             from executors.kraken_executor import execute_kraken
 
@@ -1591,6 +1639,8 @@ class BotState:
             "paper_trading": PAPER_TRADING,
             "test_mode": TEST_MODE,
             "coinbase_connected": self.coinbase_connected,
+            "binance_enabled": ENABLE_BINANCE,
+            "kraken_enabled": ENABLE_KRAKEN,
             "fear_greed": self.fear_greed,
             "agentkit": agentkit.status_snapshot(),
             "consecutive_losses": self.circuit_breaker.consecutive_losses,

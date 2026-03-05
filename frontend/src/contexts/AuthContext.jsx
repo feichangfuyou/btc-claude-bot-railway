@@ -58,11 +58,15 @@ export function AuthProvider({ children }) {
   }
 
   async function signInWithGoogle() {
+    console.log("Initiating Google Sign-In with redirect:", window.location.origin + "/oauth/callback");
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin + "/oauth/callback" },
     });
-    if (error) throw error;
+    if (error) {
+      console.error("Google Sign-In Error:", error);
+      throw error;
+    }
     return data;
   }
 

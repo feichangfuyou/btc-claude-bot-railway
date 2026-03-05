@@ -82,88 +82,88 @@ export default function Billing() {
 
   return (
     <>
-    <style>{responsiveCss}</style>
-    <div style={styles.container}>
-      <div style={styles.page} className="billing-page">
-        <div style={styles.header}>
-          <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>&larr; Dashboard</button>
-          <h1 style={styles.title}>BILLING</h1>
-        </div>
-
-        <div style={styles.currentPlan}>
-          <span style={{ color: colors.muted, fontSize: 11 }}>Current Plan:</span>
-          <span style={{ color: colors.gold, fontFamily: typography.fontButton, fontSize: 16, letterSpacing: 2, textTransform: "uppercase" }}>
-            {currentTier}
-          </span>
-        </div>
-
-        {message && (
-          <div
-            style={{
-              ...styles.message,
-              background: message.type === "error" ? "rgba(192,57,43,0.15)" : message.type === "success" ? "rgba(39,174,96,0.15)" : "rgba(212,175,55,0.1)",
-              borderColor: message.type === "error" ? "rgba(192,57,43,0.5)" : message.type === "success" ? "rgba(39,174,96,0.5)" : "rgba(212,175,55,0.3)",
-              color: message.type === "error" ? colors.error : message.type === "success" ? colors.success : colors.gold,
-            }}
-          >
-            {message.text}
+      <style>{responsiveCss}</style>
+      <div style={styles.container}>
+        <div style={styles.page} className="billing-page">
+          <div style={styles.header}>
+            <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>&larr; Dashboard</button>
+            <h1 style={styles.title}>BILLING</h1>
           </div>
-        )}
 
-        <div style={styles.tierGrid} className="tier-grid">
-          {TIERS.map(tier => (
+          <div style={styles.currentPlan}>
+            <span style={{ color: colors.muted, fontSize: 11 }}>Current Plan:</span>
+            <span style={{ color: colors.gold, fontFamily: typography.fontButton, fontSize: 16, letterSpacing: 2, textTransform: "uppercase" }}>
+              {currentTier}
+            </span>
+          </div>
+
+          {message && (
             <div
-              key={tier.id}
               style={{
-                ...styles.tierCard,
-                borderColor: tier.popular ? colors.gold : colors.border,
-                ...(currentTier === tier.id ? { background: "rgba(212,175,55,0.03)" } : {}),
+                ...styles.message,
+                background: message.type === "error" ? "rgba(192,57,43,0.15)" : message.type === "success" ? "rgba(39,174,96,0.15)" : "rgba(212,175,55,0.1)",
+                borderColor: message.type === "error" ? "rgba(192,57,43,0.5)" : message.type === "success" ? "rgba(39,174,96,0.5)" : "rgba(212,175,55,0.3)",
+                color: message.type === "error" ? colors.error : message.type === "success" ? colors.success : colors.gold,
               }}
             >
-              {tier.popular && <div style={styles.popularBadge}>MOST POPULAR</div>}
-              <div style={{ ...styles.tierName, color: tier.color }}>{tier.name}</div>
-              <div style={styles.tierPrice}>
-                <span style={styles.priceAmount}>{tier.price}</span>
-                <span style={styles.pricePeriod}>{tier.period}</span>
-              </div>
-              <ul style={styles.featureList}>
-                {tier.features.map((f, i) => (
-                  <li key={i} style={styles.featureItem}>
-                    <span style={{ color: colors.success }}>&#10003;</span> {f}
-                  </li>
-                ))}
-              </ul>
-              {currentTier === tier.id ? (
-                <div style={styles.currentBadge}>Current Plan</div>
-              ) : (
-                <button
-                  style={styles.selectBtn}
-                  onClick={() => handleSelectPlan(tier.id)}
-                  disabled={loading}
-                >
-                  {loading ? "Redirecting…" : TIERS.findIndex(t => t.id === tier.id) > TIERS.findIndex(t => t.id === currentTier) ? "Upgrade" : "Downgrade"}
-                </button>
-              )}
+              {message.text}
             </div>
-          ))}
-        </div>
+          )}
 
-        <div style={styles.faq}>
-          <div style={styles.faqItem}>
-            <div style={styles.faqQ}>Can I cancel anytime?</div>
-            <div style={styles.faqA}>Yes. Cancel anytime from this page. Your bot will continue until the end of your billing period.</div>
+          <div style={styles.tierGrid} className="tier-grid">
+            {TIERS.map(tier => (
+              <div
+                key={tier.id}
+                style={{
+                  ...styles.tierCard,
+                  borderColor: tier.popular ? colors.gold : colors.border,
+                  ...(currentTier === tier.id ? { background: "rgba(212,175,55,0.03)" } : {}),
+                }}
+              >
+                {tier.popular && <div style={styles.popularBadge}>MOST POPULAR</div>}
+                <div style={{ ...styles.tierName, color: tier.color }}>{tier.name}</div>
+                <div style={styles.tierPrice}>
+                  <span style={styles.priceAmount}>{tier.price}</span>
+                  <span style={styles.pricePeriod}>{tier.period}</span>
+                </div>
+                <ul style={styles.featureList}>
+                  {tier.features.map((f, i) => (
+                    <li key={i} style={styles.featureItem}>
+                      <span style={{ color: colors.success }}>&#10003;</span> {f}
+                    </li>
+                  ))}
+                </ul>
+                {currentTier === tier.id ? (
+                  <div style={styles.currentBadge}>Current Plan</div>
+                ) : (
+                  <button
+                    style={styles.selectBtn}
+                    onClick={() => handleSelectPlan(tier.id)}
+                    disabled={loading}
+                  >
+                    {loading ? "Redirecting…" : TIERS.findIndex(t => t.id === tier.id) > TIERS.findIndex(t => t.id === currentTier) ? "Upgrade" : "Downgrade"}
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
-          <div style={styles.faqItem}>
-            <div style={styles.faqQ}>What happens if my payment fails?</div>
-            <div style={styles.faqA}>You get a 3-day grace period. After that, your bot pauses but your data is preserved.</div>
-          </div>
-          <div style={styles.faqItem}>
-            <div style={styles.faqQ}>Do you touch my funds?</div>
-            <div style={styles.faqA}>Never. Your API keys stay on your device. We send trade signals, your agent executes them.</div>
+
+          <div style={styles.faq}>
+            <div style={styles.faqItem}>
+              <div style={styles.faqQ}>Can I cancel anytime?</div>
+              <div style={styles.faqA}>Yes. Cancel anytime from this page. Your bot will continue until the end of your billing period.</div>
+            </div>
+            <div style={styles.faqItem}>
+              <div style={styles.faqQ}>What happens if my payment fails?</div>
+              <div style={styles.faqA}>You get a 3-day grace period. After that, your bot pauses but your data is preserved.</div>
+            </div>
+            <div style={styles.faqItem}>
+              <div style={styles.faqQ}>Do you touch my funds?</div>
+              <div style={styles.faqA}>Never. Your exchange API keys are encrypted with AES-256 and stored securely. We never see your private keys or enable withdrawals. The bot executes trades through your own exchange account using restricted API keys.</div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
     </>
   );
 }

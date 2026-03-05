@@ -28,15 +28,15 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ fontFamily:"'Space Mono',monospace", background:"#0A0A0A", color:"#D4D4D4", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:"16px", padding:"20px", textAlign:"center" }}>
-          <div style={{ fontSize:"48px" }}>🥊</div>
-          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:"28px", fontWeight:"400", color:colors.error, letterSpacing:"4px" }}>DOWN FOR THE COUNT</div>
-          <div style={{ fontSize:"12px", color:colors.muted, maxWidth:"500px", lineHeight:"1.8" }}>
+        <div style={{ fontFamily: "'Space Mono',monospace", background: "#0A0A0A", color: "#D4D4D4", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "16px", padding: "20px", textAlign: "center" }}>
+          <div style={{ fontSize: "48px" }}>🥊</div>
+          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "28px", fontWeight: "400", color: colors.error, letterSpacing: "4px" }}>DOWN FOR THE COUNT</div>
+          <div style={{ fontSize: "12px", color: colors.muted, maxWidth: "500px", lineHeight: "1.8" }}>
             {this.state.error?.message || "An unexpected error occurred."}
           </div>
           <button
             onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
-            style={{ fontFamily:"'Oswald',sans-serif", fontSize:"12px", fontWeight:"600", letterSpacing:"2px", padding:"10px 24px", border:"none", borderRadius:"3px", cursor:"pointer", background:`linear-gradient(180deg,${colors.gold},${colors.goldDark})`, color:colors.dark }}
+            style={{ fontFamily: "'Oswald',sans-serif", fontSize: "12px", fontWeight: "600", letterSpacing: "2px", padding: "10px 24px", border: "none", borderRadius: "3px", cursor: "pointer", background: `linear-gradient(180deg,${colors.gold},${colors.goldDark})`, color: colors.dark }}
           >
             GET BACK UP
           </button>
@@ -54,9 +54,9 @@ function logId() { return `log_${Date.now()}_${++_logSeq}`; }
 // Dev-only shortcut; production uses Supabase JWT (VITE_BOT_API_SECRET is never bundled in prod builds)
 const API_SECRET = import.meta.env.DEV ? (import.meta.env.VITE_BOT_API_SECRET || "") : "";
 
-// Direct backend connection by default (no proxy). More reliable for WebSocket + API.
+// Direct backend connection by default (no proxy). Use 127.0.0.1 to avoid IPv6 localhost issues on macOS.
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL
-  || (import.meta.env.DEV ? "http://localhost:8000" : "");
+  || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
 
 function getBackendWsUrl(accessToken) {
   // Prefer JWT when logged in so backend can resolve per-user keys (dev vs user_exchanges)
@@ -71,12 +71,12 @@ function getBackendWsUrl(accessToken) {
       const u = new URL(BACKEND_BASE.replace(/\/$/, ""));
       const proto = u.protocol === "https:" ? "wss:" : "ws:";
       return `${proto}//${u.host}/ws` + auth;
-    } catch {}
+    } catch { }
   }
   return (window.location.protocol === "https:" ? "wss:" : "ws:") + "//" + window.location.host + "/ws" + auth;
 }
 const DEFAULT_ROUND_TRIP_FEE = 0.012;  // fallback: 0.6% taker × 2 sides
-const DEFAULT_COINS = ["BTC","ETH","SOL","DOGE","LINK","AVAX","UNI","AAVE"];
+const DEFAULT_COINS = ["BTC", "ETH", "SOL", "DOGE", "LINK", "AVAX", "UNI", "AAVE"];
 
 const PRESETS_FALLBACK = [
   { id: "default", name: "Default (Balanced)", trader: "Bot default", category: "General" },
@@ -195,16 +195,17 @@ function Dashboard() {
   const getAuthQueryParam = useAuthQueryParam();
 
   // ── Connection ──────────────────────────────────────────────────────────────
-  const [connected,   setConnected]   = useState(false);
-  const [cbLive,      setCbLive]      = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [cbLive, setCbLive] = useState(false);
   const [krakenEnabled, setKrakenEnabled] = useState(false);
-  const [hasClaude,   setHasClaude]   = useState(false);
-  const [paperMode,   setPaperMode]   = useState(true);
-  const [agentKit,    setAgentKit]    = useState({ agentkit_ready:false, wallet_address:null, network:null, error:null });
-  const [wsRetrying,  setWsRetrying]  = useState(false);
+  const [binanceEnabled, setBinanceEnabled] = useState(false);
+  const [hasClaude, setHasClaude] = useState(false);
+  const [paperMode, setPaperMode] = useState(true);
+  const [agentKit, setAgentKit] = useState({ agentkit_ready: false, wallet_address: null, network: null, error: null });
+  const [wsRetrying, setWsRetrying] = useState(false);
 
   // ── Multi-coin ──────────────────────────────────────────────────────────────
-  const [coins,       setCoins]       = useState({});
+  const [coins, setCoins] = useState({});
   const [activeCoins, setActiveCoins] = useState(DEFAULT_COINS);
   const [selectedCoin, setSelectedCoin] = useState("BTC");
   const selectedCoinRef = useRef("BTC");
@@ -213,35 +214,35 @@ function Dashboard() {
   const [multiExchangePrices, setMultiExchangePrices] = useState({});
 
   // ── Market (derived from selected coin) ───────────────────────────────────
-  const [price,       setPrice]       = useState(0);
-  const [prevPrice,   setPrevPrice]   = useState(0);
-  const [change24h,   setChange24h]   = useState(0);
+  const [price, setPrice] = useState(0);
+  const [prevPrice, setPrevPrice] = useState(0);
+  const [change24h, setChange24h] = useState(0);
   const [priceSource, setPriceSource] = useState("coinbase");  // "coinbase" | "coingecko" — chart matches only when coinbase
-  const [history,     setHistory]     = useState([]);
-  const [indic,       setIndic]       = useState({ ema9:null, ema21:null, rsi:50, atr:0, bb_upper:0, bb_middle:0, bb_lower:0, bb_width:0, vwap:null });
-  const [regime,      setRegime]      = useState("ranging");
-  const [fearGreed,   setFearGreed]   = useState({ value: 50, label: "Neutral" });
-  const [candles,     setCandles]     = useState([]);
+  const [history, setHistory] = useState([]);
+  const [indic, setIndic] = useState({ ema9: null, ema21: null, rsi: 50, atr: 0, bb_upper: 0, bb_middle: 0, bb_lower: 0, bb_width: 0, vwap: null });
+  const [regime, setRegime] = useState("ranging");
+  const [fearGreed, setFearGreed] = useState({ value: 50, label: "Neutral" });
+  const [candles, setCandles] = useState([]);
 
   // ── Account ─────────────────────────────────────────────────────────────────
-  const [startBal,    setStartBal]    = useState(1000);
-  const [targetBal,   setTargetBal]   = useState(5000);
-  const [account,     setAccount]     = useState({ balance: 1000, daily_pnl: 0, total_pnl: 0 });
+  const [startBal, setStartBal] = useState(1000);
+  const [targetBal, setTargetBal] = useState(5000);
+  const [account, setAccount] = useState({ balance: 1000, daily_pnl: 0, total_pnl: 0 });
 
   // ── Trading ─────────────────────────────────────────────────────────────────
-  const [position,    setPosition]    = useState(null);
-  const [positions,   setPositions]   = useState([]);
+  const [position, setPosition] = useState(null);
+  const [positions, setPositions] = useState([]);
   const [maxPositions, setMaxPositions] = useState(3);
   const [maxFuturesPositions, setMaxFuturesPositions] = useState(0);
   const [enableFutures, setEnableFutures] = useState(false);
-  const [trades,      setTrades]      = useState([]);
-  const [decision,    setDecision]    = useState(null);
+  const [trades, setTrades] = useState([]);
+  const [decision, setDecision] = useState(null);
   const [lastAiBlockReason, setLastAiBlockReason] = useState(null);
-  const [thinking,    setThinking]    = useState(false);
-  const [botOn,       setBotOn]       = useState(false);
-  const [lastCall,    setLastCall]    = useState("--");
-  const [countdown,   setCountdown]   = useState(180);
-  const [priceAge,    setPriceAge]    = useState(0);
+  const [thinking, setThinking] = useState(false);
+  const [botOn, setBotOn] = useState(false);
+  const [lastCall, setLastCall] = useState("--");
+  const [countdown, setCountdown] = useState(180);
+  const [priceAge, setPriceAge] = useState(0);
 
   // ── Claude model ───────────────────────────────────────────────────────────
   const [claudeModel, setClaudeModel] = useState("claude-opus-4-20250514");
@@ -268,7 +269,7 @@ function Dashboard() {
   const [profitGoal, setProfitGoal] = useState(() => {
     try { const v = localStorage.getItem("claudebot_profit_goal"); return v ? Math.max(0, +v) : 4000; } catch { return 4000; }
   });
-  useEffect(() => { if (profitGoal > 0) try { localStorage.setItem("claudebot_profit_goal", String(profitGoal)); } catch {} }, [profitGoal]);
+  useEffect(() => { if (profitGoal > 0) try { localStorage.setItem("claudebot_profit_goal", String(profitGoal)); } catch { } }, [profitGoal]);
   const profitGoalSyncRef = useRef(false);
   useEffect(() => {
     if (!profitGoalSyncRef.current) { profitGoalSyncRef.current = true; return; }
@@ -288,7 +289,7 @@ function Dashboard() {
       if (!cfg) return;
       if (cfg.round_trip_fee) setRoundTripFee(cfg.round_trip_fee);
       if (cfg.symbol_to_coingecko) Object.assign(FALLBACK_SYMBOL_TO_COINGECKO, cfg.symbol_to_coingecko);
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   // ── Logs ────────────────────────────────────────────────────────────────────
@@ -297,19 +298,19 @@ function Dashboard() {
     setLogs(prev => [{ id: logId(), msg, type, ts: new Date().toLocaleTimeString() }, ...prev].slice(0, 60)), []);
 
   // ── Refs (always current, no stale closures) ─────────────────────────────────
-  const wsRef        = useRef(null);
-  const priceRef     = useRef(price);
-  const accountRef   = useRef(account);
-  const posRef       = useRef(position);
+  const wsRef = useRef(null);
+  const priceRef = useRef(price);
+  const accountRef = useRef(account);
+  const posRef = useRef(position);
   const positionsRef = useRef(positions);
-  const indicRef     = useRef(indic);
-  const regimeRef    = useRef(regime);
-  const tradesRef    = useRef(trades);
+  const indicRef = useRef(indic);
+  const regimeRef = useRef(regime);
+  const tradesRef = useRef(trades);
   const fearGreedRef = useRef(fearGreed);
-  const botTimerRef  = useRef(null);
-  const priceAgeRef  = useRef(null);
+  const botTimerRef = useRef(null);
+  const priceAgeRef = useRef(null);
   const lastResetRef = useRef("");
-  const thinkingRef  = useRef(false);
+  const thinkingRef = useRef(false);
   const lastGoalReachedRef = useRef(false);
   const profitGoalRef = useRef(profitGoal);
   const change24hRef = useRef(change24h);
@@ -319,18 +320,18 @@ function Dashboard() {
   const lastStaggeredLogsRef = useRef(0);
   const lastStaggeredTradesRef = useRef(0);
 
-  priceRef.current         = price;
-  accountRef.current       = account;
-  posRef.current           = position;
-  positionsRef.current     = positions;
-  indicRef.current         = indic;
-  regimeRef.current        = regime;
-  tradesRef.current        = trades;
-  fearGreedRef.current     = fearGreed;
-  thinkingRef.current      = thinking;
-  change24hRef.current     = change24h;
-  selectedCoinRef.current  = selectedCoin;
-  profitGoalRef.current    = profitGoal;
+  priceRef.current = price;
+  accountRef.current = account;
+  posRef.current = position;
+  positionsRef.current = positions;
+  indicRef.current = indic;
+  regimeRef.current = regime;
+  tradesRef.current = trades;
+  fearGreedRef.current = fearGreed;
+  thinkingRef.current = thinking;
+  change24hRef.current = change24h;
+  selectedCoinRef.current = selectedCoin;
+  profitGoalRef.current = profitGoal;
 
   // ── Send to backend ──────────────────────────────────────────────────────────
   const send = useCallback((cmd, extra) => {
@@ -348,7 +349,7 @@ function Dashboard() {
     function connect() {
       if (disposed) return;
       if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
-        try { ws.close(); } catch {}
+        try { ws.close(); } catch { }
       }
       setWsRetrying(true);
       ws = new WebSocket(getBackendWsUrl(accessToken));
@@ -360,15 +361,15 @@ function Dashboard() {
         hadConnection = true;
         setConnected(true);
         setWsRetrying(false);
-        try { ws.send(JSON.stringify({ cmd: "set_profit_goal", profit_goal: profitGoalRef.current })); } catch {}
-        if (botTimerRef.current){ clearInterval(botTimerRef.current); botTimerRef.current = null; }
-        if (priceAgeRef.current){ clearInterval(priceAgeRef.current); priceAgeRef.current = null; }
+        try { ws.send(JSON.stringify({ cmd: "set_profit_goal", profit_goal: profitGoalRef.current })); } catch { }
+        if (botTimerRef.current) { clearInterval(botTimerRef.current); botTimerRef.current = null; }
+        if (priceAgeRef.current) { clearInterval(priceAgeRef.current); priceAgeRef.current = null; }
         priceAgeRef.current = setInterval(() => setPriceAge(p => p + 1), 1000);
         log("Backend connected — real-time data active", "success");
         if (pingTimer) clearInterval(pingTimer);
         pingTimer = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
-            try { ws.send(JSON.stringify({ cmd: "ping" })); } catch {}
+            try { ws.send(JSON.stringify({ cmd: "ping" })); } catch { }
           }
         }, 25000);
       };
@@ -409,11 +410,11 @@ function Dashboard() {
 
           const isBtcSelected = selectedCoinRef.current === "BTC";
           if (isBtcSelected) {
-            if (m.price != null)            { setPrevPrice(priceRef.current); setPrice(m.price); setPriceAge(m.coins?.BTC?.price_age_sec ?? 0); priceTimestampRef.current = Date.now(); setPriceSource("coinbase"); }
-            if (m.price_change24h != null)  setChange24h(m.price_change24h);
-            if (m.history)                  setHistory(m.history);
-            if (m.indicators)               setIndic(m.indicators);
-            if (m.market_condition)         setRegime(m.market_condition);
+            if (m.price != null) { setPrevPrice(priceRef.current); setPrice(m.price); setPriceAge(m.coins?.BTC?.price_age_sec ?? 0); priceTimestampRef.current = Date.now(); setPriceSource("coinbase"); }
+            if (m.price_change24h != null) setChange24h(m.price_change24h);
+            if (m.history) setHistory(m.history);
+            if (m.indicators) setIndic(m.indicators);
+            if (m.market_condition) setRegime(m.market_condition);
             if (m.candles) {
               setCandles(prev => {
                 if (m.type === "full_state") return m.candles;
@@ -443,9 +444,9 @@ function Dashboard() {
           }
           if (m.open_position !== undefined) setPosition(m.open_position);
           if (m.open_positions !== undefined) setPositions(m.open_positions);
-          if (m.max_positions != null)    setMaxPositions(m.max_positions);
+          if (m.max_positions != null) setMaxPositions(m.max_positions);
           if (m.max_futures_positions != null) setMaxFuturesPositions(m.max_futures_positions);
-          if (m.enable_futures != null)  setEnableFutures(m.enable_futures);
+          if (m.enable_futures != null) setEnableFutures(m.enable_futures);
           if (m.trades) {
             setTrades(m.trades);
             if (m.type === "trade_update" && m.trades?.length > 0) {
@@ -463,40 +464,41 @@ function Dashboard() {
               }
             }
           }
-          if (m.claude_decision)          setDecision(m.claude_decision);
+          if (m.claude_decision) setDecision(m.claude_decision);
           if (m.last_ai_block_reason !== undefined) setLastAiBlockReason(m.last_ai_block_reason);
           if (m.pending_decision !== undefined) setPendingDecision(m.pending_decision);
-          if (m.pending_expires_at != null)    setPendingExpiresAt(m.pending_expires_at);
+          if (m.pending_expires_at != null) setPendingExpiresAt(m.pending_expires_at);
           if (m.require_trade_approval != null) setRequireTradeApproval(m.require_trade_approval);
-          if (m.direction_bias)                 setDirectionBias(m.direction_bias);
-          if (m.trading_preset)                 setTradingPreset(m.trading_preset);
-          if (m.type === "preset_changed")       setTradingPreset(m.trading_preset);
+          if (m.direction_bias) setDirectionBias(m.direction_bias);
+          if (m.trading_preset) setTradingPreset(m.trading_preset);
+          if (m.type === "preset_changed") setTradingPreset(m.trading_preset);
           if (m.type === "pending_trade") {
             setPendingDecision(m.pending_decision ?? null);
             if (m.pending_expires_at != null) setPendingExpiresAt(m.pending_expires_at);
           }
-          if (m.bot_running  != null)     setBotOn(m.bot_running);
-          if (m.claude_thinking != null)  setThinking(m.claude_thinking);
-          if (m.last_claude_call)         setLastCall(m.last_claude_call);
-          if (m.countdown != null)        setCountdown(m.countdown);
-          if (m.has_claude_key != null)   setHasClaude(m.has_claude_key);
-          if (m.paper_trading  != null)   setPaperMode(m.paper_trading);
+          if (m.bot_running != null) setBotOn(m.bot_running);
+          if (m.claude_thinking != null) setThinking(m.claude_thinking);
+          if (m.last_claude_call) setLastCall(m.last_claude_call);
+          if (m.countdown != null) setCountdown(m.countdown);
+          if (m.has_claude_key != null) setHasClaude(m.has_claude_key);
+          if (m.paper_trading != null) setPaperMode(m.paper_trading);
           if (m.coinbase_connected != null) setCbLive(m.coinbase_connected);
           if (m.kraken_enabled != null) setKrakenEnabled(m.kraken_enabled);
-          if (m.fear_greed)               setFearGreed(m.fear_greed);
-          if (m.agentkit)                 setAgentKit(m.agentkit);
-          if (m.start_balance != null)    setStartBal(m.start_balance);
-          if (m.target_balance != null)   setTargetBal(m.target_balance);
+          if (m.binance_enabled != null) setBinanceEnabled(m.binance_enabled);
+          if (m.fear_greed) setFearGreed(m.fear_greed);
+          if (m.agentkit) setAgentKit(m.agentkit);
+          if (m.start_balance != null) setStartBal(m.start_balance);
+          if (m.target_balance != null) setTargetBal(m.target_balance);
           if (m.profit_goal != null && m.profit_goal > 0) setProfitGoal(m.profit_goal);
           else if (m.profit_to_target != null && profitGoalRef.current === 0) setProfitGoal(m.profit_to_target);
-          if (m.claude_model)             setClaudeModel(m.claude_model);
-          if (m.logs)                     setLogs(m.logs.map((l, i) => ({ ...l, id: l.id || `srv_${i}` })));
+          if (m.claude_model) setClaudeModel(m.claude_model);
+          if (m.logs) setLogs(m.logs.map((l, i) => ({ ...l, id: l.id || `srv_${i}` })));
           if (m.type === "wallet_status") setAgentKit(prev => ({ ...prev, ...m }));
           if (m.type === "log" && m.entry) setLogs(prev => [{ ...m.entry, id: logId() }, ...prev].slice(0, 60));
         } catch { /* ignore parse errors */ }
       };
 
-      ws.onerror = () => {};
+      ws.onerror = () => { };
       ws.onclose = (ev) => {
         if (disposed) return;
         if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
@@ -527,7 +529,7 @@ function Dashboard() {
       clearTimeout(retryTimer);
       if (pingTimer) clearInterval(pingTimer);
       if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
-        try { ws.close(); } catch {}
+        try { ws.close(); } catch { }
       }
       wsRef.current = null;
     };
@@ -548,13 +550,13 @@ function Dashboard() {
         const d = await r.json();
         setAccount(a => ({
           ...a,
-          balance:   d.balance ?? a.balance,
+          balance: d.balance ?? a.balance,
           daily_pnl: d.daily_pnl ?? a.daily_pnl,
           total_pnl: d.total_pnl ?? a.total_pnl,
         }));
         if (d.start_balance != null) setStartBal(d.start_balance);
         if (d.target_balance != null) setTargetBal(d.target_balance);
-      } catch {}
+      } catch { }
     };
     sync(); // immediate sync on connect
     // 10k scale: 15s when idle (no positions), 10s when active — reduces aggregate REST load
@@ -564,7 +566,7 @@ function Dashboard() {
   }, [connected, getAuthHeaders, positions?.length]);
 
   // ── Price fetch: backend first (Coinbase), then direct CoinGecko when backend fails ─
-  const CG_IDS = { BTC:"bitcoin", ETH:"ethereum", SOL:"solana", DOGE:"dogecoin", LINK:"chainlink", AVAX:"avalanche-2", UNI:"uniswap", AAVE:"aave", XRP:"ripple", ADA:"cardano" };
+  const CG_IDS = { BTC: "bitcoin", ETH: "ethereum", SOL: "solana", DOGE: "dogecoin", LINK: "chainlink", AVAX: "avalanche-2", UNI: "uniswap", AAVE: "aave", XRP: "ripple", ADA: "cardano" };
   const fetchCoinGeckoDirect = async (sel) => {
     const cgId = CG_IDS[sel] || "bitcoin";
     const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd&include_24hr_change=true`);
@@ -673,16 +675,20 @@ function Dashboard() {
           setPriceSource("coinbase");
           const open24 = parseFloat(m.open_24h);
           if (open24 > 0) setChange24h(((p - open24) / open24) * 100);
-        } catch {}
+        } catch { }
       };
 
       ws.onclose = () => { if (!disposed) scheduleReconnect(); };
-      ws.onerror = () => { try { ws.close(); } catch {} };
+      ws.onerror = () => { try { ws.close(); } catch { } };
     }
 
+    let retryDelay = 3000;
     function scheduleReconnect() {
       if (disposed) return;
-      reconnectTimer = setTimeout(connect, 3000);
+      reconnectTimer = setTimeout(() => {
+        connect();
+        retryDelay = Math.min(retryDelay * 1.5, 30000);
+      }, retryDelay);
     }
 
     connect();
@@ -690,9 +696,18 @@ function Dashboard() {
     return () => {
       disposed = true;
       clearTimeout(reconnectTimer);
-      if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
-        try { ws.close(); } catch {}
+      if (ws) {
+        // Unbind listeners before closing to avoid errors/reconnects during cleanup
+        ws.onopen = null;
+        ws.onmessage = null;
+        ws.onerror = null;
+        ws.onclose = null;
+        // CONNECTING (0) or OPEN (1)
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          try { ws.close(); } catch { }
+        }
       }
+      wsRef.current = null;
     };
   }, [selectedCoin]);
 
@@ -761,13 +776,13 @@ function Dashboard() {
         setPresets(d.presets);
         setPresetCategories(d.categories || []);
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, [connected, getAuthHeaders]);
 
   // ── Midnight P&L reset (display) ────────────────────────────────────────────
   useEffect(() => {
     const t = setInterval(() => {
-      const now   = new Date();
+      const now = new Date();
       const today = now.toDateString();
       if (now.getHours() === 0 && now.getMinutes() === 0 && lastResetRef.current !== today) {
         lastResetRef.current = today;
@@ -873,24 +888,24 @@ function Dashboard() {
       for (const pos of closeTargets) {
         const coinPrice = coins[pos.symbol]?.price || priceRef.current;
         const closeSz = pos.coin_size || pos.btc_size || 0;
-        const pnl = pos.side==="buy" ? (coinPrice-pos.entry)*closeSz : (pos.entry-coinPrice)*closeSz;
+        const pnl = pos.side === "buy" ? (coinPrice - pos.entry) * closeSz : (pos.entry - coinPrice) * closeSz;
         const net = +(pnl - pos.usd_size * roundTripFeeRef.current).toFixed(2);
         totalNet += net;
-        newTrades.push({ id:Date.now()+Math.random(), symbol:pos.symbol, side:pos.side, entry:pos.entry, exit:coinPrice, pnl:net, reason:"MANUAL CLOSE", ts:new Date().toLocaleTimeString(), win:net>0 });
-        setAccount(a => ({ balance:+(a.balance+pos.usd_size+net).toFixed(2), daily_pnl:+(a.daily_pnl+net).toFixed(2), total_pnl:+(a.total_pnl+net).toFixed(2) }));
+        newTrades.push({ id: Date.now() + Math.random(), symbol: pos.symbol, side: pos.side, entry: pos.entry, exit: coinPrice, pnl: net, reason: "MANUAL CLOSE", ts: new Date().toLocaleTimeString(), win: net > 0 });
+        setAccount(a => ({ balance: +(a.balance + pos.usd_size + net).toFixed(2), daily_pnl: +(a.daily_pnl + net).toFixed(2), total_pnl: +(a.total_pnl + net).toFixed(2) }));
       }
-      setTrades(p => [...newTrades, ...p].slice(0,30));
+      setTrades(p => [...newTrades, ...p].slice(0, 30));
       if (act.pos) {
         setPositions(prev => prev.filter(p => p.id !== act.pos.id));
       } else {
         setPositions([]);
       }
       setPosition(null);
-      log(`MANUAL CLOSE | Net: ${totalNet>=0?"+":""}$${totalNet.toFixed(2)}`, totalNet>=0?"success":"warning");
+      log(`MANUAL CLOSE | Net: ${totalNet >= 0 ? "+" : ""}$${totalNet.toFixed(2)}`, totalNet >= 0 ? "success" : "warning");
     } else if (act.type === "reset") {
       if (connected) { send("reset_account"); return; }
       lastGoalReachedRef.current = false;
-      setAccount({ balance:startBal, daily_pnl:0, total_pnl:0 });
+      setAccount({ balance: startBal, daily_pnl: 0, total_pnl: 0 });
       setPosition(null);
       setPositions([]);
       setTrades([]);
@@ -900,17 +915,17 @@ function Dashboard() {
   };
 
   // ── Full Trade History (from database) ──────────────────────────────────────
-  const [historyTrades,   setHistoryTrades]   = useState([]);
-  const [historyTotal,    setHistoryTotal]    = useState(0);
-  const [historyStats,    setHistoryStats]    = useState({ wins:0, losses:0, win_rate:0, total_pnl:0 });
-  const [historyLoading,  setHistoryLoading]  = useState(false);
-  const [historyPage,     setHistoryPage]     = useState(0);
-  const [historyLimit]                        = useState(50);
-  const [historyFilters,  setHistoryFilters]  = useState({ date_from:"", date_to:"", symbol:"", side:"", result:"", product_type:"" });
-  const [showHistory,     setShowHistory]     = useState(false);
+  const [historyTrades, setHistoryTrades] = useState([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyStats, setHistoryStats] = useState({ wins: 0, losses: 0, win_rate: 0, total_pnl: 0 });
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPage, setHistoryPage] = useState(0);
+  const [historyLimit] = useState(50);
+  const [historyFilters, setHistoryFilters] = useState({ date_from: "", date_to: "", symbol: "", side: "", result: "", product_type: "" });
+  const [showHistory, setShowHistory] = useState(false);
 
   // ── Trade Detail Modal (chart screenshots) ──────────────────────────────────
-  const [tradeDetail,     setTradeDetail]     = useState(null);
+  const [tradeDetail, setTradeDetail] = useState(null);
   const [tradeDetailLoading, setTradeDetailLoading] = useState(false);
 
   const openTradeDetail = useCallback(async (tr) => {
@@ -942,17 +957,17 @@ function Dashboard() {
       params.set("limit", historyLimit);
       params.set("offset", page * historyLimit);
       if (filters.date_from) params.set("date_from", filters.date_from);
-      if (filters.date_to)   params.set("date_to", filters.date_to);
-      if (filters.symbol)    params.set("symbol", filters.symbol);
-      if (filters.side)      params.set("side", filters.side);
-      if (filters.result)    params.set("result", filters.result);
+      if (filters.date_to) params.set("date_to", filters.date_to);
+      if (filters.symbol) params.set("symbol", filters.symbol);
+      if (filters.side) params.set("side", filters.side);
+      if (filters.result) params.set("result", filters.result);
       if (filters.product_type) params.set("product_type", filters.product_type);
       const res = await fetch(`${backendBase}/trades/history?${params}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setHistoryTrades(data.trades || []);
       setHistoryTotal(data.total || 0);
-      setHistoryStats({ wins: data.wins||0, losses: data.losses||0, win_rate: data.win_rate||0, total_pnl: data.total_pnl||0 });
+      setHistoryStats({ wins: data.wins || 0, losses: data.losses || 0, win_rate: data.win_rate || 0, total_pnl: data.total_pnl || 0 });
       setHistoryPage(page);
     } catch (e) {
       log(`Failed to load history: ${e.message}`, "error");
@@ -968,20 +983,20 @@ function Dashboard() {
   };
 
   const clearHistoryFilters = () => {
-    const blank = { date_from:"", date_to:"", symbol:"", side:"", result:"", product_type:"" };
+    const blank = { date_from: "", date_to: "", symbol: "", side: "", result: "", product_type: "" };
     setHistoryFilters(blank);
     fetchHistory(0, blank);
   };
 
   const tradeTypeBadge = (tr) => {
     const exBadge = tr.exchange === "kraken"
-      ? <span className="tag" style={{ background:"#7b61ff18", color:"#7b61ff", fontSize:"9px", marginLeft:"3px" }}>KRAKEN</span>
+      ? <span className="tag" style={{ background: "#7b61ff18", color: "#7b61ff", fontSize: "9px", marginLeft: "3px" }}>KRAKEN</span>
       : tr.exchange === "coinbase"
-      ? <span className="tag" style={{ background:"#0052ff18", color:"#4d8ffa", fontSize:"9px", marginLeft:"3px" }}>COINBASE</span>
-      : null;
-    if (tr.onchain) return <><span className="tag" style={{ background:"#D4AF3718", color:"#D4AF37", fontSize:"9px" }}>ON-CHAIN</span>{exBadge}</>;
-    if (tr.product_type === "futures") return <><span className="tag" style={{ background:"#D4AF3718", color:"#D4AF37", fontSize:"9px" }}>FUTURES{tr.leverage ? ` ${tr.leverage}x` : ""}</span>{exBadge}</>;
-    return <><span className="tag" style={{ background:"#2a2a2a", color:"#64748b", fontSize:"9px" }}>SPOT</span>{exBadge}</>;
+        ? <span className="tag" style={{ background: "#0052ff18", color: "#4d8ffa", fontSize: "9px", marginLeft: "3px" }}>COINBASE</span>
+        : null;
+    if (tr.onchain) return <><span className="tag" style={{ background: "#D4AF3718", color: "#D4AF37", fontSize: "9px" }}>ON-CHAIN</span>{exBadge}</>;
+    if (tr.product_type === "futures") return <><span className="tag" style={{ background: "#D4AF3718", color: "#D4AF37", fontSize: "9px" }}>FUTURES{tr.leverage ? ` ${tr.leverage}x` : ""}</span>{exBadge}</>;
+    return <><span className="tag" style={{ background: "#2a2a2a", color: "#64748b", fontSize: "9px" }}>SPOT</span>{exBadge}</>;
   };
 
   // ── Export trades as CSV ───────────────────────────────────────────────────────
@@ -991,12 +1006,12 @@ function Dashboard() {
     const typeLabel = (t) => t.onchain ? "ON-CHAIN" : (t.product_type === "futures" ? `FUTURES ${t.leverage || 1}x` : "SPOT");
     const header = "Date,Time,Symbol,Side,Type,Entry,Exit,PnL,Reason,Win\n";
     const rows = list.map(t =>
-      `${t.created_at||""},${t.ts},${t.symbol||"BTC"},${t.side},${typeLabel(t)},${t.entry},${t.exit},${t.pnl},"${t.reason}",${t.win}`
+      `${t.created_at || ""},${t.ts},${t.symbol || "BTC"},${t.side},${typeLabel(t)},${t.entry},${t.exit},${t.pnl},"${t.reason}",${t.win}`
     ).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `claudebot_trades_${new Date().toISOString().slice(0,10)}.csv`;
+    a.href = url; a.download = `claudebot_trades_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     log("Trade history exported as CSV", "info");
@@ -1040,12 +1055,12 @@ function Dashboard() {
   useEffect(() => {
     const cd = coins[selectedCoin];
     if (!cd) return;
-    if (cd.price != null)           { setPrevPrice(priceRef.current); setPrice(cd.price); setPriceAge(cd.price_age_sec ?? 0); priceTimestampRef.current = Date.now(); }
+    if (cd.price != null) { setPrevPrice(priceRef.current); setPrice(cd.price); setPriceAge(cd.price_age_sec ?? 0); priceTimestampRef.current = Date.now(); }
     if (cd.price_change24h != null) setChange24h(cd.price_change24h);
-    if (cd.history)                 setHistory(cd.history);
-    if (cd.indicators)              setIndic(cd.indicators);
-    if (cd.market_condition)        setRegime(cd.market_condition);
-    if (cd.candles)                 setCandles(cd.candles);
+    if (cd.history) setHistory(cd.history);
+    if (cd.indicators) setIndic(cd.indicators);
+    if (cd.market_condition) setRegime(cd.market_condition);
+    if (cd.candles) setCandles(cd.candles);
   }, [selectedCoin, coins, connected]); // eslint-disable-line
 
   // ── Derived (memoized to avoid cascade re-renders) ──────────────────────────────
@@ -1075,7 +1090,7 @@ function Dashboard() {
   }, []);
 
   return (
-    <div className="app-root" style={{ fontFamily:"'Space Mono',monospace", background:"#0A0A0A", color:"#D4D4D4",  padding:"20px 24px 40px", fontSize:"12px" }}>
+    <div className="app-root" style={{ fontFamily: "'Space Mono',monospace", background: "#0A0A0A", color: "#D4D4D4", padding: "20px 24px 80px", fontSize: "12px" }}>
       <style>{`
         *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
         ::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(212,175,55,0.2);border-radius:2px}
@@ -1114,7 +1129,9 @@ function Dashboard() {
         select optgroup{color:#5C5C5C;font-weight:700}
         .live-banner{background:linear-gradient(90deg,rgba(192,57,43,0.1),rgba(255,153,0,0.1));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(192,57,43,0.2);border-radius:12px;padding:8px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:10px}
         .app-root{min-height:100vh;min-height:100dvh}
-        .brand-ticker-row{display:flex;align-items:center;margin-bottom:14px;position:relative;overflow:hidden;background:rgba(17,17,17,0.55);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border:1px solid rgba(212,175,55,0.1);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.04)}
+        /* ─── Section spacing: every major section gets breathing room ─── */
+        .section-gap{margin-bottom:20px}
+        .brand-ticker-row{display:flex;align-items:center;margin-bottom:20px;position:relative;overflow:hidden;background:rgba(17,17,17,0.55);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border:1px solid rgba(212,175,55,0.1);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.04)}
         .brand-ticker-row::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#D4AF37,#C0392B,#D4AF37);z-index:20;opacity:0.7}
         .brand-ticker-row::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(212,175,55,0.15),transparent);z-index:20}
         .ironmike-brand{display:flex;align-items:center;gap:14px;padding:10px 0 10px 16px;position:relative;z-index:10;flex-shrink:0;background:rgba(17,17,17,0.7)}
@@ -1122,7 +1139,7 @@ function Dashboard() {
         .ticker-wrapper{flex:1;min-width:0;overflow:hidden;position:relative;z-index:1;display:flex;align-items:center}
         .ticker-wrapper .ticker-tape{margin-bottom:0;border:none;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;padding:0;flex:1;min-width:0}
         .ticker-wrapper .ticker-tape::before{display:none}
-        .ticker-tape{margin-bottom:14px;overflow:hidden;position:relative;background:rgba(17,17,17,0.45);backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:10px 0;box-shadow:0 4px 24px rgba(0,0,0,0.4);z-index:1}
+        .ticker-tape{margin-bottom:20px;overflow:hidden;position:relative;background:rgba(17,17,17,0.45);backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:10px 0;box-shadow:0 4px 24px rgba(0,0,0,0.4);z-index:1}
         .ticker-tape::before,.ticker-tape::after{content:'';position:absolute;top:0;bottom:0;width:48px;z-index:2;pointer-events:none}
         .ticker-tape::before{left:0;background:linear-gradient(90deg,rgba(17,17,17,0.6) 0%,transparent 100%)}
         .ticker-tape::after{right:0;background:linear-gradient(270deg,rgba(17,17,17,0.6) 0%,transparent 100%)}
@@ -1130,9 +1147,16 @@ function Dashboard() {
         .ticker-track{display:flex;align-items:center;gap:32px;will-change:transform;animation:tickerScroll 90s linear infinite;width:max-content;backface-visibility:hidden;-webkit-backface-visibility:hidden}
         @keyframes tickerScroll{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-50%,0,0)}}
         @keyframes lossToastIn{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-        /* TABLET 601–1024px: iPad, Android tablets */
+        @keyframes slideDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+        /* ── Hamburger nav drawer ── */
+        .nav-drawer{position:fixed;bottom:48px;right:0;left:0;z-index:8999;background:rgba(10,10,10,0.97);backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);border-top:1px solid rgba(212,175,55,0.15);padding:16px;display:flex;flex-direction:column;gap:10px;animation:slideDown 0.2s cubic-bezier(0.4,0,0.2,1)}
+        .nav-drawer-btn{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;letter-spacing:2px;padding:14px 20px;border-radius:10px;border:1px solid rgba(212,175,55,0.15);background:rgba(212,175,55,0.05);color:#D4AF37;cursor:pointer;text-align:center;touch-action:manipulation}
+        .nav-drawer-btn:active{background:rgba(212,175,55,0.12)}
+        .hamburger-btn{display:none;background:transparent;border:1px solid rgba(212,175,55,0.2);border-radius:8px;color:#D4AF37;cursor:pointer;padding:6px 10px;flex-direction:column;gap:4px;align-items:center;justify-content:center;min-width:36px;min-height:36px;flex-shrink:0}
+        .hamburger-btn span{display:block;width:18px;height:2px;background:#D4AF37;border-radius:1px;transition:all 0.2s}
+        /* TABLET 601–1024px */
         @media(max-width:1024px){
-          .app-root{padding:16px 18px}
+          .app-root{padding:16px 18px 80px}
           .grid{grid-template-columns:1fr 1fr!important}
           .grid>.col:first-child{order:2}.grid>.col:nth-child(2){order:1;grid-column:1/-1}.grid>.col:last-child{order:3}
           .grid-bottom{grid-template-columns:1fr 1fr!important}
@@ -1144,9 +1168,9 @@ function Dashboard() {
           .cp-row1{gap:3px!important;flex-wrap:wrap!important}
           .cp-row1 .btn{min-height:28px!important;padding:3px 10px!important}
         }
-        /* PHONE ≤600px: iPhone, Android phones, Z Fold cover */
+        /* PHONE ≤600px */
         @media(max-width:600px){
-          .app-root{padding:12px 14px;margin:0;max-width:100%;border-radius:0}
+          .app-root{padding:12px 12px 80px;margin:0;max-width:100%;border-radius:0}
           .grid{grid-template-columns:1fr!important}
           .grid>.col{order:unset!important;grid-column:unset!important}
           .grid-bottom{grid-template-columns:1fr!important}
@@ -1158,9 +1182,11 @@ function Dashboard() {
           .cp-row1{gap:3px!important;justify-content:center!important;flex-wrap:wrap!important}
           .cp-row1 .btn{min-height:32px!important;padding:4px 10px!important;font-size:9px!important}
           .cp-row2{justify-content:center!important;gap:3px!important;flex-wrap:wrap!important}
-          .status-bar{flex-wrap:wrap!important;gap:4px!important;padding:5px 10px!important}
+          .status-bar-badges{display:none!important}
+          .status-bar-user{flex:1;min-width:0}
+          .hamburger-btn{display:flex!important}
           .pos-grid{grid-template-columns:repeat(2,1fr)!important}
-          .card{border-radius:16px;padding:16px 18px}
+          .card{border-radius:14px;padding:14px}
           .btn{min-height:44px;padding:12px 20px;font-size:11px;border-radius:10px}
           .live-banner{border-radius:12px}
           .brand-ticker-row{flex-direction:column;overflow:visible}
@@ -1170,37 +1196,52 @@ function Dashboard() {
           .ticker-wrapper .ticker-tape{border-top:1px solid #1e1e1e}
           .ironmike-brand img{width:44px!important;height:44px!important}
           .coin-btn{min-height:44px;padding:12px 16px;-webkit-tap-highlight-color:transparent}
-          .chart-card{height:55vh!important;min-height:320px!important;max-height:500px!important}
+          .chart-card{height:55vh!important;min-height:300px!important;max-height:500px!important}
+          .section-gap{margin-bottom:16px}
         }
-        /* NARROW 320–400px: Z Fold cover (323px), Galaxy S25 (360px), legacy Android */
+        /* NARROW ≤400px: Z Fold cover, Galaxy S etc */
         @media(max-width:400px){
-          .app-root{padding:10px 8px}
+          .app-root{padding:8px 8px 80px}
           .card{padding:12px 10px}
           .section-label{font-size:9px!important;letter-spacing:1px!important}
           .pos-grid{grid-template-columns:1fr!important}
           .cp-row1 .btn{font-size:8px!important;padding:3px 6px!important;letter-spacing:0.5px!important}
           .cp-row2 .btn{font-size:8px!important;padding:3px 6px!important}
-          .status-bar{font-size:8px!important;gap:3px!important}
+          .status-bar{font-size:8px!important}
           .ironmike-brand img{width:36px!important;height:36px!important}
+          .section-gap{margin-bottom:12px}
+        }
+        /* ULTRA-NARROW ≤280px */
+        @media(max-width:280px){
+          .app-root{padding:6px 6px 76px}
+          .card{padding:10px 8px;border-radius:10px}
+          .section-label{font-size:8px!important;letter-spacing:0.5px!important}
+          .btn{font-size:8px!important;padding:8px 10px!important;letter-spacing:1px!important}
+          .brand-ticker-row{border-radius:10px}
+          .ironmike-brand img{width:28px!important;height:28px!important}
+          .ironmike-brand{gap:8px!important;padding:8px 8px 4px!important}
+          .section-gap{margin-bottom:10px}
+          .grid-bottom{gap:10px!important}
+          .col{gap:10px!important}
         }
       `}</style>
 
       {/* ══ LIVE MODE WARNING BANNER ══ */}
       {isLiveMode && (
         <div className="live-banner" role="alert">
-          <span style={{ fontSize:"14px" }}>&#9888;</span>
-          <span style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:"14px", color:"#C0392B", letterSpacing:"3px" }}>LIVE TRADING MODE</span>
-          <span style={{ fontSize:"10px", color:"#ff9900" }}>Real funds at risk — trades execute on-chain</span>
+          <span style={{ fontSize: "14px" }}>&#9888;</span>
+          <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "14px", color: "#C0392B", letterSpacing: "3px" }}>LIVE TRADING MODE</span>
+          <span style={{ fontSize: "10px", color: "#ff9900" }}>Real funds at risk — trades execute on-chain</span>
         </div>
       )}
 
       {/* ══ BRAND + TICKER — horizontal row, ticker fades behind brand ══ */}
       <div className="brand-ticker-row">
         <div className="ironmike-brand">
-          <img src="/Bravo.svg" alt="DoYou.trade" style={{ width:"80px", height:"80px", flexShrink:0 }} />
+          <img src="/Bravo.svg" alt="DoYou.trade" style={{ width: "80px", height: "80px", flexShrink: 0 }} />
           <div>
-            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:"36px", color:"transparent", letterSpacing:"6px", lineHeight:"1", background:"linear-gradient(180deg,#D4AF37,#B8860B)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>DOYOU.TRADE</div>
-            <div style={{ width:"100%", height:"1px", background:"linear-gradient(90deg,#D4AF37,#C0392B,transparent)", margin:"4px 0" }} />
+            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "36px", color: "transparent", letterSpacing: "6px", lineHeight: "1", background: "linear-gradient(180deg,#D4AF37,#B8860B)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>DOYOU.TRADE</div>
+            <div style={{ width: "100%", height: "1px", background: "linear-gradient(90deg,#D4AF37,#C0392B,transparent)", margin: "4px 0" }} />
             <TradeQuote />
           </div>
         </div>
@@ -1218,19 +1259,19 @@ function Dashboard() {
       </div>
 
       {/* ══ HEADER ══ */}
-      <div className="header-main" style={{ display:"grid", gridTemplateColumns:"1fr", gridTemplateRows:"auto auto", alignItems:"center", marginBottom:"16px", gap:"12px 16px" }}>
+      <div className="header-main section-gap" style={{ display: "grid", gridTemplateColumns: "1fr", gridTemplateRows: "auto auto", alignItems: "center", gap: "12px 16px" }}>
         {/* Price — always centered */}
-        <div className="header-price" style={{ gridColumn:"1", gridRow:"1", justifySelf:"center", textAlign:"center", contain:"layout paint", minWidth:0 }}>
+        <div className="header-price" style={{ gridColumn: "1", gridRow: "1", justifySelf: "center", textAlign: "center", contain: "layout paint", minWidth: 0 }}>
           {price > 0 ? (
             <>
-              <div style={{ fontFamily:"'Oswald',sans-serif", fontSize:"11px", color:"#D4AF37", letterSpacing:"3px", fontWeight:"600", marginBottom:"2px" }}>{selectedCoin}</div>
-              <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:"36px", letterSpacing:"2px", color: priceUp?"#00E676":"#FF1744" }}>
+              <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: "11px", color: "#D4AF37", letterSpacing: "3px", fontWeight: "600", marginBottom: "2px" }}>{selectedCoin}</div>
+              <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "36px", letterSpacing: "2px", color: priceUp ? "#00E676" : "#FF1744" }}>
                 $<AnimatedNumber value={price} format={(v) => priceFormat(v)} duration={50} />
               </div>
-              <div style={{ fontSize:"10px", color: change24h>=0?"#00E676":"#FF1744", marginTop:"2px" }}>
-                {change24h>=0?"\u25B2":"\u25BC"} <AnimatedNumber value={Math.abs(change24h)} format={(v) => `${v.toFixed(2)}%`} duration={200} /> 24h
+              <div style={{ fontSize: "10px", color: change24h >= 0 ? "#00E676" : "#FF1744", marginTop: "2px" }}>
+                {change24h >= 0 ? "\u25B2" : "\u25BC"} <AnimatedNumber value={Math.abs(change24h)} format={(v) => `${v.toFixed(2)}%`} duration={200} /> 24h
               </div>
-              <div style={{ fontSize:"8px", color:"#5C5C5C", marginTop:"2px", letterSpacing:"1px" }}>{priceSource === "coinbase" ? "COINBASE · real-time" : "COINGECKO · may differ from chart"}</div>
+              <div style={{ fontSize: "8px", color: "#5C5C5C", marginTop: "2px", letterSpacing: "1px" }}>{priceSource === "coinbase" ? "COINBASE · real-time" : "COINGECKO · may differ from chart"}</div>
             </>
           ) : (
             <FetchingPrice />
@@ -1248,22 +1289,26 @@ function Dashboard() {
       </div>
 
       {/* ══ FULL-WIDTH CHART ══ */}
-      <ChartSection
-        chartSymbol={chartSymbol} setChartSymbol={setChartSymbol}
-        selectedCoin={selectedCoin} positions={positions} price={price}
-        marketTickers={marketTickers}
-        multiExchangePrices={multiExchangePrices} setMultiExchangePrices={setMultiExchangePrices}
-      />
+      <div className="section-gap">
+        <ChartSection
+          chartSymbol={chartSymbol} setChartSymbol={setChartSymbol}
+          selectedCoin={selectedCoin} positions={positions} price={price}
+          marketTickers={marketTickers}
+          multiExchangePrices={multiExchangePrices} setMultiExchangePrices={setMultiExchangePrices}
+        />
+      </div>
 
       {/* ══ OPEN POSITIONS (full width) ══ */}
-      <PositionsPanel
-        positions={positions} coins={coins} price={price}
-        enableFutures={enableFutures} maxPositions={maxPositions} maxFuturesPositions={maxFuturesPositions}
-        unrealized={unrealized} botOn={botOn} handleClose={handleClose}
-      />
+      <div className="section-gap">
+        <PositionsPanel
+          positions={positions} coins={coins} price={price}
+          enableFutures={enableFutures} maxPositions={maxPositions} maxFuturesPositions={maxFuturesPositions}
+          unrealized={unrealized} botOn={botOn} handleClose={handleClose}
+        />
+      </div>
 
       {/* ══ 3-COL GRID (panels below chart) ══ */}
-      <div className="grid-bottom">
+      <div className="grid-bottom section-gap">
         {/* ═══ LEFT ═══ */}
         <div className="col">
           <ClaudeBrainPanel
@@ -1296,7 +1341,7 @@ function Dashboard() {
 
       {/* ══ ANALYTICS ROW (equity + analytics + memory) ══ */}
       <AnalyticsSection connected={connected} log={log} lossToast={lossToast}
-        cbLive={cbLive} krakenEnabled={krakenEnabled} hasClaude={hasClaude}
+        cbLive={cbLive} krakenEnabled={krakenEnabled} binanceEnabled={binanceEnabled} hasClaude={hasClaude}
         isLiveMode={isLiveMode} agentKit={agentKit} paperMode={paperMode}
         directionBias={directionBias} requireTradeApproval={requireTradeApproval}
         price={price} priceAge={priceAge} wsRetrying={wsRetrying} />
@@ -1322,11 +1367,11 @@ function Dashboard() {
       {confirmAction && (
         <div className="confirm-overlay" onClick={() => setConfirmAction(null)} role="dialog" aria-modal="true" aria-label="Confirmation">
           <div className="confirm-box" onClick={e => e.stopPropagation()}>
-            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:"18px", color:"#D4AF37", letterSpacing:"3px", marginBottom:"16px" }}>CONFIRM ACTION</div>
-            <div style={{ fontSize:"11px", color:"#D4D4D4", lineHeight:"1.9", marginBottom:"22px" }}>{confirmAction.label}</div>
-            <div style={{ display:"flex", gap:"12px", justifyContent:"center" }}>
-              <button className="btn btn-r" onClick={confirmYes} style={{ minWidth:"90px" }}>YES</button>
-              <button className="btn btn-d" onClick={() => setConfirmAction(null)} style={{ minWidth:"90px", color:"#D4D4D4" }}>CANCEL</button>
+            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", color: "#D4AF37", letterSpacing: "3px", marginBottom: "16px" }}>CONFIRM ACTION</div>
+            <div style={{ fontSize: "11px", color: "#D4D4D4", lineHeight: "1.9", marginBottom: "22px" }}>{confirmAction.label}</div>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+              <button className="btn btn-r" onClick={confirmYes} style={{ minWidth: "90px" }}>YES</button>
+              <button className="btn btn-d" onClick={() => setConfirmAction(null)} style={{ minWidth: "90px", color: "#D4D4D4" }}>CANCEL</button>
             </div>
           </div>
         </div>

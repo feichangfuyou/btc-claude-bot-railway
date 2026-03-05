@@ -43,12 +43,32 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(autouse=True)
 def _clear_global_rate_limits():
-    """Reset in-memory rate limit counters between tests to prevent cross-test 429s."""
-    from core.redis_client import _rate_limit_memory
+    """Reset rate limit counters between tests to prevent cross-test 429s."""
+    from core.redis_client import _get_redis, _rate_limit_memory
+
+    # 1. Clear in-memory fallback
+    _rate_limit_memory.clear()
+
+    # 2. Clear Redis (if available)
+    r = _get_redis()
+    if r:
+        try:
+            keys = r.keys("ratelimit:*")
+            if keys:
+                r.delete(*keys)
+        except Exception:
+            pass
+
+    yield
 
     _rate_limit_memory.clear()
-    yield
-    _rate_limit_memory.clear()
+    if r:
+        try:
+            keys = r.keys("ratelimit:*")
+            if keys:
+                r.delete(*keys)
+        except Exception:
+            pass
 
 
 @pytest.fixture

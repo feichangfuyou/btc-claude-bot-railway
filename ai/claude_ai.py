@@ -591,6 +591,9 @@ async def _api_call(model: str, system: str, user_msg: str, max_tokens: int = 80
             data = r.json()
             if "error" in data:
                 error_msg = data["error"].get("message", "Anthropic API error")
+                if "credit balance is too low" in error_msg.lower():
+                    error_msg = "❌ Anthropic API balance is zero. Please top up at console.anthropic.com"
+                
                 next_model = model_fallback.record_failure(effective_model, error_msg)
                 if next_model and next_model != effective_model:
                     return await _api_call(next_model, system, user_msg, max_tokens)

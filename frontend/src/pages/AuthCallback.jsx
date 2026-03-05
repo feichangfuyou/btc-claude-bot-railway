@@ -10,7 +10,6 @@ export default function AuthCallback() {
   const [exchanging, setExchanging] = useState(true);
 
   useEffect(() => {
-    const code = searchParams.get("code");
     const errorParam = searchParams.get("error");
     const errorDescription = searchParams.get("error_description");
 
@@ -20,20 +19,14 @@ export default function AuthCallback() {
       return;
     }
 
-    if (code) {
-      supabase.auth
-        .exchangeCodeForSession(code)
-        .then(() => {
-          window.history.replaceState({}, "", window.location.pathname);
-          setExchanging(false);
-        })
-        .catch((err) => {
-          console.error("Failed to exchange code for session:", err);
-          navigate("/login?error=" + encodeURIComponent(err.message || "Sign-in failed"), { replace: true });
-        });
-    } else {
+    // Set exchanging to false after a slight delay to allow Supabase to populate AuthContext
+    // The detectSessionInUrl=true setup in supabaseClient will automatically consume the ?code=
+    const timeout = setTimeout(() => {
       setExchanging(false);
-    }
+      // Clean up URL parameters implicitly by React Router shortly
+    }, 1500);
+
+    return () => clearTimeout(timeout);
   }, [searchParams, navigate]);
 
   useEffect(() => {

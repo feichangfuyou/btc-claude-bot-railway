@@ -10,6 +10,8 @@ import Settings from "./pages/Settings.jsx";
 import History from "./pages/History.jsx";
 import Billing from "./pages/Billing.jsx";
 import AuthCallback from "./pages/AuthCallback.jsx";
+import Terms from "./pages/Terms.jsx";
+import Privacy from "./pages/Privacy.jsx";
 import "./suppress-warnings.js";
 import "./capacitor-init.js";
 import "./global.css";
@@ -61,6 +63,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
           <Route path="/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

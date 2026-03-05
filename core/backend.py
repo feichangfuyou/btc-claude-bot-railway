@@ -111,20 +111,25 @@ async def broadcast_price(symbol: str | None = None):
     btc = bot.coins.get("BTC")
     payload = {
         "type": "price_update",
+        "symbol": symbol,
         "price": bot.price,
         "price_change24h": bot.price_change24h,
-        "history": btc.price_history if btc else [],
-        "candles": (btc.candles if btc else [])[-5:],
-        "indicators": btc.indicators if btc else {},
-        "market_condition": btc.market_cond if btc else "ranging",
         "coins": coins_data,
-        "open_position": bot.open_position,
-        "open_positions": bot.open_positions,
-        "account": bot.account,
-        "agentkit": agentkit.status_snapshot(),
         "coinbase_connected": bot.coinbase_connected,
         "kraken_enabled": getattr(bot, "kraken_enabled", False),
     }
+    if symbol is None:
+        # Full sync: send everything
+        payload.update({
+            "history": btc.price_history if btc else [],
+            "candles": (btc.candles if btc else [])[-5:],
+            "indicators": btc.indicators if btc else {},
+            "market_condition": btc.market_cond if btc else "ranging",
+            "open_position": bot.open_position,
+            "open_positions": bot.open_positions,
+            "account": bot.account,
+            "agentkit": agentkit.status_snapshot(),
+        })
     await broadcast(payload)
     if is_redis_available():
         publish("price:update", payload)
@@ -652,9 +657,13 @@ if API_SECRET:
 
 
 class IPRateLimitMiddleware(BaseHTTPMiddleware):
-    """Blanket per-IP throttle — prevents abuse before auth even runs."""
+    """Blanket per-IP throttle — prevents abuse before auth even runs.
+    Localhost is exempt (can't be an external abuser — it's the dashboard/dev machine).
+    Remote IPs: 300 req/min (raised from 120 to support multi-tab dashboard + price feed)."""
 
     EXEMPT = {"/health", "/readiness", "/metrics"}
+    # Localhost IPs are always exempt — the dashboard, bot, and scripts all run here
+    LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost"}
 
     async def dispatch(self, request: StarletteRequest, call_next):
         path = request.url.path
@@ -668,7 +677,13 @@ class IPRateLimitMiddleware(BaseHTTPMiddleware):
             or (request.client.host if request.client else "unknown")
             or "unknown"
         )
-        if not rate_limit_check(f"global_ip:{client_ip}", 120, 60):
+
+        # Localhost is fully exempt — no rate limiting for the dashboard/dev machine
+        if client_ip in self.LOCALHOST_IPS:
+            return await call_next(request)
+
+        # Remote IPs: 300 req/min (up from 120 — supports multi-tab usage without false 429s)
+        if not rate_limit_check(f"global_ip:{client_ip}", 300, 60):
             return JSONResponse(
                 {"error": "rate limited", "retry_after": 60},
                 status_code=429,

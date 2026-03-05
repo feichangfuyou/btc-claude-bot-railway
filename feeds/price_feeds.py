@@ -22,6 +22,7 @@ from core.config import (
     FEAR_GREED_URL,
     PRICE_FETCH_TIMEOUT,
     coinbase_product_id,
+    coingecko_url_for_coins,
 )
 from core.database import file_log
 
@@ -65,6 +66,34 @@ async def _fetch_kraken_fallback_prices(bot) -> bool:
         return False
 
 
+async def _fetch_coingecko_fallback_prices(bot) -> bool:
+    """Tertiary fallback using CoinGecko public API."""
+    try:
+        url = coingecko_url_for_coins(ACTIVE_COINS)
+        async with httpx.AsyncClient(timeout=_httpx_timeout) as client:
+            r = await client.get(url)
+            if r.status_code != 200:
+                return False
+            data = r.json()
+            updated = False
+            from strategy.symbol_registry import get_coingecko_id
+
+            for sym in ACTIVE_COINS:
+                cs = bot.coins.get(sym)
+                if cs and cs.price > 0:
+                    continue
+                cg_id = get_coingecko_id(sym)
+                if cg_id in data:
+                    price = float(data[cg_id].get("usd", 0))
+                    change = float(data[cg_id].get("usd_24h_change", 0))
+                    if price > 0:
+                        bot.update_coin_price(sym, price, 0.0, change)
+                        updated = True
+            return updated
+    except Exception:
+        return False
+
+
 async def _bootstrap_prices(bot, broadcast_price) -> bool:
     """Fetch initial prices — Coinbase first (matches TradingView chart), then fill gaps with Binance/Kraken."""
     sources_used = []
@@ -87,6 +116,11 @@ async def _bootstrap_prices(bot, broadcast_price) -> bool:
             sources_used.append("Kraken")
     except Exception as e:
         file_log(f"Bootstrap Kraken error: {e}", "warning")
+    try:
+        if await _fetch_instrumented_coingecko(bot):
+            sources_used.append("CoinGecko")
+    except Exception:
+        pass
 
     if sources_used:
         bot.add_log(
@@ -95,7 +129,15 @@ async def _bootstrap_prices(bot, broadcast_price) -> bool:
         )
         await broadcast_price()
         return True
+    
+    # If we get here, everything failed.
+    bot.add_log("❌ Price bootstrap FAILED — check API keys or regional blocks (Coinbase/Binance/Kraken/CG)", "error")
     return False
+
+
+async def _fetch_instrumented_coingecko(bot) -> bool:
+    """Wrapper for CG fallback with logging on failure if all else failed."""
+    return await _fetch_coingecko_fallback_prices(bot)
 
 
 async def _fetch_single_coinbase_stats(client: httpx.AsyncClient, sym: str) -> tuple[str, float, float, float]:
@@ -170,9 +212,9 @@ async def coinbase_ws_loop(bot, broadcast, broadcast_price):
             bot.add_log(f"📡 Connecting to Coinbase WS for {len(product_ids)} coins...", "info")
             async with websockets.connect(
                 COINBASE_WS_URL,
-                ping_interval=15,
-                ping_timeout=10,
-                open_timeout=5,
+                ping_interval=20,
+                ping_timeout=20,
+                open_timeout=10,
             ) as ws:
                 # Ticker: 24h stats (volume, change). Batches updates — can lag vs TradingView.
                 await ws.send(json.dumps(_sign_subscribe("ticker", product_ids)))

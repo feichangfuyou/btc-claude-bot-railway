@@ -84,8 +84,15 @@ MIN_ETH_GAS = float(os.getenv("MIN_ETH_GAS", "0.0005"))
 MAX_DRAWDOWN_PCT = float(os.getenv("MAX_DRAWDOWN_PCT", "0.20"))
 MAX_POSITION_USD = float(os.getenv("MAX_POSITION_USD", "500"))
 
-COINS_RAW = os.getenv("COINS", "BTC,ETH,SOL,LINK")
-ACTIVE_COINS = [c.strip().upper() for c in COINS_RAW.split(",") if c.strip()]
+COINS_RAW = os.getenv("COINS", "BTC,ETH,SOL,LINK").strip()
+if COINS_RAW.lower() == "all":
+    from strategy.symbol_registry import SYMBOL_TO_COINGECKO
+
+    # Exclude stablecoins and low-leverage symbols from auto-list if desired, 
+    # but for now we follow the registry.
+    ACTIVE_COINS = [s for s in SYMBOL_TO_COINGECKO.keys() if s != "USDC"]
+else:
+    ACTIVE_COINS = [c.strip().upper() for c in COINS_RAW.split(",") if c.strip()]
 
 # ─── Trade approval & direction bias ────────────────────────────────────────
 # Require user approval before executing trades (reduces risk, builds trust)
