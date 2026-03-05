@@ -48,15 +48,17 @@ export default function History() {
   }
 
   return (
+    <>
+    <style>{responsiveCss}</style>
     <div style={styles.container}>
-      <div style={styles.page}>
+      <div style={styles.page} className="history-page">
         <div style={styles.header}>
           <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>&larr; Dashboard</button>
           <h1 style={styles.title}>TRADE HISTORY</h1>
         </div>
 
         {/* Stats Summary */}
-        <div style={styles.statsRow}>
+        <div style={styles.statsRow} className="stats-row">
           <div style={styles.statCard}>
             <div style={styles.statLabel}>Total Trades</div>
             <div style={styles.statValue}>{stats.total}</div>
@@ -76,7 +78,7 @@ export default function History() {
         </div>
 
         {/* Filters */}
-        <div style={styles.filterRow}>
+        <div style={styles.filterRow} className="filter-row">
           <select value={filter.symbol} onChange={e => setFilter(f => ({ ...f, symbol: e.target.value }))} style={styles.filterSelect}>
             <option value="">All Coins</option>
             {["BTC", "ETH", "SOL", "LINK", "DOGE", "AVAX"].map(s => <option key={s} value={s}>{s}</option>)}
@@ -138,6 +140,7 @@ export default function History() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -146,8 +149,9 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     background: DARK,
     color: "#D4D4D4",
-    minHeight: "100vh",
-    padding: 20,
+    minHeight: "100dvh",
+    padding: "20px 16px",
+    paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
   },
   page: { maxWidth: 900, margin: "0 auto" },
   header: { display: "flex", alignItems: "center", gap: 16, marginBottom: 24 },
@@ -163,19 +167,26 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     fontSize: 12,
     padding: "6px 12px",
-    background: "transparent",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 4,
+    background: "rgba(255,255,255,0.03)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 8,
     color: MUTED,
     cursor: "pointer",
+    transition: "all 0.2s ease",
   },
   statsRow: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 },
   statCard: {
-    background: CARD,
-    border: `1px solid ${BORDER}`,
-    borderRadius: 6,
+    background: "rgba(17,17,17,0.55)",
+    backdropFilter: "blur(20px) saturate(1.4)",
+    WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+    border: "1px solid rgba(212,175,55,0.1)",
+    borderRadius: 14,
     padding: "14px 16px",
     textAlign: "center",
+    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
   },
   statLabel: { fontSize: 10, color: MUTED, letterSpacing: 1, marginBottom: 4 },
   statValue: { fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 2 },
@@ -184,16 +195,22 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     fontSize: 11,
     padding: "6px 10px",
-    background: CARD,
-    border: `1px solid ${BORDER}`,
-    borderRadius: 4,
+    background: "rgba(17,17,17,0.55)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 8,
     color: "#D4D4D4",
+    transition: "border-color 0.2s ease",
   },
   tableContainer: {
-    background: CARD,
-    border: `1px solid ${BORDER}`,
-    borderRadius: 8,
+    background: "rgba(17,17,17,0.55)",
+    backdropFilter: "blur(20px) saturate(1.4)",
+    WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+    border: "1px solid rgba(212,175,55,0.1)",
+    borderRadius: 16,
     overflow: "auto",
+    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
   },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 11 },
   th: {
@@ -202,9 +219,51 @@ const styles = {
     color: MUTED,
     fontSize: 10,
     letterSpacing: 1,
-    borderBottom: `1px solid ${BORDER}`,
+    borderBottom: "1px solid rgba(255,255,255,0.04)",
     fontWeight: 400,
   },
-  tr: { borderBottom: `1px solid ${BORDER}` },
+  tr: { borderBottom: "1px solid rgba(255,255,255,0.04)" },
   td: { padding: "8px 12px", whiteSpace: "nowrap" },
 };
+
+const responsiveCss = `
+@media (max-width: 768px) {
+  .history-page {
+    max-width: 100% !important;
+  }
+  .history-page .stats-row {
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  .history-page .filter-row {
+    flex-wrap: wrap !important;
+  }
+  .history-page .filter-row select {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+}
+@media (max-width: 600px) {
+  .history-page {
+    padding: 0 !important;
+  }
+  .history-page .stats-row {
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 6px !important;
+  }
+}
+@media (max-width: 375px) {
+  .history-page {
+    padding: 0 !important;
+  }
+  .history-page .stats-row {
+    gap: 4px !important;
+  }
+}
+@media (max-width: 320px) {
+  .history-page .filter-row select {
+    font-size: 10px !important;
+    padding: 5px 6px !important;
+  }
+}
+`;

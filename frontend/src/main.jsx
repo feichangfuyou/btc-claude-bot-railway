@@ -1,9 +1,3 @@
-const _warn = console.warn;
-console.warn = (...args) => {
-  if (args[0]?.includes?.("defineLocale") && args[0]?.includes?.("updateLocale")) return;
-  _warn.apply(console, args);
-};
-
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -16,6 +10,9 @@ import Settings from "./pages/Settings.jsx";
 import History from "./pages/History.jsx";
 import Billing from "./pages/Billing.jsx";
 import AuthCallback from "./pages/AuthCallback.jsx";
+import "./suppress-warnings.js";
+import "./capacitor-init.js";
+import "./global.css";
 
 function ProtectedRoute({ children }) {
   const { user, profile, loading } = useAuth();

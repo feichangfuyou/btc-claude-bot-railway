@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">DoYou Trade</string>
+    <string name="title_activity_main">DoYou Trade</string>
+    <string name="package_name">com.doyou.trade</string>
+    <string name="custom_url_scheme">com.doyou.trade</string>
+</resources>

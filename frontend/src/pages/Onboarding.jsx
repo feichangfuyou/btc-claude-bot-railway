@@ -234,8 +234,10 @@ export default function Onboarding() {
   const progress = ((step - 1) / 3) * 100;
 
   return (
+    <>
+    <style>{responsiveCss}</style>
     <div style={styles.container}>
-      <div style={styles.card}>
+      <div style={styles.card} className="onboarding-card">
         {/* Progress bar */}
         <div style={styles.progressBar}>
           <div style={{ ...styles.progressFill, width: `${progress}%` }} />
@@ -462,6 +464,7 @@ export default function Onboarding() {
         )}
       </div>
     </div>
+    </>
   );
 }
 
@@ -470,23 +473,27 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     background: DARK,
     color: "#D4D4D4",
-    minHeight: "100vh",
+    minHeight: "100dvh",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
+    padding: "20px 16px",
+    paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
   },
   card: {
-    background: CARD,
-    border: `1px solid ${BORDER}`,
-    borderRadius: 8,
+    background: "rgba(17,17,17,0.6)",
+    backdropFilter: "blur(40px) saturate(1.6)",
+    WebkitBackdropFilter: "blur(40px) saturate(1.6)",
+    border: "1px solid rgba(212,175,55,0.1)",
+    borderRadius: 24,
     padding: "32px 28px",
     width: "100%",
     maxWidth: 520,
+    boxShadow: "0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.06)",
   },
   progressBar: {
     height: 3,
-    background: "#1A1A1A",
+    background: "rgba(255,255,255,0.06)",
     borderRadius: 2,
     marginBottom: 8,
     overflow: "hidden",
@@ -512,13 +519,16 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     fontSize: 13,
     padding: "10px 12px",
-    background: "#0D0D0D",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 4,
+    background: "rgba(10,10,10,0.6)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 8,
     color: "#D4D4D4",
     outline: "none",
     width: "100%",
     boxSizing: "border-box",
+    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
   },
   exchangeList: { display: "flex", flexDirection: "column", gap: 8 },
   exchangeRow: {
@@ -526,9 +536,12 @@ const styles = {
     alignItems: "center",
     gap: 12,
     padding: "12px 14px",
-    background: "#0D0D0D",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 6,
+    background: "rgba(10,10,10,0.4)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    transition: "border-color 0.2s ease",
   },
   exchangeName: { fontSize: 13, fontWeight: 600, color: "#D4D4D4" },
   exchangeDesc: { fontSize: 10, color: MUTED, marginTop: 2 },
@@ -537,12 +550,13 @@ const styles = {
     fontSize: 11,
     letterSpacing: 1,
     padding: "6px 14px",
-    border: `1px solid ${GOLD}`,
-    borderRadius: 3,
-    background: "transparent",
+    border: "1px solid rgba(212,175,55,0.3)",
+    borderRadius: 6,
+    background: "rgba(212,175,55,0.05)",
     color: GOLD,
     cursor: "pointer",
     whiteSpace: "nowrap",
+    transition: "all 0.2s ease",
   },
   presetCarousel: {
     display: "flex",
@@ -557,15 +571,18 @@ const styles = {
     minWidth: 160,
     maxWidth: 200,
     padding: "10px 12px",
-    background: "#0D0D0D",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 6,
+    background: "rgba(10,10,10,0.4)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 10,
     cursor: "pointer",
     textAlign: "left",
     color: "#D4D4D4",
     scrollSnapAlign: "start",
+    transition: "all 0.2s ease",
   },
-  presetActive: { borderColor: GOLD, background: "rgba(212,175,55,0.05)" },
+  presetActive: { borderColor: "rgba(212,175,55,0.4)", background: "rgba(212,175,55,0.06)" },
   presetName: { fontSize: 12, fontWeight: 600 },
   presetDesc: { fontSize: 10, color: MUTED, marginTop: 2 },
   riskRow: { display: "flex", gap: 8 },
@@ -599,19 +616,26 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     fontSize: 11,
     padding: "10px 8px",
-    background: "#0D0D0D",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 4,
+    background: "rgba(10,10,10,0.5)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 8,
     color: "#D4D4D4",
     cursor: "pointer",
     textAlign: "center",
+    minWidth: 0,
+    wordBreak: "break-word",
+    transition: "all 0.2s ease",
   },
-  toggleActive: { borderColor: GREEN, color: GREEN },
-  toggleDanger: { borderColor: RED, color: RED },
+  toggleActive: { borderColor: "rgba(39,174,96,0.4)", color: GREEN, background: "rgba(39,174,96,0.05)" },
+  toggleDanger: { borderColor: "rgba(192,57,43,0.4)", color: RED, background: "rgba(192,57,43,0.05)" },
   summaryBox: {
-    background: "#0D0D0D",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 6,
+    background: "rgba(10,10,10,0.4)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 12,
     padding: 16,
     marginBottom: 20,
   },
@@ -620,7 +644,7 @@ const styles = {
     justifyContent: "space-between",
     fontSize: 12,
     padding: "6px 0",
-    borderBottom: `1px solid ${BORDER}`,
+    borderBottom: "1px solid rgba(255,255,255,0.04)",
   },
   summaryLabel: { color: MUTED },
   btnRow: {
@@ -633,11 +657,14 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     fontSize: 12,
     padding: "10px 16px",
-    background: "transparent",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 4,
+    background: "rgba(255,255,255,0.03)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 8,
     color: MUTED,
     cursor: "pointer",
+    transition: "all 0.2s ease",
   },
   nextBtn: {
     fontFamily: "'Oswald', sans-serif",
@@ -646,10 +673,12 @@ const styles = {
     letterSpacing: 2,
     padding: "10px 24px",
     border: "none",
-    borderRadius: 4,
+    borderRadius: 10,
     cursor: "pointer",
     background: `linear-gradient(180deg, ${GOLD}, #B8860B)`,
     color: DARK,
+    boxShadow: "0 4px 20px rgba(212,175,55,0.2)",
+    transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
   },
   launchBtn: {
     fontFamily: "'Oswald', sans-serif",
@@ -658,27 +687,36 @@ const styles = {
     letterSpacing: 2,
     padding: "12px 28px",
     border: "none",
-    borderRadius: 4,
+    borderRadius: 10,
     cursor: "pointer",
     background: `linear-gradient(180deg, ${GREEN}, #1E8449)`,
     color: "#fff",
+    boxShadow: "0 4px 20px rgba(39,174,96,0.2)",
+    transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
   },
   modalOverlay: {
     position: "fixed",
     top: 0, left: 0, right: 0, bottom: 0,
-    background: "rgba(0,0,0,0.7)",
+    background: "rgba(0,0,0,0.6)",
+    backdropFilter: "blur(24px) saturate(1.5)",
+    WebkitBackdropFilter: "blur(24px) saturate(1.5)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     zIndex: 1000,
   },
   modal: {
-    background: CARD,
-    border: `1px solid ${BORDER}`,
-    borderRadius: 8,
+    background: "rgba(17,17,17,0.72)",
+    backdropFilter: "blur(40px) saturate(1.6)",
+    WebkitBackdropFilter: "blur(40px) saturate(1.6)",
+    border: "1px solid rgba(212,175,55,0.12)",
+    borderRadius: 20,
     padding: "28px 24px",
     width: "100%",
     maxWidth: 380,
+    margin: "16px",
+    boxSizing: "border-box",
+    boxShadow: "0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
   },
   modalTitle: {
     fontFamily: "'Bebas Neue', sans-serif",
@@ -688,9 +726,11 @@ const styles = {
     margin: "0 0 16px",
   },
   keyInfo: {
-    background: "#0D0D0D",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 4,
+    background: "rgba(10,10,10,0.4)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 8,
     padding: 12,
     marginTop: 12,
   },
@@ -699,10 +739,34 @@ const styles = {
   error: {
     fontSize: 12,
     color: RED,
-    background: "rgba(192,57,43,0.1)",
-    border: `1px solid ${RED}`,
-    borderRadius: 4,
+    background: "rgba(192,57,43,0.08)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(192,57,43,0.2)",
+    borderRadius: 8,
     padding: "8px 12px",
     marginBottom: 12,
   },
 };
+
+const responsiveCss = `
+@media (max-width: 600px) {
+  .onboarding-card {
+    max-width: 100% !important;
+    border-radius: 20px !important;
+    padding: 24px 16px !important;
+  }
+}
+@media (max-width: 375px) {
+  .onboarding-card {
+    padding: 20px 12px !important;
+    border-radius: 16px !important;
+  }
+}
+@media (max-width: 320px) {
+  .onboarding-card {
+    padding: 16px 10px !important;
+    border-radius: 12px !important;
+  }
+}
+`;

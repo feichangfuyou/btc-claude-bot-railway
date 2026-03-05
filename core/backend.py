@@ -641,6 +641,7 @@ if API_SECRET:
             "/manifest-icon-192.maskable.png",
             "/manifest-icon-512.maskable.png",
             "/doyou-logo.svg",
+            "/Bravo.svg",
         }
 
         async def dispatch(self, request: StarletteRequest, call_next):
@@ -1928,6 +1929,8 @@ if FRONTEND_DIST.exists():
         "favicon-196.png",
         "manifest-icon-192.maskable.png",
         "manifest-icon-512.maskable.png",
+        "Bravo.svg",
+        "doyou-logo.svg",
     ):
         _path = FRONTEND_DIST / _name
         if _path.exists():

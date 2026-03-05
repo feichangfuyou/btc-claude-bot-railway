@@ -5,9 +5,23 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "icons": "npx pwa-asset-generator public/icon.svg public/ --icon-only --no-manifest --no-index"
+    "icons": "npx pwa-asset-generator public/icon.svg public/ --icon-only --no-manifest --no-index",
+    "cap:sync": "npx cap sync",
+    "cap:ios": "vite build && npx cap sync ios && npx cap open ios",
+    "cap:android": "vite build && npx cap sync android && npx cap open android",
+    "cap:build": "vite build && npx cap sync"
   },
   "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/app": "^8.0.1",
+    "@capacitor/browser": "^8.0.1",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/haptics": "^8.0.1",
+    "@capacitor/ios": "^8.1.0",
+    "@capacitor/keyboard": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.1",
     "@supabase/supabase-js": "^2.98.0",
     "animejs": "^4.3.6",
     "canvas-confetti": "^1.9.4",

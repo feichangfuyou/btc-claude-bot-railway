@@ -47,8 +47,10 @@ export default function Billing() {
   }
 
   return (
+    <>
+    <style>{responsiveCss}</style>
     <div style={styles.container}>
-      <div style={styles.page}>
+      <div style={styles.page} className="billing-page">
         <div style={styles.header}>
           <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>&larr; Dashboard</button>
           <h1 style={styles.title}>BILLING</h1>
@@ -61,7 +63,7 @@ export default function Billing() {
           </span>
         </div>
 
-        <div style={styles.tierGrid}>
+        <div style={styles.tierGrid} className="tier-grid">
           {TIERS.map(tier => (
             <div
               key={tier.id}
@@ -111,6 +113,7 @@ export default function Billing() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -119,8 +122,9 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     background: DARK,
     color: "#D4D4D4",
-    minHeight: "100vh",
-    padding: 20,
+    minHeight: "100dvh",
+    padding: "20px 16px",
+    paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
   },
   page: { maxWidth: 800, margin: "0 auto" },
   header: { display: "flex", alignItems: "center", gap: 16, marginBottom: 24 },
@@ -136,11 +140,14 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     fontSize: 12,
     padding: "6px 12px",
-    background: "transparent",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 4,
+    background: "rgba(255,255,255,0.03)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 8,
     color: MUTED,
     cursor: "pointer",
+    transition: "all 0.2s ease",
   },
   currentPlan: {
     display: "flex",
@@ -150,13 +157,17 @@ const styles = {
   },
   tierGrid: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 32 },
   tierCard: {
-    background: CARD,
-    border: `1px solid ${BORDER}`,
-    borderRadius: 8,
+    background: "rgba(17,17,17,0.55)",
+    backdropFilter: "blur(20px) saturate(1.4)",
+    WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+    border: "1px solid rgba(212,175,55,0.1)",
+    borderRadius: 20,
     padding: "24px 20px",
     position: "relative",
     display: "flex",
     flexDirection: "column",
+    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+    transition: "border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease",
   },
   popularBadge: {
     position: "absolute",
@@ -171,6 +182,7 @@ const styles = {
     color: DARK,
     borderRadius: 10,
     fontWeight: 600,
+    boxShadow: "0 4px 12px rgba(212,175,55,0.3)",
   },
   tierName: {
     fontFamily: "'Bebas Neue', sans-serif",
@@ -192,8 +204,9 @@ const styles = {
     fontSize: 11,
     color: GREEN,
     padding: "8px 0",
-    border: `1px solid ${GREEN}`,
-    borderRadius: 4,
+    border: "1px solid rgba(39,174,96,0.3)",
+    borderRadius: 8,
+    background: "rgba(39,174,96,0.05)",
   },
   selectBtn: {
     fontFamily: "'Oswald', sans-serif",
@@ -202,19 +215,51 @@ const styles = {
     letterSpacing: 2,
     padding: "10px 0",
     border: "none",
-    borderRadius: 4,
+    borderRadius: 10,
     cursor: "pointer",
     background: `linear-gradient(180deg, ${GOLD}, #B8860B)`,
     color: DARK,
     textAlign: "center",
+    boxShadow: "0 4px 20px rgba(212,175,55,0.2)",
+    transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
   },
   faq: {
-    background: CARD,
-    border: `1px solid ${BORDER}`,
-    borderRadius: 8,
+    background: "rgba(17,17,17,0.55)",
+    backdropFilter: "blur(20px) saturate(1.4)",
+    WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+    border: "1px solid rgba(212,175,55,0.1)",
+    borderRadius: 16,
     padding: 20,
+    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
   },
   faqItem: { marginBottom: 16 },
   faqQ: { fontSize: 12, fontWeight: 600, marginBottom: 4 },
   faqA: { fontSize: 11, color: MUTED, lineHeight: 1.6 },
 };
+
+const responsiveCss = `
+@media (max-width: 768px) {
+  .billing-page {
+    max-width: 100% !important;
+  }
+  .tier-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+}
+@media (max-width: 600px) {
+  .billing-page {
+    padding: 0 !important;
+  }
+}
+@media (max-width: 375px) {
+  .billing-page {
+    padding: 0 !important;
+  }
+}
+@media (max-width: 320px) {
+  .billing-page {
+    padding: 0 !important;
+  }
+}
+`;

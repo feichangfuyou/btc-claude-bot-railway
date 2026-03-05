@@ -223,15 +223,20 @@ export default function Settings() {
 
   if (!prefs) {
     return (
-      <div style={styles.container}>
-        <div style={{ color: MUTED, fontSize: 12 }}>Loading settings...</div>
-      </div>
+      <>
+        <style>{responsiveCss}</style>
+        <div style={styles.container}>
+          <div style={{ color: MUTED, fontSize: 12 }}>Loading settings...</div>
+        </div>
+      </>
     );
   }
 
   return (
+    <>
+    <style>{responsiveCss}</style>
     <div style={styles.container}>
-      <div style={styles.page}>
+      <div style={styles.page} className="settings-page">
         <div style={styles.header}>
           <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>&larr; Dashboard</button>
           <h1 style={styles.title}>SETTINGS</h1>
@@ -370,7 +375,7 @@ export default function Settings() {
         {/* API Key Modal */}
         {keyModal && (
           <div style={styles.modalOverlay} onClick={() => setKeyModal(null)}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div style={styles.modal} className="settings-modal" onClick={e => e.stopPropagation()}>
               <h3 style={styles.modalTitle}>Add {keyModal.charAt(0).toUpperCase() + keyModal.slice(1)} API Key</h3>
               {keyError && <div style={styles.error}>{keyError}</div>}
               <input type="text" placeholder="API Key" value={apiKey} onChange={e => setApiKey(e.target.value)} style={styles.input} />
@@ -384,6 +389,7 @@ export default function Settings() {
         )}
       </div>
     </div>
+    </>
   );
 }
 
@@ -392,8 +398,9 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     background: DARK,
     color: "#D4D4D4",
-    minHeight: "100vh",
-    padding: "20px",
+    minHeight: "100dvh",
+    padding: "20px 16px",
+    paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
   },
   page: { maxWidth: 600, margin: "0 auto" },
   header: { display: "flex", alignItems: "center", gap: 16, marginBottom: 24 },
@@ -409,18 +416,25 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     fontSize: 12,
     padding: "6px 12px",
-    background: "transparent",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 4,
+    background: "rgba(255,255,255,0.03)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 8,
     color: MUTED,
     cursor: "pointer",
+    transition: "all 0.2s ease",
   },
   section: {
-    background: CARD,
-    border: `1px solid ${BORDER}`,
-    borderRadius: 8,
+    background: "rgba(17,17,17,0.55)",
+    backdropFilter: "blur(20px) saturate(1.4)",
+    WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+    border: "1px solid rgba(212,175,55,0.1)",
+    borderRadius: 16,
     padding: "20px",
     marginBottom: 16,
+    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
   },
   sectionTitle: {
     fontFamily: "'Oswald', sans-serif",
@@ -436,7 +450,7 @@ const styles = {
     justifyContent: "space-between",
     fontSize: 12,
     padding: "8px 0",
-    borderBottom: `1px solid ${BORDER}`,
+    borderBottom: "1px solid rgba(255,255,255,0.04)",
   },
   rowLabel: { color: MUTED },
   label: { fontSize: 11, color: "#888", letterSpacing: 1, display: "block", marginTop: 14, marginBottom: 6 },
@@ -444,23 +458,29 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     fontSize: 12,
     padding: "8px 10px",
-    background: "#0D0D0D",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 4,
+    background: "rgba(10,10,10,0.6)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 8,
     color: "#D4D4D4",
     width: "100%",
+    transition: "border-color 0.2s ease",
   },
   input: {
     fontFamily: "'Space Mono', monospace",
     fontSize: 13,
     padding: "10px 12px",
-    background: "#0D0D0D",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 4,
+    background: "rgba(10,10,10,0.6)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 8,
     color: "#D4D4D4",
     outline: "none",
     width: "100%",
     boxSizing: "border-box",
+    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
   },
   riskRow: { display: "flex", gap: 8 },
   riskBtn: {
@@ -468,32 +488,38 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     fontSize: 11,
     padding: "8px 0",
-    background: "#0D0D0D",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 4,
+    background: "rgba(10,10,10,0.5)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 8,
     color: "#D4D4D4",
     cursor: "pointer",
     textAlign: "center",
+    transition: "all 0.2s ease",
   },
-  riskActive: { borderColor: GOLD, color: GOLD },
+  riskActive: { borderColor: "rgba(212,175,55,0.4)", color: GOLD, background: "rgba(212,175,55,0.05)" },
   coinGrid: { display: "flex", flexWrap: "wrap", gap: 6 },
   coinBtn: {
     fontFamily: "'Space Mono', monospace",
     fontSize: 11,
     padding: "5px 10px",
-    background: "#0D0D0D",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 4,
+    background: "rgba(10,10,10,0.5)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 8,
     color: "#D4D4D4",
     cursor: "pointer",
+    transition: "all 0.2s ease",
   },
-  coinActive: { borderColor: GOLD, color: GOLD },
+  coinActive: { borderColor: "rgba(212,175,55,0.4)", color: GOLD, background: "rgba(212,175,55,0.05)" },
   exchangeRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     padding: "10px 0",
-    borderBottom: `1px solid ${BORDER}`,
+    borderBottom: "1px solid rgba(255,255,255,0.04)",
   },
   exchangeName: { fontSize: 13, fontWeight: 600 },
   connectBtn: {
@@ -501,32 +527,35 @@ const styles = {
     fontSize: 11,
     letterSpacing: 1,
     padding: "5px 12px",
-    border: `1px solid ${GOLD}`,
-    borderRadius: 3,
-    background: "transparent",
+    border: "1px solid rgba(212,175,55,0.3)",
+    borderRadius: 6,
+    background: "rgba(212,175,55,0.05)",
     color: GOLD,
     cursor: "pointer",
+    transition: "all 0.2s ease",
   },
   disconnectBtn: {
     fontFamily: "'Space Mono', monospace",
     fontSize: 10,
     padding: "5px 10px",
-    border: `1px solid ${RED}`,
-    borderRadius: 3,
-    background: "transparent",
+    border: "1px solid rgba(192,57,43,0.3)",
+    borderRadius: 6,
+    background: "rgba(192,57,43,0.05)",
     color: RED,
     cursor: "pointer",
+    transition: "all 0.2s ease",
   },
   dangerBtn: {
     fontFamily: "'Space Mono', monospace",
     fontSize: 11,
     padding: "8px 16px",
-    border: `1px solid ${RED}`,
-    borderRadius: 4,
-    background: "transparent",
+    border: "1px solid rgba(192,57,43,0.3)",
+    borderRadius: 8,
+    background: "rgba(192,57,43,0.05)",
     color: RED,
     cursor: "pointer",
     marginTop: 12,
+    transition: "all 0.2s ease",
   },
   saveRow: { marginTop: 20, textAlign: "right" },
   saveBtn: {
@@ -536,27 +565,34 @@ const styles = {
     letterSpacing: 2,
     padding: "10px 24px",
     border: "none",
-    borderRadius: 4,
+    borderRadius: 10,
     cursor: "pointer",
     background: `linear-gradient(180deg, ${GOLD}, #B8860B)`,
     color: DARK,
+    boxShadow: "0 4px 20px rgba(212,175,55,0.2)",
+    transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
   },
   modalOverlay: {
     position: "fixed",
     top: 0, left: 0, right: 0, bottom: 0,
-    background: "rgba(0,0,0,0.7)",
+    background: "rgba(0,0,0,0.6)",
+    backdropFilter: "blur(24px) saturate(1.5)",
+    WebkitBackdropFilter: "blur(24px) saturate(1.5)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     zIndex: 1000,
   },
   modal: {
-    background: CARD,
-    border: `1px solid ${BORDER}`,
-    borderRadius: 8,
+    background: "rgba(17,17,17,0.72)",
+    backdropFilter: "blur(40px) saturate(1.6)",
+    WebkitBackdropFilter: "blur(40px) saturate(1.6)",
+    border: "1px solid rgba(212,175,55,0.12)",
+    borderRadius: 20,
     padding: "28px 24px",
     width: "100%",
     maxWidth: 380,
+    boxShadow: "0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
   },
   modalTitle: {
     fontFamily: "'Bebas Neue', sans-serif",
@@ -568,10 +604,43 @@ const styles = {
   error: {
     fontSize: 12,
     color: RED,
-    background: "rgba(192,57,43,0.1)",
-    border: `1px solid ${RED}`,
-    borderRadius: 4,
+    background: "rgba(192,57,43,0.08)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(192,57,43,0.2)",
+    borderRadius: 8,
     padding: "8px 12px",
     marginBottom: 12,
   },
 };
+
+const responsiveCss = `
+@media (max-width: 600px) {
+  .settings-page {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+  .settings-modal {
+    margin: 16px !important;
+    max-width: calc(100vw - 32px) !important;
+    box-sizing: border-box !important;
+  }
+}
+@media (max-width: 375px) {
+  .settings-page {
+    padding: 0 !important;
+  }
+  .settings-modal {
+    margin: 10px !important;
+    max-width: calc(100vw - 20px) !important;
+    padding: 20px 16px !important;
+  }
+}
+@media (max-width: 320px) {
+  .settings-modal {
+    margin: 8px !important;
+    max-width: calc(100vw - 16px) !important;
+    padding: 16px 12px !important;
+  }
+}
+`;

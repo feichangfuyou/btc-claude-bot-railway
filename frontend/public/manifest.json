@@ -1,14 +1,14 @@
 {
-  "name": "ClaudeBot BTC Trader",
-  "short_name": "ClaudeBot",
-  "description": "AI-powered multi-coin trading engine with Claude",
+  "name": "DoYou Trade — AI-Powered Crypto Trading",
+  "short_name": "DoYou Trade",
+  "description": "AI-powered multi-coin trading engine with Claude. Trade smarter with institutional strategies.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui", "browser"],
-  "orientation": "any",
-  "theme_color": "#06060f",
-  "background_color": "#06060f",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "theme_color": "#0A0A0A",
+  "background_color": "#0A0A0A",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -33,8 +33,27 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    },
+    {
+      "src": "/favicon-196.png",
+      "sizes": "196x196",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
-  "categories": ["finance", "business"],
-  "prefer_related_applications": false
+  "categories": ["finance", "business", "productivity"],
+  "prefer_related_applications": true,
+  "related_applications": [
+    {
+      "platform": "play",
+      "id": "com.doyou.trade"
+    },
+    {
+      "platform": "itunes",
+      "url": "https://apps.apple.com/app/doyou-trade/id0000000000"
+    }
+  ],
+  "screenshots": [],
+  "lang": "en-US",
+  "dir": "ltr"
 }
