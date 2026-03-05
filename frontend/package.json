@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "icons": "npx pwa-asset-generator public/icon.svg public/ --icon-only --no-manifest --no-index",
+    "icons": "node scripts/generate-icons.js",
     "cap:sync": "npx cap sync",
     "cap:ios": "vite build && npx cap sync ios && npx cap open ios",
     "cap:android": "vite build && npx cap sync android && npx cap open android",
@@ -30,6 +30,7 @@
     "react-router-dom": "^7.13.1"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^6.2.0"
   }
