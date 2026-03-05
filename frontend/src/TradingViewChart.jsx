@@ -1,5 +1,6 @@
 import { useEffect, useRef, memo } from "react";
 
+// Coinbase symbols — same exchange as our price feed, so header price matches chart
 const SYMBOL_MAP = {
   BTC:  "COINBASE:BTCUSD",
   ETH:  "COINBASE:ETHUSD",
@@ -9,10 +10,19 @@ const SYMBOL_MAP = {
   AVAX: "COINBASE:AVAXUSD",
   UNI:  "COINBASE:UNIUSD",
   AAVE: "COINBASE:AAVEUSD",
+  POL:  "COINBASE:MATICUSD",  // Polygon (MATIC)
+  MATIC:"COINBASE:MATICUSD",
 };
 
-function getSymbol(coin) {
-  return SYMBOL_MAP[coin] || `COINBASE:${coin}USD`;
+/** Resolve symbol for TradingView. Accepts:
+ * - Full format: "BINANCE:BTCUSDT", "COINBASE:ETHUSD", "KRAKEN:XBTUSD"
+ * - Short format: "BTC", "ETH" → maps to COINBASE:XUSD
+ */
+function getSymbol(symbol) {
+  if (!symbol || typeof symbol !== "string") return "COINBASE:BTCUSD";
+  const s = symbol.trim().toUpperCase();
+  if (s.includes(":")) return s; // Full exchange:symbol format
+  return SYMBOL_MAP[s] || `COINBASE:${s}USD`;
 }
 
 function TradingViewChart({ symbol = "BTC" }) {
@@ -39,8 +49,8 @@ function TradingViewChart({ symbol = "BTC" }) {
           theme: "dark",
           style: "1",
           locale: "en",
-          backgroundColor: "rgba(6, 6, 15, 1)",
-          gridColor: "rgba(13, 13, 28, 1)",
+          backgroundColor: "rgba(10, 10, 10, 1)",
+          gridColor: "rgba(30, 30, 30, 0.3)",
           allow_symbol_change: true,
           withdateranges: true,
           hide_side_toolbar: false,
@@ -65,15 +75,15 @@ function TradingViewChart({ symbol = "BTC" }) {
           enable_publishing: false,
           overrides: {
             "paneProperties.backgroundType": "solid",
-            "paneProperties.background": "rgba(6, 6, 15, 1)",
-            "paneProperties.vertGridProperties.color": "rgba(13, 13, 28, 1)",
-            "paneProperties.horzGridProperties.color": "rgba(13, 13, 28, 1)",
-            "mainSeriesProperties.candleStyle.upColor": "#00ff88",
-            "mainSeriesProperties.candleStyle.downColor": "#ff3366",
-            "mainSeriesProperties.candleStyle.borderUpColor": "#00ff88",
-            "mainSeriesProperties.candleStyle.borderDownColor": "#ff3366",
-            "mainSeriesProperties.candleStyle.wickUpColor": "#00ff88",
-            "mainSeriesProperties.candleStyle.wickDownColor": "#ff3366",
+            "paneProperties.background": "rgba(10, 10, 10, 1)",
+            "paneProperties.vertGridProperties.color": "rgba(30, 30, 30, 0.3)",
+            "paneProperties.horzGridProperties.color": "rgba(30, 30, 30, 0.3)",
+            "mainSeriesProperties.candleStyle.upColor": "#D4AF37",
+            "mainSeriesProperties.candleStyle.downColor": "#C0392B",
+            "mainSeriesProperties.candleStyle.borderUpColor": "#D4AF37",
+            "mainSeriesProperties.candleStyle.borderDownColor": "#C0392B",
+            "mainSeriesProperties.candleStyle.wickUpColor": "#D4AF37",
+            "mainSeriesProperties.candleStyle.wickDownColor": "#C0392B",
           },
         });
 

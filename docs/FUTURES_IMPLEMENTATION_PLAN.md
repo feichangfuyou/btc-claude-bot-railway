@@ -85,7 +85,7 @@ futures_executor.py
 │   → Same TP/SL/watchdog flow as spot
 ├── close_futures_position(bot, pos, reason)
 │   → Removes from open_positions, updates balance, records trade
-└── (Phase 3) execute_futures_live(...) - placeholder / stub
+└── (Phase 3) execute_futures_live(...) — implemented
 ```
 
 ### 2.2 Position structure for paper futures

@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 cdp_api_key.json
 cdp_wallet_secret.txt
 cdp_wallet_data.json
@@ -7,9 +9,15 @@ bot.db-wal
 bot.db-shm
 backups/
 logs/
+data/
+trade_screenshots/
+charts/
 __pycache__/
 *.pyc
 node_modules/
 frontend/dist/
 .vite/
 .DS_Store
+assets/*.csv
+docker-compose.override.yml
+.railway/

@@ -1,5 +1,18 @@
 FROM node:20-slim AS frontend-build
 WORKDIR /app/frontend
+
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_BOT_API_SECRET
+ARG VITE_BACKEND_URL
+ARG VITE_WS_URL
+
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
+    VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY \
+    VITE_BOT_API_SECRET=$VITE_BOT_API_SECRET \
+    VITE_BACKEND_URL=$VITE_BACKEND_URL \
+    VITE_WS_URL=$VITE_WS_URL
+
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit
 COPY frontend/ ./
@@ -14,7 +27,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY *.py ./
+COPY run.py ./
+COPY core/ ./core/
+COPY ai/ ./ai/
+COPY api/ ./api/
+COPY agent/ ./agent/
+COPY billing/ ./billing/
+COPY executors/ ./executors/
+COPY safety/ ./safety/
+COPY strategy/ ./strategy/
+COPY learning/ ./learning/
+COPY feeds/ ./feeds/
+COPY tools/ ./tools/
+COPY utils/ ./utils/
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
 RUN mkdir -p logs backups data
@@ -24,4 +49,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["python", "backend.py"]
+CMD ["python", "run.py"]

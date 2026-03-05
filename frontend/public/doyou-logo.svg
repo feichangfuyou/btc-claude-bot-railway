@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#B8860B"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C0392B"/>
+      <stop offset="100%" stop-color="#E74C3C"/>
+    </linearGradient>
+  </defs>
+  <circle cx="100" cy="100" r="90" fill="none" stroke="url(#g1)" stroke-width="4"/>
+  <circle cx="100" cy="100" r="80" fill="none" stroke="url(#g1)" stroke-width="1" opacity="0.3"/>
+  <text x="100" y="78" text-anchor="middle" font-family="'Helvetica Neue',Arial,sans-serif" font-weight="700" font-size="42" fill="url(#g1)" letter-spacing="2">DO</text>
+  <text x="100" y="118" text-anchor="middle" font-family="'Helvetica Neue',Arial,sans-serif" font-weight="700" font-size="42" fill="url(#g2)" letter-spacing="2">YOU</text>
+  <line x1="55" y1="130" x2="145" y2="130" stroke="url(#g1)" stroke-width="1" opacity="0.5"/>
+  <text x="100" y="150" text-anchor="middle" font-family="'Helvetica Neue',Arial,sans-serif" font-weight="400" font-size="16" fill="#D4AF37" letter-spacing="6" opacity="0.8">.TRADE</text>
+  <path d="M85 165 L100 180 L115 165" fill="none" stroke="url(#g2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+</svg>

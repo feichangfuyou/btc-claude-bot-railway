@@ -1,0 +1,19 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: ruff check .
+        language: system
+        pass_filenames: false
+      - id: pytest
+        name: pytest
+        entry: pytest tests/ -q
+        language: system
+        pass_filenames: false
+      - id: no-env-files
+        name: block .env commits
+        entry: bash -c 'for f in "$@"; do case "$f" in .env|.env.*) [[ "$f" == ".env.example" ]] && continue; echo "BLOCKED: $f — never commit secrets"; exit 1;; esac; done' --
+        language: system
+        always_run: false
+        types: [file]

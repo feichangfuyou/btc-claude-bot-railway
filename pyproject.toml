@@ -1,7 +1,13 @@
+[project]
+name = "claudebot"
+version = "7.0.0"
+description = "AI-powered multi-coin trading bot with Claude"
+requires-python = ">=3.11"
+
 [tool.ruff]
 line-length = 120
 target-version = "py311"
-exclude = ["frontend", "node_modules", "__pycache__", ".git", "backups", "*.db"]
+exclude = ["frontend", "node_modules", "__pycache__", ".git", "backups"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]

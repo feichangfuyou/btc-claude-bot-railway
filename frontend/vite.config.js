@@ -18,11 +18,14 @@ function httpProxy() {
 
 export default defineConfig({
   plugins: [react()],
+  envDir: "..",  // load .env from project root (where BOT_API_SECRET / VITE_BOT_API_SECRET live)
   server: {
     port: 5173,
     proxy: {
       // Demo-mode price feed — Coinbase via backend proxy
       "/api/coinbase": httpProxy(),
+      "/api/exchange": httpProxy(),
+      "/api/prices": httpProxy(),
       "/api/alternative": {
         target: "https://api.alternative.me",
         changeOrigin: true,
@@ -47,6 +50,8 @@ export default defineConfig({
         },
       },
       "/health":     httpProxy(),
+      "/readiness":  httpProxy(),
+      "/metrics":    httpProxy(),
       "/trades":     httpProxy(),
       "/account":    httpProxy(),
       "/stats":      httpProxy(),
@@ -55,8 +60,12 @@ export default defineConfig({
       "/memory":     httpProxy(),
       "/costs":      httpProxy(),
       "/emergency":  httpProxy(),
+      "/equity":     httpProxy(),
       "/snapshots":  httpProxy(),
       "/backtest":   httpProxy(),
+      "/api/preset": httpProxy(),
+      "/api/presets": httpProxy(),
+      "/auth":       httpProxy(),
     },
   },
 });

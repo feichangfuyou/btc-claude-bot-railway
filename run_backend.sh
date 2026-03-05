@@ -3,7 +3,7 @@
 cd "$(dirname "$0")"
 echo "Starting backend (restart loop — Ctrl+C to stop)"
 while true; do
-  python backend.py
+  python run.py
   code=$?
   echo "Backend exited (code=$code) — restarting in 3s..."
   sleep 3
