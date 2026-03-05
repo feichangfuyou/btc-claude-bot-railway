@@ -1,16 +1,18 @@
 import { useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 
-const API_SECRET = import.meta.env.VITE_BOT_API_SECRET || "";
+// VITE_BOT_API_SECRET is a dev-only shortcut for local single-user testing.
+// In production multi-user deployments, leave it unset — Supabase JWT handles auth.
+const API_SECRET = import.meta.env.DEV ? (import.meta.env.VITE_BOT_API_SECRET || "") : "";
 
-/** Returns headers for backend API calls. Uses x-bot-secret when set, else Bearer token when user is logged in. */
+/** Returns headers for backend API calls. Uses Bearer token when user is logged in; falls back to x-bot-secret in dev. */
 export function useAuthHeaders() {
   const { session } = useAuth();
   const accessToken = session?.access_token;
   return useCallback(() => {
     const h = {};
-    if (API_SECRET) h["x-bot-secret"] = API_SECRET;
-    else if (accessToken) h["Authorization"] = `Bearer ${accessToken}`;
+    if (accessToken) h["Authorization"] = `Bearer ${accessToken}`;
+    else if (API_SECRET) h["x-bot-secret"] = API_SECRET;
     return h;
   }, [accessToken]);
 }
@@ -20,8 +22,8 @@ export function useAuthQueryParam() {
   const { session } = useAuth();
   const accessToken = session?.access_token;
   return useCallback(() => {
-    if (API_SECRET) return `?secret=${encodeURIComponent(API_SECRET)}`;
     if (accessToken) return `?token=${encodeURIComponent(accessToken)}`;
+    if (API_SECRET) return `?secret=${encodeURIComponent(API_SECRET)}`;
     return "";
   }, [accessToken]);
 }

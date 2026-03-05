@@ -2,7 +2,16 @@ node_modules
 frontend/node_modules
 frontend/dist
 .env
+.env.*
+!.env.example
+!.env.10k.example
+.stripe_key
+cdp_api_key.json
+cdp_wallet_secret.txt
+cdp_wallet_data.json
 *.db
+*.db-wal
+*.db-shm
 logs/
 backups/
 __pycache__
@@ -10,3 +19,6 @@ __pycache__
 .git
 .gitignore
 *.md
+trade_screenshots/
+charts/
+assets/*.csv

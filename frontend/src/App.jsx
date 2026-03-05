@@ -102,7 +102,8 @@ function calcBB(prices, period = 20) {
 let _logSeq = 0;
 function logId() { return `log_${Date.now()}_${++_logSeq}`; }
 
-const API_SECRET = import.meta.env.VITE_BOT_API_SECRET || "";
+// Dev-only shortcut; production uses Supabase JWT (VITE_BOT_API_SECRET is never bundled in prod builds)
+const API_SECRET = import.meta.env.DEV ? (import.meta.env.VITE_BOT_API_SECRET || "") : "";
 
 // Direct backend connection by default (no proxy). More reliable for WebSocket + API.
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL

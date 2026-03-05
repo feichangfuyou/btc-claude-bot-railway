@@ -134,8 +134,9 @@ class BotState:
         """Fire-and-forget chart screenshot capture for trade visual record."""
         try:
             asyncio.create_task(capture_trade_screenshot(trade_id, symbol, phase, trade_info))
-        except Exception:
-            pass
+        except Exception as e:
+            from core.database import file_log
+            file_log(f"Screenshot capture error [{symbol}]: {e}", "warning")
 
     def _available_spot_exchanges(self) -> list[str]:
         """Return list of configured spot exchanges for round-robin routing."""
@@ -485,8 +486,9 @@ class BotState:
             try:
                 run_learning_cycle()
                 self.add_log("📉 Loss recorded — learning cycle run to internalize mistake", "dim")
-            except Exception:
-                pass
+            except Exception as e:
+                from core.database import file_log
+                file_log(f"Post-loss learning cycle error [{pos_symbol}]: {e}", "warning")
         color = "success" if net >= 0 else "error"
         self.add_log(
             f"{reason} [{pos_symbol}] | {pos['side'].upper()} | Net: {'+' if net >= 0 else ''}${net}",
@@ -562,8 +564,9 @@ class BotState:
                 self.fear_greed.get("value", 50),
                 self.account["balance"],
             )
-        except Exception:
-            pass
+        except Exception as e:
+            from core.database import file_log
+            file_log(f"Trade memory record error [{pos_symbol}]: {e}", "warning")
 
         self.remove_position(pos)
         self.persist_position()
@@ -581,8 +584,9 @@ class BotState:
             try:
                 run_learning_cycle()
                 self.add_log("📉 Loss recorded — learning cycle run", "dim")
-            except Exception:
-                pass
+            except Exception as e:
+                from core.database import file_log
+                file_log(f"Post-loss learning cycle error [{pos_symbol}]: {e}", "warning")
 
         log_level = "warning" if net < 0 else "success"
         self.add_log(f"{reason} [{pos_symbol}] — Net: {'+' if net >= 0 else ''}${net}", log_level)
@@ -1066,8 +1070,9 @@ class BotState:
             try:
                 run_learning_cycle()
                 self.add_log("📉 Loss recorded — learning cycle run to internalize mistake", "dim")
-            except Exception:
-                pass
+            except Exception as e:
+                from core.database import file_log
+                file_log(f"Post-loss learning cycle error [{pos_symbol}]: {e}", "warning")
         ex_label = f" ({pos.get('exchange', 'paper').upper()})" if pos.get("exchange") else ""
         self.add_log(
             f"{reason} [{pos_symbol}]{ex_label} — Net: {'+' if net >= 0 else ''}${net}",

@@ -9,7 +9,7 @@ from datetime import datetime
 from api.kraken_api import add_market_order, add_market_order_by_quote, is_configured
 from core.config import AI_COST_PER_TRADE, ENABLE_KRAKEN, ROUND_TRIP_FEE
 from core.key_resolution import resolve_exchange_keys
-from core.database import db_save_trade
+from core.database import db_save_trade, file_log
 from learning.trade_memory import record_trade_memory, run_learning_cycle
 from utils.notifications import send_notification
 
@@ -122,14 +122,14 @@ async def close_kraken(bot, pos: dict, reason: str = "⚡ KRAKEN CLOSE"):
         coin_state = bot.coins.get(pos_symbol)
         try:
             record_trade_memory(trade, pos, coin_state, bot.fear_greed.get("value", 50), bot.account["balance"])
-        except Exception:
-            pass
+        except Exception as e:
+            file_log(f"Trade memory record error [{pos_symbol}]: {e}", "warning")
         if net <= 0:
             try:
                 run_learning_cycle()
                 bot.add_log("📉 Loss recorded — learning cycle run", "dim")
-            except Exception:
-                pass
+            except Exception as e:
+                file_log(f"Post-loss learning cycle error [{pos_symbol}]: {e}", "warning")
         bot.remove_position(pos)
         bot.persist_position()
         bot.persist_account()

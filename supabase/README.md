@@ -6,7 +6,7 @@ Apply `migrations/20260305000000_rls_user_exchanges.sql` to enforce Row Level Se
 
 ### Option 1: Supabase Dashboard (fastest)
 
-1. Go to [SQL Editor](https://supabase.com/dashboard/project/bszxamytfibyrkgmxeue/sql/new)
+1. Go to [SQL Editor](https://supabase.com/dashboard/project/<YOUR_PROJECT_REF>/sql/new)
 2. Paste the contents of `migrations/20260305000000_rls_user_exchanges.sql`
 3. Run
 

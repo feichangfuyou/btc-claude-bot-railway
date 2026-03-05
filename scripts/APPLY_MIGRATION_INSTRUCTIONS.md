@@ -2,7 +2,7 @@
 
 ## Option 1: Supabase Dashboard (easiest)
 
-1. **Open SQL Editor:** [Supabase SQL Editor](https://supabase.com/dashboard/project/bszxamytfibyrkgmxeue/sql/new)
+1. **Open SQL Editor:** [Supabase SQL Editor](https://supabase.com/dashboard/project/<YOUR_PROJECT_REF>/sql/new)
 
 2. **Copy the migration:** Open `supabase/migrations/20260305100000_user_tables.sql` and copy all contents.
 
@@ -27,6 +27,6 @@ Then: `python scripts/apply_user_tables_migration.py`
 
 Add to `.env`:
 ```
-DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.bszxamytfibyrkgmxeue.supabase.co:5432/postgres
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.<YOUR_PROJECT_REF>.supabase.co:5432/postgres
 ```
 Then: `python scripts/apply_user_tables_migration.py`

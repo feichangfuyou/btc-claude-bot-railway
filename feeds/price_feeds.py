@@ -23,6 +23,7 @@ from core.config import (
     PRICE_FETCH_TIMEOUT,
     coinbase_product_id,
 )
+from core.database import file_log
 
 # Shared fast client config — no hanging on crypto
 _httpx_timeout = httpx.Timeout(PRICE_FETCH_TIMEOUT)
@@ -72,20 +73,20 @@ async def _bootstrap_prices(bot, broadcast_price) -> bool:
     try:
         if await _fetch_coinbase_rest_prices(bot):
             sources_used.append("Coinbase")
-    except Exception:
-        pass
+    except Exception as e:
+        file_log(f"Bootstrap Coinbase error: {e}", "warning")
 
     # 2. Fill gaps only — never overwrite Coinbase data with other exchanges
     try:
         if await _fetch_binance_prices(bot, only_fill_missing=True):
             sources_used.append("Binance")
-    except Exception:
-        pass
+    except Exception as e:
+        file_log(f"Bootstrap Binance error: {e}", "warning")
     try:
         if await _fetch_kraken_fallback_prices(bot):
             sources_used.append("Kraken")
-    except Exception:
-        pass
+    except Exception as e:
+        file_log(f"Bootstrap Kraken error: {e}", "warning")
 
     if sources_used:
         bot.add_log(
@@ -348,8 +349,8 @@ async def fetch_fear_greed(bot, broadcast):
             label = d["data"][0]["value_classification"]
             bot.fear_greed = {"value": val, "label": label}
             await broadcast({"type": "fear_greed_update", "fear_greed": bot.fear_greed})
-    except Exception:
-        pass
+    except Exception as e:
+        file_log(f"Fear & Greed fetch error: {e}", "warning")
 
 
 async def fear_greed_cycle(bot, broadcast):
@@ -370,8 +371,8 @@ async def stats_refresh_cycle(bot, broadcast_price):
                     if isinstance(r, tuple) and len(r) >= 4 and r[1] > 0:
                         bot.update_coin_24h_change(r[0], r[3])
             await broadcast_price()
-        except Exception:
-            pass
+        except Exception as e:
+            file_log(f"Stats refresh error: {e}", "warning")
         await asyncio.sleep(900)
 
 

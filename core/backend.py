@@ -188,8 +188,8 @@ def _shutdown_handler(sig, frame):
     try:
         bot.add_log(f"🛑 Received signal {sig} — persisting state...", "warning")
         bot.persist_all()
-    except Exception:
-        pass
+    except Exception as e:
+        file_log(f"Shutdown persist error: {e}", "error")
     raise SystemExit(0)
 
 
@@ -317,14 +317,14 @@ async def learning_cycle():
         rules_count = len(db_get_active_rules())
         if rules_count:
             bot.add_log(f"🧠 Memory initialized — {rules_count} learned rules active", "info")
-    except Exception:
-        pass
+    except Exception as e:
+        file_log(f"Learning cycle init error: {e}", "error")
     while True:
         try:
             await asyncio.sleep(1800)
             await loop.run_in_executor(None, run_learning_cycle)
-        except Exception:
-            pass
+        except Exception as e:
+            file_log(f"Learning cycle error: {e}", "error")
 
 
 async def backup_cycle():
@@ -399,8 +399,8 @@ async def status_heartbeat():
                 f"{pos_details}"
             )
             await send_notification(msg, "info")
-        except Exception:
-            pass
+        except Exception as e:
+            file_log(f"Status heartbeat error: {e}", "error")
         await asyncio.sleep(1800)
 
 
@@ -422,8 +422,8 @@ async def lifespan(app: FastAPI):
                 environment=os.getenv("RAILWAY_ENVIRONMENT", "development"),
             )
             bot.add_log("  Sentry: ✅ APM enabled", "info")
-        except Exception:
-            pass
+        except Exception as e:
+            bot.add_log(f"  Sentry: ❌ init failed: {str(e)[:60]}", "warning")
 
     # Clear presets cache on startup so deploy picks up preset changes immediately
     global _PRESETS_CACHE
@@ -598,10 +598,8 @@ async def lifespan(app: FastAPI):
 # ─── FastAPI app ─────────────────────────────────────────────────────────────
 app = FastAPI(title="ClaudeBot Backend", lifespan=lifespan)
 
-ALLOWED_ORIGINS = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:5173,http://localhost:8000,https://doyou.trade,https://www.doyou.trade",
-).split(",")
+_DEFAULT_CORS = "https://doyou.trade,https://www.doyou.trade"
+ALLOWED_ORIGINS = os.getenv("CORS_ORIGINS", _DEFAULT_CORS).split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -1305,8 +1303,8 @@ async def proxy_coinbase_tickers(symbols: str = "BTC,ETH,SOL,DOGE,LINK,AVAX,UNI,
                             p = float(data[cg_id]["usd"])
                             ch = float(data[cg_id].get("usd_24h_change") or 0)
                             results[sym] = {"price": p, "price_change24h": ch}
-            except Exception:
-                pass
+            except Exception as e:
+                file_log(f"CoinGecko fallback error: {e}", "warning")
 
     # Last resort: if still empty, at least fetch BTC from CoinGecko so header never shows "unavailable"
     if not results and "BTC" in sym_list:
@@ -1322,8 +1320,8 @@ async def proxy_coinbase_tickers(symbols: str = "BTC,ETH,SOL,DOGE,LINK,AVAX,UNI,
                         "price": float(d["bitcoin"]["usd"]),
                         "price_change24h": float(d["bitcoin"].get("usd_24h_change") or 0),
                     }
-        except Exception:
-            pass
+        except Exception as e:
+            file_log(f"CoinGecko BTC fallback error: {e}", "warning")
 
     return {"coins": results}
 
@@ -1363,8 +1361,8 @@ async def exchange_tickers(limit: int = 500):
             cache_set(f"exchange_tickers:{limit}", tickers, ttl_sec=_EXCHANGE_TICKERS_TTL)
             _EXCHANGE_TICKERS_CACHE[limit] = (now, tickers)
             return tickers
-    except Exception:
-        pass
+    except Exception as e:
+        file_log(f"Exchange tickers error: {e}", "warning")
     # Last resort: active coins from our price feed
     result = []
     for sym, cs in bot.coins.items():
@@ -1408,8 +1406,8 @@ async def multi_exchange_prices(symbols: str = "BTC,ETH,SOL,XRP,DOGE,ADA"):
                         if p:
                             result[sym]["binance"] = p
                             filled = True
-        except Exception:
-            pass
+        except Exception as e:
+            file_log(f"Binance price fetch error: {e}", "warning")
         return filled
 
     async def fetch_binance():
@@ -1463,8 +1461,8 @@ async def multi_exchange_prices(symbols: str = "BTC,ETH,SOL,XRP,DOGE,ADA"):
                     p = float(c[0]) if c else None
                     if p:
                         result[sym]["kraken"] = p
-        except Exception:
-            pass
+        except Exception as e:
+            file_log(f"Kraken multi-price fetch error: {e}", "warning")
 
     # Run all three in parallel
     await asyncio.gather(fetch_binance(), fetch_coinbase(), fetch_kraken())

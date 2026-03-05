@@ -17,7 +17,7 @@ if not DATABASE_URL:
     print(
         "Set DATABASE_URL in .env first.\n"
         "Get it from: Supabase Dashboard → Project → Connect → URI (Direct connection)\n"
-        "Example: postgresql://postgres:[PASSWORD]@db.bszxamytfibyrkgmxeue.supabase.co:5432/postgres"
+        "Example: postgresql://postgres:[PASSWORD]@db.<YOUR_PROJECT_REF>.supabase.co:5432/postgres"
     )
     sys.exit(1)
 

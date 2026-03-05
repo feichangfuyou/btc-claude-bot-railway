@@ -37,8 +37,8 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # ports:
+    #   - "6379:6379"  # Uncomment only for local debugging; never expose in production
     volumes:
       - redis-data:/data
     restart: unless-stopped

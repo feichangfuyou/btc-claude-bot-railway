@@ -13,7 +13,7 @@ from core.config import (
     MAX_FUTURES_POSITIONS,
     PERP_PRODUCT_IDS,
 )
-from core.database import db_save_state, db_save_trade
+from core.database import db_save_state, db_save_trade, file_log
 from learning.trade_memory import record_trade_memory, run_learning_cycle
 from utils.notifications import send_notification
 
@@ -91,8 +91,8 @@ async def execute_futures_paper(
                     "account": bot.account,
                 }
             )
-        except Exception:
-            pass
+        except Exception as e:
+            file_log(f"Futures broadcast error: {e}", "warning")
 
 
 def close_futures_position(bot, pos: dict, exit_price: float, reason: str):
@@ -187,8 +187,8 @@ def close_futures_position(bot, pos: dict, exit_price: float, reason: str):
         try:
             run_learning_cycle()
             bot.add_log("📉 Loss recorded — learning cycle run", "dim")
-        except Exception:
-            pass
+        except Exception as e:
+            file_log(f"Post-loss learning cycle error: {e}", "warning")
 
     color = "success" if net >= 0 else "error"
     bot.add_log(
@@ -291,8 +291,8 @@ async def execute_futures_live(
                         "account": bot.account,
                     }
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                file_log(f"Futures live broadcast error: {e}", "warning")
     except ImportError:
         bot.add_log("coinbase_api not ready — falling back to paper futures", "warning")
         await execute_futures_paper(bot, action, symbol, entry, tp, sl, usd_sz, leverage, decision)
