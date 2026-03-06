@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
 import { colors, typography } from "../theme.js";
@@ -163,6 +163,14 @@ export default function Billing() {
             </div>
           </div>
         </div>
+
+        <div style={styles.legalFooter}>
+          <Link to="/terms" target="_blank" style={styles.legalLink}>Terms of Service</Link>
+          <span style={{ color: "#333" }}> · </span>
+          <Link to="/privacy" target="_blank" style={styles.legalLink}>Privacy Policy</Link>
+          <span style={{ color: "#333" }}> · </span>
+          <a href="mailto:support@doyou.trade" style={styles.legalLink}>Support</a>
+        </div>
       </div>
     </>
   );
@@ -293,6 +301,18 @@ const styles = {
   faqItem: { marginBottom: 16 },
   faqQ: { fontSize: 12, fontWeight: 600, marginBottom: 4 },
   faqA: { fontSize: 11, color: colors.muted, lineHeight: 1.6 },
+  legalFooter: {
+    textAlign: "center",
+    marginTop: 24,
+    fontSize: 11,
+    color: "#444",
+    letterSpacing: 0.5,
+  },
+  legalLink: {
+    color: "#555",
+    textDecoration: "none",
+    transition: "color 0.2s",
+  },
 };
 
 const responsiveCss = `
