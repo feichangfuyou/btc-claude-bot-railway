@@ -1375,7 +1375,7 @@ function Dashboard() {
             <div style={{ padding: "8px 20px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: "8px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
                 <span style={{ fontSize: "10px", color: "#5C5C5C", letterSpacing: "1px" }}>ACCOUNT</span>
-                {(user?.email === "feichangfuyou@gmail.com" || profile?.role === "admin") ? (
+                {user?.email === "feichangfuyou@gmail.com" ? (
                   <span style={{ fontSize: "9px", color: colors.success, background: "rgba(0,230,118,0.1)", padding: "2px 6px", borderRadius: "4px", letterSpacing: "1px" }}>DEV · ELITE</span>
                 ) : (
                   <span style={{ fontSize: "9px", color: colors.gold, background: "rgba(212,175,55,0.1)", padding: "2px 6px", borderRadius: "4px" }}>{(profile?.subscription_status === "active" ? (profile?.subscription_tier || "NONE") : "NONE").toUpperCase()}</span>
@@ -1662,7 +1662,7 @@ function Dashboard() {
       </div>
 
       {/* ══ SUBSCRIPTION GATE ══ */}
-      {profile && profile.subscription_status !== "active" && user?.email !== "feichangfuyou@gmail.com" && profile?.role !== "admin" && (
+      {profile && profile.subscription_status !== "active" && user?.email !== "feichangfuyou@gmail.com" && (
         <div className="confirm-overlay" style={{ zIndex: 99999, position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(20px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div className="confirm-box" style={{ maxWidth: "420px", textAlign: "center", background: "rgba(17,17,17,0.72)", border: "1px solid rgba(212,175,55,0.15)", borderRadius: "24px", padding: "40px 32px", boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}>
             <div style={{ fontSize: "48px", marginBottom: "20px" }}><Brain size={48} color={colors.gold} /></div>

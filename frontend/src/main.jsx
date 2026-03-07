@@ -37,7 +37,7 @@ function ProtectedRoute({ children }) {
 
   const isActive = profile?.subscription_status === "active";
   const isBilling = location.pathname === "/billing";
-  const isAdmin = user?.email === "feichangfuyou@gmail.com" || profile?.role === "admin";
+  const isAdmin = user?.email === "feichangfuyou@gmail.com";
 
   if (!isActive && !isBilling && !isAdmin) {
     return <Navigate to="/billing" replace />;
@@ -66,7 +66,7 @@ function AdminRoute({ children }) {
   const { user, profile, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.email !== "feichangfuyou@gmail.com" && profile?.role !== "admin") {
+  if (user.email !== "feichangfuyou@gmail.com") {
     return <Navigate to="/dashboard" replace />;
   }
   return children;

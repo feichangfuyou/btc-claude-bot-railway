@@ -419,7 +419,7 @@ export default function Settings() {
               <span style={styles.rowLabel}>Plan</span>
               <span style={{ color: colors.gold, textTransform: "capitalize" }}>{profile?.subscription_tier || "None"}</span>
             </div>
-            {(user?.email === "feichangfuyou@gmail.com" || profile?.role === "admin") && (
+            {user?.email === "feichangfuyou@gmail.com" && (
               <div style={styles.row}>
                 <span style={styles.rowLabel}>Administration</span>
                 <button 

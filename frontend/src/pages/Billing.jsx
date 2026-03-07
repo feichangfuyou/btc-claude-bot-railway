@@ -46,7 +46,7 @@ export default function Billing() {
   const [message, setMessage] = useState(null);
 
   // Dev account always gets elite — overrides Supabase profile state
-  const isDevUser = user?.email?.toLowerCase() === DEV_EMAIL || profile?.role === "admin";
+  const isDevUser = user?.email?.toLowerCase() === DEV_EMAIL;
   const currentTier = isDevUser
     ? "elite"
     : (profile?.subscription_status === "active" ? (profile?.subscription_tier || "none") : "none");
