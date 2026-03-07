@@ -490,9 +490,9 @@ h1, h2, h3, h4, h5, h6, .card-title, .section-label, .btn {
 }
 
 .chart-card {
-  height: 50vh;
-  min-height: 400px;
-  max-height: 500px;
+  height: 60vh;
+  min-height: 500px;
+  max-height: 650px;
 }
 
 .card::before,
@@ -573,9 +573,9 @@ h1, h2, h3, h4, h5, h6, .card-title, .section-label, .btn {
     padding: 10px 8px;
   }
   .chart-card {
-    height: 55vh;
-    min-height: 350px;
-    max-height: 500px;
+    height: 60vh;
+    min-height: 380px;
+    max-height: 600px;
   }
 }
 
@@ -585,9 +585,9 @@ h1, h2, h3, h4, h5, h6, .card-title, .section-label, .btn {
     padding: 8px 6px;
   }
   .chart-card {
-    height: 50vh;
-    min-height: 300px;
-    max-height: 400px;
+    height: 55vh;
+    min-height: 350px;
+    max-height: 450px;
   }
 }
 
