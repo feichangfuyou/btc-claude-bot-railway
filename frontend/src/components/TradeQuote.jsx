@@ -20,7 +20,7 @@ export function TradeQuote() {
     return () => clearInterval(timer);
   }, []);
   return (
-    <div style={{ fontFamily:"'Space Mono',monospace", fontSize:"11px", color:colors.gold, letterSpacing:"0.5px", fontStyle:"italic", maxWidth:"300px", lineHeight:"1.5", opacity:fade?1:0, transition:"opacity 0.4s ease" }}>
+    <div style={{ fontFamily:"'Space Mono',monospace", fontSize:"11px", color:colors.gold, letterSpacing:"0.5px", fontStyle:"italic", maxWidth:"min(300px, calc(100vw - 48px))", lineHeight:"1.5", opacity:fade?1:0, transition:"opacity 0.4s ease" }}>
       &ldquo;{TRADE_QUOTES[idx]}&rdquo;
     </div>
   );

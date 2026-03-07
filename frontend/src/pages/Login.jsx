@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { colors } from "../theme.js";
@@ -7,7 +7,17 @@ import { Brain, Shield, Zap, ArrowUp, ArrowRight } from "lucide-react";
 // Minimal Ticker for Landing if the main one is too heavy
 function LandingTicker() {
   const symbols = ["BTC", "ETH", "SOL", "DOGE", "LINK", "AVAX", "PEPE", "WIF", "BONK", "AAPL", "TSLA", "NVDA"];
-  const items = [...symbols, ...symbols];
+  // Initialize prices once using lazy state to avoid react-hooks/purity warnings
+  const [items] = useState(() => {
+    const all = [...symbols, ...symbols];
+    return all.map((s, i) => ({
+      key: i,
+      sym: s,
+      price: (Math.random() * 1000 + 10).toFixed(2),
+      chg: (Math.random() * 5).toFixed(2),
+    }));
+  });
+
   const trackRef = useRef(null);
   const rafRef = useRef(null);
   const offsetRef = useRef(0);
@@ -39,13 +49,14 @@ function LandingTicker() {
     <div style={{ background: "rgba(212,175,55,0.03)", borderTop: "1px solid rgba(212,175,55,0.1)", borderBottom: "1px solid rgba(212,175,55,0.1)", padding: "10px 0", marginBottom: "0", overflow: "hidden" }}>
       <div
         ref={trackRef}
-        style={{ display: "flex", gap: "40px", width: "max-content", willChange: "transform", backfaceVisibility: "hidden", WebkitFontSmoothing: "antialiased" }}
+        className="landing-ticker-track"
+        style={{ display: "flex", width: "max-content", willChange: "transform", backfaceVisibility: "hidden", WebkitFontSmoothing: "antialiased" }}
       >
-        {items.map((s, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", fontWeight: "700", color: "#666", whiteSpace: "nowrap" }}>
-            <span style={{ color: colors.gold }}>{s}</span>
-            <span>${(Math.random() * 1000 + 10).toFixed(2)}</span>
-            <span style={{ color: "#00E676" }}>+{(Math.random() * 5).toFixed(2)}%</span>
+        {items.map((item) => (
+          <div key={item.key} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", fontWeight: "700", color: "#666", whiteSpace: "nowrap" }}>
+            <span style={{ color: colors.gold }}>{item.sym}</span>
+            <span>${item.price}</span>
+            <span style={{ color: "#00E676" }}>+{item.chg}%</span>
           </div>
         ))}
       </div>
@@ -154,10 +165,33 @@ export default function Login() {
           <div style={{ display: "flex", gap: "16px", marginBottom: "40px", justifyContent: "center", flexWrap: "wrap" }}>
             <button className="btn btn-r" onClick={() => document.getElementById('login-card').scrollIntoView({ behavior: 'smooth' })} aria-label="Start Trading Now" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "16px 32px", fontSize: "14px" }}>START TRADING NOW <ArrowRight size={18} /></button>
           </div>
-          <div style={{ display: "flex", gap: "32px", opacity: 0.3, justifyContent: "center", filter: "grayscale(1) invert(1)" }}>
-            <img src="https://cryptologos.cc/logos/coinbase-coin-logo.png" alt="Trade Bitcoin on Coinbase with AI" style={{ height: "24px" }} />
-            <img src="https://cryptologos.cc/logos/binance-coin-bnb-logo.png" alt="Automate Binance Trading" style={{ height: "24px" }} />
-            <img src="https://cryptologos.cc/logos/kraken-kraken-logo.png" alt="Kraken AI Trading Bot" style={{ height: "24px" }} />
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", opacity: 0.45 }}>
+            <div style={{ display: "flex", gap: "32px", justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
+              {/* Coinbase */}
+              <svg aria-label="Trade Bitcoin on Coinbase with AI" width="100" height="24" viewBox="0 0 100 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="12" fill="#0052FF"/>
+                <path d="M12 6C8.69 6 6 8.69 6 12C6 15.31 8.69 18 12 18C14.97 18 17.44 15.97 17.9 13.2H15.33C14.93 14.56 13.58 15.56 12 15.56C10.03 15.56 8.44 13.97 8.44 12C8.44 10.03 10.03 8.44 12 8.44C13.58 8.44 14.93 9.44 15.33 10.8H17.9C17.44 8.03 14.97 6 12 6Z" fill="white"/>
+                <text x="28" y="17" fontFamily="'Space Mono', monospace" fontSize="12" fontWeight="700" fill="#aaa" letterSpacing="1">COINBASE</text>
+              </svg>
+              {/* Binance */}
+              <svg aria-label="Automate Binance Trading" width="90" height="24" viewBox="0 0 90 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L14.5 4.5L9.5 9.5L7 7L12 2Z" fill="#F3BA2F"/>
+                <path d="M16.5 6.5L19 9L12 16L5 9L7.5 6.5L12 11L16.5 6.5Z" fill="#F3BA2F"/>
+                <path d="M9.5 14.5L12 17L14.5 14.5L17 17L12 22L7 17L9.5 14.5Z" fill="#F3BA2F"/>
+                <path d="M19.5 9.5L22 12L19.5 14.5L17 12L19.5 9.5Z" fill="#F3BA2F"/>
+                <path d="M2 12L4.5 9.5L7 12L4.5 14.5L2 12Z" fill="#F3BA2F"/>
+                <text x="28" y="17" fontFamily="'Space Mono', monospace" fontSize="12" fontWeight="700" fill="#aaa" letterSpacing="1">BINANCE</text>
+              </svg>
+              {/* Kraken */}
+              <svg aria-label="Kraken AI Trading Bot" width="80" height="24" viewBox="0 0 80 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="12" fill="#5741D9"/>
+                <text x="6" y="16" fontFamily="Arial" fontSize="10" fontWeight="900" fill="white">K</text>
+                <text x="26" y="17" fontFamily="'Space Mono', monospace" fontSize="12" fontWeight="700" fill="#aaa" letterSpacing="1">KRAKEN</text>
+              </svg>
+            </div>
+            <span style={{ fontSize: "10px", letterSpacing: "2px", color: "#555", fontWeight: "600" }}>
+              + MANY MORE EXCHANGES COMING SOON
+            </span>
           </div>
         </div>
 
@@ -265,7 +299,7 @@ export default function Login() {
         </div>
       </header>
 
-      <section className="landing-stats">
+      <section className="landing-stats" style={{ contentVisibility: "auto", containIntrinsicSize: "0 200px" }}>
         <div className="stats-grid">
           <div className="stat-item">
             <h4>$2.4B</h4>
@@ -286,7 +320,7 @@ export default function Login() {
         </div>
       </section>
 
-      <section className="landing-security" style={{ padding: "80px 20px", borderTop: "1px solid rgba(212,175,55,0.1)" }}>
+      <section className="landing-security" style={{ padding: "80px 20px", borderTop: "1px solid rgba(212,175,55,0.1)", contentVisibility: "auto", containIntrinsicSize: "0 400px" }}>
         <div style={{ maxWidth: "1200px", margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "60px", alignItems: "center" }}>
           <div>
             <h2 style={{ fontSize: "32px", marginBottom: "24px" }}>UNCOMPROMISING SECURITY</h2>
@@ -320,7 +354,7 @@ export default function Login() {
         </div>
       </section>
 
-      <section className="landing-how-it-works" style={{ padding: "80px 20px", background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(212,175,55,0.1)" }}>
+      <section className="landing-how-it-works" style={{ padding: "80px 20px", background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(212,175,55,0.1)", contentVisibility: "auto", containIntrinsicSize: "0 400px" }}>
         <div className="section-header" style={{ textAlign: "center", marginBottom: "60px" }}>
           <h2 style={{ fontSize: "32px", marginBottom: "16px" }}>HOW IT WORKS</h2>
           <p style={{ color: "#888", maxWidth: "600px", margin: "0 auto" }}>THREE STEPS TO AUTOMATED TRADING EXCELLENCE</p>
@@ -344,7 +378,7 @@ export default function Login() {
         </div>
       </section>
 
-      <section className="landing-faq" style={{ padding: "80px 20px", maxWidth: "800px", margin: "0 auto" }}>
+      <section className="landing-faq" style={{ padding: "80px 20px", maxWidth: "800px", margin: "0 auto", contentVisibility: "auto", containIntrinsicSize: "0 500px" }}>
         <div className="section-header" style={{ textAlign: "center", marginBottom: "40px" }}>
           <h2 style={{ fontSize: "32px", marginBottom: "16px" }}>FREQUENTLY ASKED QUESTIONS</h2>
           <p style={{ color: "#888" }}>EVERYTHING YOU NEED TO KNOW ABOUT THE BRAIN</p>
@@ -368,7 +402,7 @@ export default function Login() {
         </div>
       </section>
 
-      <section className="landing-features" id="features">
+      <section className="landing-features" id="features" style={{ contentVisibility: "auto", containIntrinsicSize: "0 400px" }}>
         <div className="section-header">
           <h2>SYSTEM CAPABILITIES</h2>
           <p style={{ color: "#555", letterSpacing: "1px", fontSize: "14px" }}>ADVANCED INFRASTRUCTURE FOR THE MODERN TRADER</p>
@@ -404,10 +438,10 @@ export default function Login() {
           <div>
             <h4 style={{ fontSize: "12px", color: "#888", letterSpacing: "2px", marginBottom: "15px" }}>MARKET INDEX</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px" }}>
-              <Link to="/login" title="Trade Bitcoin with AI" aria-label="Trade Bitcoin with AI">BTC/USD Intelligence</Link>
-              <Link to="/login" title="Automate Ethereum Trading" aria-label="Automate Ethereum Trading">ETH/USD Strategy</Link>
-              <Link to="/login" title="Solana AI Algorithms" aria-label="Solana AI Algorithms">SOL/USD Execution</Link>
-              <Link to="/login" title="Algorithmic Altcoin Trading" aria-label="Algorithmic Altcoin Trading">Altcoin Neural Engine</Link>
+              <Link to="/market/btc" title="Trade Bitcoin with AI" aria-label="Trade Bitcoin with AI">BTC/USD Intelligence</Link>
+              <Link to="/market/eth" title="Automate Ethereum Trading" aria-label="Automate Ethereum Trading">ETH/USD Strategy</Link>
+              <Link to="/market/sol" title="Solana AI Algorithms" aria-label="Solana AI Algorithms">SOL/USD Execution</Link>
+              <Link to="/market/altcoins" title="Algorithmic Altcoin Trading" aria-label="Algorithmic Altcoin Trading">Altcoin Neural Engine</Link>
             </div>
           </div>
           <div>

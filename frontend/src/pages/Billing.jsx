@@ -38,7 +38,7 @@ const BACKEND_BASE = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "")
 const DEV_EMAIL = "feichangfuyou@gmail.com";
 
 export default function Billing() {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, signOut, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const getAuthHeaders = useAuthHeaders();
@@ -62,7 +62,7 @@ export default function Billing() {
       setMessage({ type: "info", text: "Checkout cancelled." });
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams]);
+  }, [searchParams, refreshProfile, setSearchParams]);
 
   async function handleSelectPlan(tierId) {
     setLoading(true);
@@ -96,6 +96,9 @@ export default function Billing() {
           <div style={styles.header}>
             <button style={styles.backBtn} onClick={() => navigate("/dashboard")}><ArrowLeft size={14} style={{ marginRight: "4px", verticalAlign: "middle" }} /> Dashboard</button>
             <h1 style={styles.title}>BILLING</h1>
+            {user && (
+              <button style={styles.signOutBtn} onClick={signOut}>SIGN OUT</button>
+            )}
           </div>
 
           {/* Dev account banner */}
@@ -139,6 +142,7 @@ export default function Billing() {
             {TIERS.map(tier => (
               <div
                 key={tier.id}
+                className="tier-card"
                 style={{
                   ...styles.tierCard,
                   borderColor: tier.popular ? colors.gold : colors.border,
@@ -146,14 +150,14 @@ export default function Billing() {
                 }}
               >
                 {tier.popular && <div style={styles.popularBadge}>MOST POPULAR</div>}
-                <div style={{ ...styles.tierName, color: tier.color }}>{tier.name}</div>
+                <div className="tier-name" style={{ ...styles.tierName, color: tier.color }}>{tier.name}</div>
                 <div style={styles.tierPrice}>
-                  <span style={styles.priceAmount}>{tier.price}</span>
+                  <span className="price-amount" style={styles.priceAmount}>{tier.price}</span>
                   <span style={styles.pricePeriod}>{tier.period}</span>
                 </div>
-                <ul style={styles.featureList}>
+                <ul className="feature-list" style={styles.featureList}>
                   {tier.features.map((f, i) => (
-                    <li key={i} style={styles.featureItem}>
+                    <li key={i} className="feature-item" style={styles.featureItem}>
                       <Check size={12} style={{ color: colors.success }} /> {f}
                     </li>
                   ))}
@@ -200,7 +204,7 @@ export default function Billing() {
                 The bot enforces strict minimums to ensure every trade is actually profitable after fees and AI costs:
               </div>
               <div style={styles.capitalCallout}>
-                <div style={styles.capitalCalloutGrid}>
+                <div style={styles.capitalCalloutGrid} className="capital-callout-grid">
                   <div style={styles.calloutStat}>
                     <span style={styles.calloutVal}>$75</span>
                     <span style={styles.calloutLbl}>Min trade size — trades below this are auto-rejected</span>
@@ -244,11 +248,14 @@ const styles = {
     background: colors.dark,
     color: colors.text,
     minHeight: "100dvh",
+    width: "100%",
+    maxWidth: "100vw",
+    boxSizing: "border-box",
     padding: "20px 16px",
     paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
   },
-  page: { maxWidth: 800, margin: "0 auto" },
-  header: { display: "flex", alignItems: "center", gap: 16, marginBottom: 24 },
+  page: { maxWidth: 800, margin: "0 auto", width: "100%", boxSizing: "border-box" },
+  header: { display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" },
   title: {
     fontFamily: typography.fontDisplay,
     fontSize: 28,
@@ -268,6 +275,19 @@ const styles = {
     borderRadius: 8,
     color: colors.muted,
     cursor: "pointer",
+    transition: "all 0.2s ease",
+  },
+  signOutBtn: {
+    fontFamily: "'Space Mono', monospace",
+    fontSize: 11,
+    letterSpacing: 1.5,
+    padding: "6px 12px",
+    background: "transparent",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 8,
+    color: "#5C5C5C",
+    cursor: "pointer",
+    marginLeft: "auto",
     transition: "all 0.2s ease",
   },
   devBanner: {
@@ -456,6 +476,40 @@ const responsiveCss = `
 @media (max-width: 320px) {
   .billing-page {
     padding: 0 !important;
+  }
+}
+@media (max-width: 280px) {
+  .billing-page {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .tier-grid {
+    gap: 8px !important;
+    grid-template-columns: 1fr !important;
+  }
+  .billing-page .tier-card {
+    padding: 12px 10px !important;
+    min-width: 0 !important;
+  }
+  .billing-page .tier-name {
+    font-size: 14px !important;
+    letter-spacing: 1px !important;
+  }
+  .billing-page .price-amount {
+    font-size: 20px !important;
+  }
+  .billing-page .feature-item {
+    font-size: 9px !important;
+  }
+  .billing-page .capital-callout-grid {
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+  }
+  .billing-page .callout-val {
+    font-size: 16px !important;
+  }
+  .billing-page .callout-lbl {
+    font-size: 9px !important;
   }
 }
 `;

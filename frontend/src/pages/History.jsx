@@ -1,23 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { supabase } from "../supabaseClient.js";
 import { colors, typography } from "../theme.js";
 
 export default function History() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState({ symbol: "", side: "", win: "" });
   const [stats, setStats] = useState({ total: 0, wins: 0, totalPnl: 0 });
 
-  useEffect(() => {
+  const loadTrades = useCallback(async () => {
     if (!user) return;
-    loadTrades();
-  }, [user, filter]);
-
-  async function loadTrades() {
     setLoading(true);
     let query = supabase
       .from("user_trades")
@@ -38,7 +34,16 @@ export default function History() {
     const totalPnl = (data || []).reduce((sum, t) => sum + (t.pnl || 0), 0);
     setStats({ total: count || 0, wins, totalPnl });
     setLoading(false);
-  }
+  }, [user, filter]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function start() {
+      if (!ignore) await loadTrades();
+    }
+    start();
+    return () => { ignore = true; };
+  }, [loadTrades]);
 
   return (
     <>
@@ -48,6 +53,9 @@ export default function History() {
         <div style={styles.header}>
           <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>&larr; Dashboard</button>
           <h1 style={styles.title}>TRADE HISTORY</h1>
+          {user && (
+            <button style={styles.signOutBtn} onClick={signOut}>SIGN OUT</button>
+          )}
         </div>
 
         {/* Stats Summary */}
@@ -89,7 +97,7 @@ export default function History() {
         </div>
 
         {/* Trade Table */}
-        <div style={styles.tableContainer}>
+        <div style={styles.tableContainer} className="table-wrap">
           {loading ? (
             <div style={{ textAlign: "center", padding: 40, color: colors.muted, fontSize: 12 }}>Loading trades...</div>
           ) : trades.length === 0 ? (
@@ -143,11 +151,14 @@ const styles = {
     background: colors.dark,
     color: colors.text,
     minHeight: "100dvh",
+    width: "100%",
+    maxWidth: "100vw",
+    boxSizing: "border-box",
     padding: "20px 16px",
     paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
   },
-  page: { maxWidth: 900, margin: "0 auto" },
-  header: { display: "flex", alignItems: "center", gap: 16, marginBottom: 24 },
+  page: { maxWidth: 900, margin: "0 auto", width: "100%", boxSizing: "border-box" },
+  header: { display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" },
   title: {
     fontFamily: typography.fontDisplay,
     fontSize: 28,
@@ -167,6 +178,19 @@ const styles = {
     borderRadius: 8,
     color: colors.muted,
     cursor: "pointer",
+    transition: "all 0.2s ease",
+  },
+  signOutBtn: {
+    fontFamily: "'Space Mono', monospace",
+    fontSize: 11,
+    letterSpacing: 1.5,
+    padding: "6px 12px",
+    background: "transparent",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 8,
+    color: "#5C5C5C",
+    cursor: "pointer",
+    marginLeft: "auto",
     transition: "all 0.2s ease",
   },
   statsRow: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 },
@@ -257,6 +281,43 @@ const responsiveCss = `
   .history-page .filter-row select {
     font-size: 10px !important;
     padding: 5px 6px !important;
+  }
+}
+@media (max-width: 280px) {
+  .history-page {
+    max-width: 100% !important;
+  }
+  .history-page .stats-row {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 4px !important;
+  }
+  .history-page .stat-card {
+    padding: 10px 8px !important;
+  }
+  .history-page .stat-value {
+    font-size: 18px !important;
+  }
+  .history-page .filter-row {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  .history-page .filter-row select {
+    font-size: 9px !important;
+    padding: 4px 4px !important;
+    min-width: 0 !important;
+  }
+  .history-page .table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -4px;
+  }
+  .history-page table {
+    min-width: 480px;
+  }
+  .history-page td,
+  .history-page th {
+    padding: 5px 6px !important;
+    font-size: 8px !important;
   }
 }
 `;

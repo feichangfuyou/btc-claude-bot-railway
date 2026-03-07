@@ -6,7 +6,17 @@ import { colors } from "../theme.js";
 // Minimal Ticker for Landing — rAF-driven for butter-smooth scroll
 function LandingTicker() {
   const symbols = ["BTC", "ETH", "SOL", "DOGE", "LINK", "AVAX", "PEPE", "WIF", "BONK", "AAPL", "TSLA", "NVDA"];
-  const items = [...symbols, ...symbols];
+  // Initialize prices once
+  const [items] = useState(() => {
+    const all = [...symbols, ...symbols];
+    return all.map((s, i) => ({
+      key: i,
+      sym: s,
+      price: (Math.random() * 1000 + 10).toFixed(2),
+      chg: (Math.random() * 5).toFixed(2),
+    }));
+  });
+
   const trackRef = useRef(null);
   const rafRef = useRef(null);
   const offsetRef = useRef(0);
@@ -40,11 +50,11 @@ function LandingTicker() {
         ref={trackRef}
         style={{ display: "flex", gap: "40px", width: "max-content", willChange: "transform", backfaceVisibility: "hidden", WebkitFontSmoothing: "antialiased" }}
       >
-        {items.map((s, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", fontWeight: "700", color: "#666", whiteSpace: "nowrap" }}>
-            <span style={{ color: colors.gold }}>{s}</span>
-            <span>${(Math.random() * 1000 + 10).toFixed(2)}</span>
-            <span style={{ color: "#00E676" }}>+{(Math.random() * 5).toFixed(2)}%</span>
+        {items.map((item) => (
+          <div key={item.key} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", fontWeight: "700", color: "#666", whiteSpace: "nowrap" }}>
+            <span style={{ color: colors.gold }}>{item.sym}</span>
+            <span>${item.price}</span>
+            <span style={{ color: "#00E676" }}>+{item.chg}%</span>
           </div>
         ))}
       </div>

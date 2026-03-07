@@ -79,12 +79,12 @@ function TickerItem({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "6px",
+        gap: "5px",
         flexShrink: 0,
         fontFamily: "'Space Mono',monospace",
-        fontSize: "11px",
+        fontSize: "10px",
         fontWeight: "700",
-        padding: "6px 12px",
+        padding: "5px 10px",
         borderRadius: "6px",
         cursor: "pointer",
         border: isSelected
@@ -118,12 +118,14 @@ function TickerItem({
       </span>
       <span
         ref={chgElRef}
+        className="ticker-chg"
         style={{
           fontSize: "10px",
           fontWeight: 600,
           opacity: 0.85,
           color: colors.muted,
           minWidth: "52px",
+          flexShrink: 0,
         }}
       />
       {hasPosition && (

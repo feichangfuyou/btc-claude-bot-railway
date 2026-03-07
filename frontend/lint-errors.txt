@@ -1,0 +1,124 @@
+
+/Users/macbook2025/Desktop/BTC_Claude_bot/frontend/src/App.jsx
+    77:13   error    Empty block statement                                                                                                    no-empty
+   307:122  error    Empty block statement                                                                                                    no-empty
+   388:35   error    Empty block statement                                                                                                    no-empty
+   400:112  error    Empty block statement                                                                                                    no-empty
+   408:69   error    Empty block statement                                                                                                    no-empty
+   580:35   error    Empty block statement                                                                                                    no-empty
+   607:15   error    Empty block statement                                                                                                    no-empty
+   692:6    warning  React Hook useEffect has a missing dependency: 'fetchCoinGeckoDirect'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+   737:17   error    Empty block statement                                                                                                    no-empty
+   744:54   error    Empty block statement                                                                                                    no-empty
+   770:37   error    Empty block statement                                                                                                    no-empty
+  1397:56   error    'pulseInfinite' is not defined                                                                                           no-undef
+
+/Users/macbook2025/Desktop/BTC_Claude_bot/frontend/src/components/TickerTape.jsx
+  177:20  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+  175 |         }}
+  176 |       >
+> 177 |         {items.map((item, i) => {
+      |                    ^^^^^^^^^^^^^^
+> 178 |           const sym = item.sym || item;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 179 |           const liveCoin = coins[sym];
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |           );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 199 |         })}
+      | ^^^^^^^^^^ Cannot access ref value during render
+  200 |       </div>
+  201 |     </div>
+  202 |   );  react-hooks/refs
+
+/Users/macbook2025/Desktop/BTC_Claude_bot/frontend/src/pages/Admin.jsx
+  277:6  warning  React Hook useEffect has a missing dependency: 'SESSION_TIMEOUT'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/macbook2025/Desktop/BTC_Claude_bot/frontend/src/pages/Billing.jsx
+  65:6  warning  React Hook useEffect has missing dependencies: 'refreshProfile' and 'setSearchParams'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/macbook2025/Desktop/BTC_Claude_bot/frontend/src/pages/History.jsx
+  17:5  error    Error: Cannot access variable before it is declared
+
+`loadTrades` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  15 |   useEffect(() => {
+  16 |     if (!user) return;
+> 17 |     loadTrades();
+     |     ^^^^^^^^^^ `loadTrades` accessed before it is declared
+  18 |   }, [user, filter]);
+  19 |
+  20 |   async function loadTrades() {
+
+  18 |   }, [user, filter]);
+  19 |
+> 20 |   async function loadTrades() {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 21 |     setLoading(true);
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 22 |     let query = supabase
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 40 |     setLoading(false);
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 41 |   }
+     | ^^^^ `loadTrades` is declared here
+  42 |
+  43 |   return (
+  44 |     <>  react-hooks/immutability
+  18:6  warning  React Hook useEffect has a missing dependency: 'loadTrades'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    react-hooks/exhaustive-deps
+
+/Users/macbook2025/Desktop/BTC_Claude_bot/frontend/src/pages/Login.jsx
+  16:15  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  14 |       key: i,
+  15 |       sym: s,
+> 16 |       price: (Math.random() * 1000 + 10).toFixed(2),
+     |               ^^^^^^^^^^^^^ Cannot call impure function
+  17 |       chg: (Math.random() * 5).toFixed(2),
+  18 |     }));
+  19 |   }, []); // eslint-disable-line react-hooks/exhaustive-deps  react-hooks/purity
+  17:13  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  15 |       sym: s,
+  16 |       price: (Math.random() * 1000 + 10).toFixed(2),
+> 17 |       chg: (Math.random() * 5).toFixed(2),
+     |             ^^^^^^^^^^^^^ Cannot call impure function
+  18 |     }));
+  19 |   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  20 |                  react-hooks/purity
+
+/Users/macbook2025/Desktop/BTC_Claude_bot/frontend/src/pages/Signup.jsx
+  46:22  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  44 |           <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", fontWeight: "700", color: "#666", whiteSpace: "nowrap" }}>
+  45 |             <span style={{ color: colors.gold }}>{s}</span>
+> 46 |             <span>${(Math.random() * 1000 + 10).toFixed(2)}</span>
+     |                      ^^^^^^^^^^^^^ Cannot call impure function
+  47 |             <span style={{ color: "#00E676" }}>+{(Math.random() * 5).toFixed(2)}%</span>
+  48 |           </div>
+  49 |         ))}  react-hooks/purity
+  47:51  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  45 |             <span style={{ color: colors.gold }}>{s}</span>
+  46 |             <span>${(Math.random() * 1000 + 10).toFixed(2)}</span>
+> 47 |             <span style={{ color: "#00E676" }}>+{(Math.random() * 5).toFixed(2)}%</span>
+     |                                                   ^^^^^^^^^^^^^ Cannot call impure function
+  48 |           </div>
+  49 |         ))}
+  50 |       </div>                                                                                                                        react-hooks/purity
+
+✖ 21 problems (17 errors, 4 warnings)
+

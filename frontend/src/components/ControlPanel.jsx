@@ -12,11 +12,11 @@ export function ControlPanel({
   return (
     <div className="card control-panel" style={{
       gridColumn: "1 / -1", gridRow: "2", justifySelf: "center",
-      width: "100%", maxWidth: "680px",
+      width: "100%", maxWidth: "min(680px, calc(100vw - 24px))",
       background: "linear-gradient(180deg, #141414 0%, #0e0e0e 100%)",
       borderRadius: "10px",
       border: "1px solid #2a2a2a",
-      padding: "10px 14px",
+      padding: "8px 12px",
       display: "flex", flexDirection: "column", gap: "0",
       boxShadow: "0 4px 24px rgba(0,0,0,0.5), 0 0 12px rgba(212,175,55,0.06), inset 0 1px 0 rgba(255,255,255,0.03)",
       position: "relative", overflow: "hidden",
@@ -31,7 +31,7 @@ export function ControlPanel({
       <div style={{ position: "absolute", bottom: 0, left: "20%", right: "20%", height: "1px", background: "linear-gradient(90deg, transparent, #D4AF3722, transparent)", zIndex: 2 }} />
 
       {/* Row 1: Stats readout */}
-      <div className="cp-row1" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "3px", position: "relative", zIndex: 3, paddingBottom: "7px" }}>
+      <div className="cp-row1" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "2px", position: "relative", zIndex: 3, paddingBottom: "5px" }}>
         {[
           { label: "BAL", val: account.balance, fmt: (v) => `$${v.toFixed(0)}`, color: "#D4D4D4", glow: "none" },
           { label: "P&L", val: account.total_pnl, fmt: (v) => `${v >= 0 ? "+" : ""}$${v.toFixed(0)}`, color: account.total_pnl >= 0 ? "#00E676" : "#FF1744", glow: account.total_pnl >= 0 ? "0 0 8px #00E67644" : "0 0 8px #FF174444" },
@@ -39,7 +39,7 @@ export function ControlPanel({
           { label: "WIN", val: winRate, fmt: (v) => `${v}%`, color: winRate >= 50 ? "#00E676" : "#FF1744", glow: "none" },
         ].map(s => (
           <div key={s.label} style={{
-            textAlign: "center", padding: "3px 10px", flex: "1 1 0",
+            textAlign: "center", padding: "2px 8px", flex: "1 1 0",
             background: "rgba(0,0,0,0.4)", borderRadius: "4px",
             borderBottom: `1px solid ${s.color}22`,
           }}>
@@ -52,7 +52,7 @@ export function ControlPanel({
 
         {/* Paper wallet tag */}
         <div style={{
-          textAlign: "center", padding: "3px 8px", flex: "0 0 auto",
+          textAlign: "center", padding: "2px 6px", flex: "0 0 auto",
           background: "rgba(0,0,0,0.4)", borderRadius: "4px",
           border: "1px solid #2a2a2a",
         }}>
@@ -64,10 +64,10 @@ export function ControlPanel({
       </div>
 
       {/* Separator line */}
-      <div style={{ height: "1px", background: "linear-gradient(90deg, transparent, #D4AF3744, #C0392B33, #D4AF3744, transparent)", marginBottom: "7px", position: "relative", zIndex: 3 }} />
+      <div style={{ height: "1px", background: "linear-gradient(90deg, transparent, #D4AF3744, #C0392B33, #D4AF3744, transparent)", marginBottom: "5px", position: "relative", zIndex: 3 }} />
 
       {/* Row 2: Model + Strategy + Goal */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", position: "relative", zIndex: 3, paddingBottom: "8px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", position: "relative", zIndex: 3, paddingBottom: "6px", flexWrap: "wrap" }}>
         {/* Model selector */}
         <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
           <span style={{ fontSize: "7px", color: "#5C5C5C", letterSpacing: "1px", fontFamily: "'Space Mono',monospace" }}>MDL</span>
@@ -155,7 +155,7 @@ export function ControlPanel({
 
       {/* Goal progress bar */}
       {profitGoal > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "6px", position: "relative", zIndex: 3 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", paddingBottom: "4px", position: "relative", zIndex: 3 }}>
           <div style={{ flex: 1, height: "8px", background: "#1a1a1a", borderRadius: "4px", overflow: "hidden", border: "1px solid #2a2a2a" }}>
             <div style={{
               height: "100%", width: `${Math.min(100, Math.max(0, (account.total_pnl / profitGoal) * 100))}%`,
@@ -173,7 +173,7 @@ export function ControlPanel({
       )}
 
       {/* Row 3: Action buttons */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", position: "relative", zIndex: 3 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", position: "relative", zIndex: 3 }}>
         {!botOn
           ? <button className="btn btn-g" onClick={handleStart} aria-label="Start bot" style={{
             padding: "4px 16px", minHeight: "28px", fontSize: "10px", borderRadius: "3px",

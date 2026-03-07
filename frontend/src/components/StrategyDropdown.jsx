@@ -26,8 +26,8 @@ export function StrategyDropdown({ tradingPreset, presets, presetCategories, onP
           cursor: "pointer",
           outline: "none",
           appearance: "none",
-          minWidth: "120px",
-          maxWidth: "180px",
+          minWidth: "100px",
+          maxWidth: "min(180px, calc(100vw - 48px))",
         }}
         aria-label="Select strategy preset"
       >

@@ -142,6 +142,14 @@ const EXCHANGES_META = {
     keyPattern: /^[A-Za-z0-9]{60,70}$/,
     keyPatternHint: "Must be exactly 64 alphanumeric characters (no spaces or dashes).",
   },
+  coinbase: {
+    name: "Coinbase",
+    keyPlaceholder: "API Key (Key Name or ID)",
+    secretPlaceholder: "API Secret / Private Key",
+    keyHint: "Coinbase Advanced API, CDP keys, or Legacy API keys are supported. Provide the Key Name as the API Key and the Private Key as the secret.",
+    keyPattern: /.+/,
+    keyPatternHint: "API Key is required.",
+  },
 };
 export default function Settings() {
   const { user, profile, signOut, accessToken } = useAuth();
@@ -239,34 +247,6 @@ export default function Settings() {
       // ignore
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handleConnectCoinbase() {
-    // Coinbase uses OAuth / AgentKit — no API key validation needed, just record the connection
-    if (!accessToken) {
-      setKeyError("Please sign in to connect Coinbase");
-      return;
-    }
-    try {
-      const base = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || "";
-      const connectUrl = base ? `${base}/auth/exchanges/connect` : "/auth/exchanges/connect";
-      const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` };
-      const connectRes = await fetch(connectUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ exchange: "coinbase", connection_type: "coinbase_oauth" }),
-      });
-      if (!connectRes.ok) {
-        const errData = await connectRes.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to connect Coinbase");
-      }
-      const { data: exData } = await supabase.from("user_exchanges").select("exchange, connection_type, is_active").eq("user_id", user.id);
-      setExchanges(exData || []);
-      setKeyModal(null);
-      setKeyError("");
-    } catch (err) {
-      setKeyError(err.message || "Failed to connect. Is the backend running?");
     }
   }
 
@@ -442,7 +422,7 @@ export default function Settings() {
               const maxExchanges = TIER_MAX_EXCHANGES[profile?.subscription_tier || "none"] ?? 0;
               const atLimit = !conn && connectedCount >= maxExchanges;
               const exLabel = ex === "coinbase" ? "Coinbase" : ex === "onchain" ? "On-Chain" : ex.charAt(0).toUpperCase() + ex.slice(1);
-              const btnLabel = ex === "coinbase" ? "Connect" : ex === "onchain" ? "Add Wallet" : "Add Key";
+              const btnLabel = ex === "onchain" ? "Add Wallet" : "Add Key";
               return (
                 <div key={ex} style={styles.exchangeRow}>
                   <div>
@@ -749,26 +729,6 @@ export default function Settings() {
           {keyModal && (() => {
             const exMeta = EXCHANGES_META[keyModal];
             const closeModal = () => { setKeyModal(null); setApiKey(""); setApiSecret(""); setWalletAddress(""); setKeyError(""); };
-
-            /* ── COINBASE: direct connect (no API key needed) ── */
-            if (keyModal === "coinbase") {
-              return (
-                <div style={styles.modalOverlay} onClick={closeModal}>
-                  <div style={styles.modal} className="settings-modal" onClick={e => e.stopPropagation()}>
-                    <h3 style={styles.modalTitle}>Connect Coinbase</h3>
-                     <div style={styles.keyHintBanner}>
-                       <Info size={14} style={{ color: colors.gold, marginRight: 6 }} />
-                       Coinbase is connected via your account credentials (the API keys you entered in the server .env). Click Connect to link your Coinbase account to your bot profile.
-                     </div>
-                    {keyError && <div style={styles.error}>{keyError}</div>}
-                    <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                      <button style={styles.backBtn} onClick={closeModal}>Cancel</button>
-                      <button style={styles.saveBtn} onClick={handleConnectCoinbase}>Connect</button>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
 
             /* ── ONCHAIN: wallet address ── */
             if (keyModal === "onchain") {
@@ -1299,19 +1259,27 @@ const responsiveCss = `
   }
 }
 @media (max-width: 280px) {
+  .settings-page {
+    max-width: 100% !important;
+  }
   .settings-page section {
-    padding: 12px 10px !important;
-    border-radius: 12px !important;
+    padding: 10px 8px !important;
+    border-radius: 10px !important;
   }
   .settings-page h1 {
-    font-size: 20px !important;
-    letter-spacing: 2px !important;
+    font-size: 18px !important;
+    letter-spacing: 1px !important;
   }
   .settings-page h2 {
-    font-size: 12px !important;
+    font-size: 11px !important;
   }
   .settings-page button, .settings-page select, .settings-page input {
-    font-size: 10px !important;
+    font-size: 9px !important;
+  }
+  .settings-modal {
+    margin: 6px !important;
+    max-width: calc(100vw - 12px) !important;
+    padding: 14px 10px !important;
   }
 }
 `;

@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, memo } from "react";
 import TradingViewChart from "../TradingViewChart.jsx";
 import AnimatedNumber from "../AnimatedNumber.jsx";
-import { Search, Zap } from "lucide-react";
+import { Search, Zap, Maximize2 } from "lucide-react";
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL
   || (import.meta.env.DEV ? "http://localhost:8000" : "");
@@ -10,6 +10,7 @@ const API_SECRET = import.meta.env.DEV ? (import.meta.env.VITE_BOT_API_SECRET ||
 export const ChartSection = memo(function ChartSection({
   chartSymbol, setChartSymbol, selectedCoin, positions, price,
   marketTickers, multiExchangePrices, setMultiExchangePrices,
+  onChartExpand,
 }) {
   const [tickerSearch, setTickerSearch] = useState("");
   const [tickerSearchOpen, setTickerSearchOpen] = useState(false);
@@ -44,8 +45,8 @@ export const ChartSection = memo(function ChartSection({
   }, [tickerSearchOpen, tickerSearch, marketTickers, setMultiExchangePrices]);
 
   return (
-    <div className="card chart-card" style={{ height: "65vh", minHeight: "500px", maxHeight: "700px", display: "flex", flexDirection: "column", padding: "12px", position: "relative", zIndex: 1, overflow: "hidden" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", padding: "0 4px", flexWrap: "wrap", gap: "10px" }}>
+    <div className="card chart-card" style={{ display: "flex", flexDirection: "column", padding: "10px", position: "relative", zIndex: 1, overflow: "hidden" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", padding: "0 2px", flexWrap: "wrap", gap: "8px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
           <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "14px", color: "#D4D4D4", fontWeight: "800", letterSpacing: "3px" }}>
             {chartSymbol.includes(":")
@@ -72,13 +73,13 @@ export const ChartSection = memo(function ChartSection({
                     setTickerSearch("");
                   } else if (e.key === "Escape") { setTickerSearchOpen(false); setTickerSearch(""); }
                 }}
-                style={{ width: "140px", fontFamily: "'Space Mono',monospace", fontSize: "11px", background: "transparent", border: "none", color: "#D4D4D4", outline: "none" }}
+                style={{ width: "min(140px, calc(100vw - 56px))", minWidth: 64, fontFamily: "'Space Mono',monospace", fontSize: "11px", background: "transparent", border: "none", color: "#D4D4D4", outline: "none" }}
               />
             </div>
             {tickerSearchOpen && (
               <div
                 style={{
-                  position: "absolute", top: "100%", left: 0, marginTop: "4px", minWidth: "min(300px, calc(100vw - 32px))", maxHeight: "320px", overflowY: "auto",
+                  position: "absolute", top: "100%", left: 0, marginTop: "4px", minWidth: "min(300px, calc(100vw - 24px))", maxWidth: "calc(100vw - 24px)", maxHeight: "min(320px, 70vh)", overflowY: "auto",
                   background: "#111111", border: "1px solid #1a1f2e", borderRadius: "6px", boxShadow: "0 8px 24px rgba(0,0,0,0.4)", zIndex: 100,
                 }}
               >
@@ -177,7 +178,33 @@ export const ChartSection = memo(function ChartSection({
           </div>
         )}
       </div>
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+        {onChartExpand && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onChartExpand(chartSymbol); }}
+            style={{
+              position: "absolute",
+              top: "8px",
+              right: "8px",
+              zIndex: 10,
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "6px 10px",
+              borderRadius: "4px",
+              background: "rgba(0,0,0,0.7)",
+              color: "#D4AF37",
+              fontSize: "9px",
+              letterSpacing: "1px",
+              border: "1px solid rgba(212,175,55,0.3)",
+              cursor: "pointer",
+            }}
+            title="Click to expand chart"
+          >
+            <Maximize2 size={12} /> EXPAND
+          </button>
+        )}
         <TradingViewChart symbol={chartSymbol} />
       </div>
     </div>

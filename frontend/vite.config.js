@@ -21,16 +21,36 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          utils: ['canvas-confetti']
+        manualChunks(id) {
+          // Put all node_modules in a single vendor chunk to avoid circular dependencies between them
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+          // Heavy dashboard-only code in its own chunk (NOT loaded on landing page)
+          if (
+            id.includes('/src/App.jsx') ||
+            id.includes('/src/pages/Admin') ||
+            id.includes('/src/pages/Settings') ||
+            id.includes('/src/pages/Onboarding') ||
+            id.includes('/src/components/BottomPanels') ||
+            id.includes('/src/components/AnalyticsSection') ||
+            id.includes('/src/components/ChartSection') ||
+            id.includes('/src/components/PositionsPanel') ||
+            id.includes('/src/components/ControlPanel') ||
+            id.includes('/src/TradingViewChart')
+          ) {
+            return 'dashboard';
+          }
         }
       }
-    }
+    },
+    // Increase the warning limit since dashboard chunk is intentionally large
+    chunkSizeWarningLimit: 1200,
   },
   envDir: "..",  // load .env from project root (where BOT_API_SECRET / VITE_BOT_API_SECRET live)
   server: {
     port: 5173,
+    strictPort: true,
     proxy: {
       // Demo-mode price feed — Coinbase via backend proxy
       "/api/coinbase": httpProxy(),

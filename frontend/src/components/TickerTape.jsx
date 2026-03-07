@@ -144,21 +144,13 @@ export const TickerTape = memo(function TickerTape({ marketTickers, activeCoins,
     }
   }, []);
 
-  const clickHandlers = useRef({});
-  const getClickHandler = useCallback((sym) => {
-    if (!clickHandlers.current[sym]) {
-      clickHandlers.current[sym] = () => onSelectCoin(sym);
-    }
-    return clickHandlers.current[sym];
-  }, [onSelectCoin]);
-
   const handleMouseEnter = useCallback(() => { pausedRef.current = true; }, []);
   const handleMouseLeave = useCallback(() => { pausedRef.current = false; }, []);
 
   return (
     <div
       className="ticker-tape"
-      style={{ marginBottom: "14px" }}
+      style={{ marginBottom: "8px" }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -167,7 +159,6 @@ export const TickerTape = memo(function TickerTape({ marketTickers, activeCoins,
         className="ticker-track"
         style={{
           display: "flex",
-          gap: "24px",
           alignItems: "center",
           willChange: "transform",
           // NO animation property — rAF drives transform directly
@@ -191,7 +182,7 @@ export const TickerTape = memo(function TickerTape({ marketTickers, activeCoins,
               logoUrl={logoUrl}
               isSelected={isSelected}
               hasPosition={hasPosition}
-              onClick={getClickHandler(sym)}
+              onClick={() => onSelectCoin(sym)}
               onImgError={handleImgError}
               imgDataSym={sym}
             />

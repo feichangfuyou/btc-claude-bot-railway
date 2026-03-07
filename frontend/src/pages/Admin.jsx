@@ -171,7 +171,7 @@ function StatCard({ label, value, sub, color }) {
 // ─── Section Wrapper ──────────────────────────────────────────────────────────
 function Section({ title, icon: Icon, children, accent }) {
   return (
-    <section style={{ ...s.section, borderColor: accent ? `${accent}44` : "rgba(255,255,255,0.05)" }}>
+    <section className="section" style={{ ...s.section, borderColor: accent ? `${accent}44` : "rgba(255,255,255,0.05)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
         {Icon && <Icon size={14} color={accent || colors.gold} />}
         <h2 style={s.sTitle}>{title}</h2>
@@ -180,6 +180,8 @@ function Section({ title, icon: Icon, children, accent }) {
     </section>
   );
 }
+
+const SESSION_TIMEOUT = 30 * 60; // 30min
 
 // ─── Main Admin Component ─────────────────────────────────────────────────────
 export default function Admin() {
@@ -190,7 +192,6 @@ export default function Admin() {
   const [verified, setVerified] = useState(false);
   const verifiedAtRef = useRef(Date.now());
   const [sessionAge, setSessionAge] = useState(0);
-  const SESSION_TIMEOUT = 30 * 60; // 30min
 
   // Data state
   const [stats, setStats] = useState(null);
@@ -393,7 +394,7 @@ export default function Admin() {
       {/* Tier Modal */}
       {tierModal && (
         <div style={s.modalOverlay}>
-          <div style={s.modal}>
+          <div style={s.modal} className="modal">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3 style={{ color: colors.gold, margin: 0, fontSize: 14, letterSpacing: 2 }}>SET TIER</h3>
               <button style={{ background: "none", border: "none", color: colors.muted, cursor: "pointer" }} onClick={() => setTierModal(null)}><X size={16} /></button>
@@ -407,7 +408,7 @@ export default function Admin() {
         </div>
       )}
 
-      <div style={s.page}>
+      <div style={s.page} className="admin-page">
         {/* Header */}
         <div style={s.header}>
           <button style={s.backBtn} onClick={() => navigate("/dashboard")}>← Dashboard</button>
@@ -466,7 +467,7 @@ export default function Admin() {
 
           {/* Platform Metrics */}
           <Section title="PLATFORM METRICS" icon={Activity}>
-            <div style={s.statsGrid}>
+            <div style={s.statsGrid} className="stats-grid">
               <StatCard label="ACTIVE BOTS" value={stats?.active_users ?? "—"} />
               <StatCard label="TOTAL USERS" value={stats?.total_users ?? "—"} />
               <StatCard label="DAILY P&L" value={stats?.global_daily_pnl != null ? fmt2(stats.global_daily_pnl) : "—"} color={pnlColor(stats?.global_daily_pnl || 0)} />
@@ -812,5 +813,19 @@ const adminCss = `
   .admin-row:hover td { background: rgba(212,175,55,0.025); }
   @media (max-width: 640px) {
     .admin-page h1 { font-size: 20px !important; letter-spacing: 3px !important; }
+  }
+  @media (max-width: 375px) {
+    .admin-page h1 { font-size: 18px !important; letter-spacing: 2px !important; }
+    .admin-page .stats-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  }
+  @media (max-width: 320px) {
+    .admin-page h1 { font-size: 16px !important; letter-spacing: 1px !important; }
+    .admin-page .stats-grid { grid-template-columns: 1fr !important; }
+    .admin-page .section { padding: 16px !important; }
+  }
+  @media (max-width: 280px) {
+    .admin-page h1 { font-size: 14px !important; }
+    .admin-page .section { padding: 12px !important; }
+    .modal { width: calc(100vw - 24px) !important; max-width: none !important; }
   }
 `;

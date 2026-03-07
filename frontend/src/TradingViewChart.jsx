@@ -47,6 +47,8 @@ function TradingViewChart({ symbol = "BTC" }) {
     const rafId = requestAnimationFrame(() => {
       timeoutId = setTimeout(() => {
         if (!container.isConnected) return;
+        
+        const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
 
         const script = document.createElement("script");
         script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
@@ -63,13 +65,16 @@ function TradingViewChart({ symbol = "BTC" }) {
           gridColor: "rgba(30, 30, 30, 0.3)",
           allow_symbol_change: true,
           withdateranges: true,
-          hide_side_toolbar: false,
-          details: true,
-          hotlist: true,
+          hide_side_toolbar: isMobile,
+          details: !isMobile,
+          hotlist: !isMobile,
           calendar: false,
           hide_volume: false,
           support_host: "https://www.tradingview.com",
-          studies: [
+          studies: isMobile ? [
+            "STD;EMA",
+            "STD;Bollinger_Bands",
+          ] : [
             "STD;EMA",
             "STD;RSI",
             "STD;MACD",

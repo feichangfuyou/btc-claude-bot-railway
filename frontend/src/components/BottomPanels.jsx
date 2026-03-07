@@ -11,8 +11,8 @@ export function TerminalBrainPanel({
 }) {
   return (
     <div className="card" style={{ border: "1px solid #D4AF3722", boxShadow: thinking ? "0 0 30px #D4AF3744" : "0 0 12px #D4AF3710" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span className="dot" style={{ background: thinking ? "#D4AF37" : botOn ? "#00E676" : "#3a3a3a", animation: (thinking || botOn) ? "pulse 1.5s infinite" : "none", boxShadow: `0 0 8px ${thinking ? "#D4AF37" : botOn ? "#00E676" : "transparent"}` }} />
           <span className="section-label">NEURAL ENGINE</span>
         </div>
@@ -22,11 +22,11 @@ export function TerminalBrainPanel({
 
       {/* Pending trade (approval required) */}
       {pendingDecision && (
-        <div className="card fadein" style={{ border: "2px solid #ff9900", background: "#ff990008", marginBottom: "14px" }}>
-          <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "16px", color: "#ff9900", letterSpacing: "3px", marginBottom: "12px" }}>
+        <div className="card fadein" style={{ border: "2px solid #ff9900", background: "#ff990008", marginBottom: "10px" }}>
+          <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "14px", color: "#ff9900", letterSpacing: "2px", marginBottom: "8px" }}>
             PENDING TRADE — AWAITING YOUR CALL
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
             <span className="tag" style={{
               background: pendingDecision.action === "buy" ? "#00E67620" : "#FF174420",
               color: pendingDecision.action === "buy" ? "#00E676" : "#FF1744",
@@ -42,12 +42,12 @@ export function TerminalBrainPanel({
             )}
           </div>
           {pendingDecision.reasoning && (
-            <div style={{ fontSize: "11px", color: "#999999", lineHeight: "1.6", marginBottom: "12px", fontStyle: "italic" }}>
+            <div style={{ fontSize: "11px", color: "#999999", lineHeight: "1.5", marginBottom: "8px", fontStyle: "italic" }}>
               &ldquo;{String(pendingDecision.reasoning).slice(0, 120)}&rdquo;
             </div>
           )}
           {pendingDecision.order && (
-            <div style={{ background: "#0A0A0A", borderRadius: "5px", padding: "10px 12px", border: "1px solid #1e1e1e", marginBottom: "12px" }}>
+            <div style={{ background: "#0A0A0A", borderRadius: "5px", padding: "8px 10px", border: "1px solid #1e1e1e", marginBottom: "8px" }}>
               {[
                 { label: "ENTRY", val: `$${(pendingDecision.order.entry_price || 0).toLocaleString()}`, color: "#D4AF37" },
                 { label: "TP", val: `$${(pendingDecision.order.take_profit || 0).toLocaleString()}`, color: "#00E676" },
@@ -61,7 +61,7 @@ export function TerminalBrainPanel({
               ))}
             </div>
           )}
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div style={{ display: "flex", gap: "8px" }}>
             <button className="btn btn-g" onClick={handleApprovePending} style={{ flex: 1 }}>APPROVE</button>
             <button className="btn btn-r" onClick={handleRejectPending} style={{ flex: 1 }}>REJECT</button>
           </div>
@@ -70,7 +70,7 @@ export function TerminalBrainPanel({
 
       {decision ? (
         <div className="fadein">
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
             <span className="tag" style={{
               background: { buy: "#00E67620", sell: "#FF174420", wait: "#ffffff10", close_all: "#ff990020" }[decision.action] || "#ffffff10",
               color: { buy: "#00E676", sell: "#FF1744", wait: "#5C5C5C", close_all: "#ff9900" }[decision.action] || "#5C5C5C",
@@ -94,16 +94,16 @@ export function TerminalBrainPanel({
               </div>
             )}
           </div>
-          <div style={{ fontFamily: "'Playfair Display',serif", fontSize: "11px", color: "#D4D4D4", lineHeight: "1.8", borderLeft: "3px solid #D4AF3744", paddingLeft: "10px", marginBottom: "14px", fontStyle: "italic" }}>
+          <div style={{ fontFamily: "'Playfair Display',serif", fontSize: "11px", color: "#D4D4D4", lineHeight: "1.6", borderLeft: "3px solid #D4AF3744", paddingLeft: "8px", marginBottom: "10px", fontStyle: "italic" }}>
             &ldquo;{decision.reasoning}&rdquo;
           </div>
           {lastAiBlockReason && (
-            <div style={{ fontSize: "10px", color: "#ff9900", lineHeight: "1.5", background: "#ff990008", border: "1px solid #ff990033", borderRadius: "5px", padding: "8px 10px", marginBottom: "14px" }}>
+            <div style={{ fontSize: "10px", color: "#ff9900", lineHeight: "1.5", background: "#ff990008", border: "1px solid #ff990033", borderRadius: "5px", padding: "6px 8px", marginBottom: "10px" }}>
               <AlertTriangle size={10} style={{ marginRight: 4 }} /> {lastAiBlockReason}
             </div>
           )}
           {decision.order && (
-            <div style={{ background: "#0A0A0A", borderRadius: "5px", padding: "10px 12px", border: "1px solid #1e1e1e" }}>
+            <div style={{ background: "#0A0A0A", borderRadius: "5px", padding: "8px 10px", border: "1px solid #1e1e1e" }}>
               {[
                 { label: "ENTRY", val: `$${(decision.order.entry_price || 0).toLocaleString()}`, color: "#D4AF37" },
                 { label: "TAKE PROFIT", val: `$${(decision.order.take_profit || 0).toLocaleString()}`, color: "#00E676" },
@@ -117,10 +117,10 @@ export function TerminalBrainPanel({
               ))}
             </div>
           )}
-          <div style={{ fontSize: "9px", color: "#2a2a2a", marginTop: "10px", textAlign: "right" }}>LAST CALL: {lastCall}</div>
+          <div style={{ fontSize: "9px", color: "#2a2a2a", marginTop: "6px", textAlign: "right" }}>LAST CALL: {lastCall}</div>
         </div>
       ) : (
-        <div style={{ textAlign: "center", padding: "20px 0", color: "#3a3a3a", fontSize: "11px", lineHeight: "2.2" }}>
+        <div style={{ textAlign: "center", padding: "14px 0", color: "#3a3a3a", fontSize: "11px", lineHeight: "2" }}>
           {botOn
             ? <span className="blink" style={{ color: "#D4AF37" }}>First analysis in <AnimatedNumber value={countdown} format={(v) => `${Math.round(v)}s`} duration={150} />...</span>
             : <span>Press <span style={{ color: "#D4AF37" }}>🕶 RELOAD TERMINAL</span> or <span style={{ color: "#D4AF37" }}>ANALYZE</span></span>
@@ -139,9 +139,9 @@ export function MarketRegimePanel({ regime, fearGreed }) {
 
   return (
     <div className="card">
-      <div className="section-label" style={{ marginBottom: "10px" }}>MARKET REGIME</div>
-      <div style={{ padding: "12px", borderRadius: "5px", background: `${condColor}11`, border: `1px solid ${condColor}22`, textAlign: "center", marginBottom: "12px" }}>
-        <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontFamily: "'Montserrat', sans-serif", color: condColor, fontSize: "16px", letterSpacing: "3px" }}>
+      <div className="section-label" style={{ marginBottom: "16px" }}>MARKET REGIME</div>
+      <div style={{ padding: "14px", borderRadius: "5px", background: `${condColor}11`, border: `1px solid ${condColor}22`, textAlign: "center", marginBottom: "16px" }}>
+        <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontFamily: "'Montserrat', sans-serif", color: condColor, fontSize: "14px", letterSpacing: "2px" }}>
           {condIcon} {condLabel}
         </span>
       </div>
@@ -163,8 +163,8 @@ export function AgentKitPanel({ agentKit, isLiveMode }) {
 
   return (
     <div className="card" style={{ border: agentKit.agentkit_ready ? "1px solid #D4AF3722" : "1px solid #1e1e1e", boxShadow: agentKit.agentkit_ready ? "0 0 12px #D4AF3710" : "none" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span className="dot" style={{ background: agentKit.agentkit_ready ? "#D4AF37" : "#3a3a3a", boxShadow: agentKit.agentkit_ready ? "0 0 8px #D4AF37" : "none" }} />
           <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "11px", color: "#D4AF37", fontWeight: "700", letterSpacing: "2px" }}>AGENTKIT WALLET</span>
         </div>
@@ -209,8 +209,8 @@ export function AgentKitPanel({ agentKit, isLiveMode }) {
 export function IndicatorsPanel({ indic, history }) {
   return (
     <div className="card">
-      <div className="section-label" style={{ marginBottom: "10px" }}>LIVE INDICATORS</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+      <div className="section-label" style={{ marginBottom: "16px" }}>LIVE INDICATORS</div>
+      <div className="indicators-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 18px" }}>
         {[
           { label: "EMA 9", num: indic.ema9, fmt: (v) => `$${v.toLocaleString()}`, fallback: "warming\u2026", color: "#00E676" },
           { label: "EMA 21", num: indic.ema21, fmt: (v) => `$${v.toLocaleString()}`, fallback: "warming\u2026", color: "#D4AF37" },
@@ -226,7 +226,7 @@ export function IndicatorsPanel({ indic, history }) {
           { label: "MACD HIST", num: indic.macd_histogram, fmt: (v) => `${v.toFixed(2)}`, fallback: "-", color: (indic.macd_histogram || 0) >= 0 ? "#00E676" : "#FF1744" },
           { label: "MOMENTUM", num: indic.momentum, fmt: (v) => `${v.toFixed(2)}%`, fallback: "-", color: (indic.momentum || 0) >= 0 ? "#00E676" : "#FF1744" },
         ].map(ind => (
-          <div key={ind.label} className="row" style={{ fontSize: "11px" }}>
+          <div key={ind.label} className="row" style={{ fontSize: "11px", padding: "8px 0" }}>
             <span style={{ color: "#3a3a3a" }}>{ind.label}</span>
             <span style={{ color: ind.color, fontWeight: "700" }}>
               {ind.num != null ? <AnimatedNumber value={ind.num} format={ind.fmt} duration={180} /> : ind.fallback}
@@ -234,7 +234,7 @@ export function IndicatorsPanel({ indic, history }) {
           </div>
         ))}
       </div>
-      <div style={{ marginTop: "10px", fontSize: "9px", color: "#2a2a2a", textAlign: "center" }}>
+      <div style={{ marginTop: "18px", fontSize: "9px", color: "#2a2a2a", textAlign: "center" }}>
         {history.length < 9 ? `Building: ${history.length}/9 candles` : `${history.length} candles loaded`}
       </div>
     </div>

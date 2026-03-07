@@ -17,7 +17,7 @@ export function TradeDetailModal({ tradeDetail, closeTradeDetail, tradeDetailLoa
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(6,6,15,0.97)", zIndex: 9999, display: "flex", flexDirection: "column", animation: "fadein 0.2s ease", overflow: "auto" }}
       onClick={closeTradeDetail}>
-      <div style={{ maxWidth: "1100px", width: "100%", margin: "20px auto", padding: "0 20px" }} ref={popIn} onClick={e => e.stopPropagation()}>
+      <div style={{ maxWidth: "min(1100px, calc(100vw - 24px))", width: "100%", margin: "max(12px, env(safe-area-inset-top)) auto 20px", padding: "0 clamp(12px, 4vw, 20px)", boxSizing: "border-box" }} ref={popIn} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -30,7 +30,7 @@ export function TradeDetailModal({ tradeDetail, closeTradeDetail, tradeDetailLoa
         </div>
 
         {/* Trade Summary Bar */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "10px", marginBottom: "20px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100px, calc(50vw - 16px)), 1fr))", gap: "10px", marginBottom: "20px" }}>
           {[
             { label: "SYMBOL", val: tradeDetail.trade?.symbol || "BTC", color: "#D4AF37" },
             { label: "SIDE", val: tradeDetail.trade?.side?.toUpperCase(), color: tradeDetail.trade?.side === "buy" ? "#00E676" : "#FF1744" },

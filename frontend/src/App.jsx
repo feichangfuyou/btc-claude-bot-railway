@@ -13,11 +13,12 @@ import { TickerTape, FALLBACK_SYMBOL_TO_COINGECKO } from "./components/TickerTap
 import { AnalyticsSection } from "./components/AnalyticsSection.jsx";
 import { TradeHistoryOverlay } from "./components/TradeHistoryOverlay.jsx";
 import { TradeDetailModal } from "./components/TradeDetailModal.jsx";
+import { ChartModal } from "./components/ChartModal.jsx";
 import { PositionsPanel } from "./components/PositionsPanel.jsx";
 import { ControlPanel } from "./components/ControlPanel.jsx";
 import { ChartSection } from "./components/ChartSection.jsx";
 import { TerminalBrainPanel, MarketRegimePanel, AgentKitPanel, IndicatorsPanel, RiskMonitorPanel, RecentTradesPanel, ActivityLogPanel } from "./components/BottomPanels.jsx";
-import { AlertTriangle, Brain } from "lucide-react";
+import { AlertTriangle, Brain, Maximize2 } from "lucide-react";
 
 // ─── Error Boundary ────────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -31,8 +32,8 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ fontFamily: "'Space Mono',monospace", background: "#0A0A0A", color: "#D4D4D4", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "16px", padding: "20px", textAlign: "center" }}>
-          <div style={{ fontSize: "48px" }}><AlertTriangle size={48} color={colors.error} /></div>
+        <div className="error-boundary-root" style={{ fontFamily: "'Space Mono',monospace", background: "#0A0A0A", color: "#D4D4D4", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "16px", padding: "20px", textAlign: "center", width: "100%", maxWidth: "100vw", boxSizing: "border-box" }}>
+          <div className="error-boundary-icon" style={{ fontSize: "48px" }}><AlertTriangle size={48} color={colors.error} /></div>
           <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "28px", fontWeight: "700", color: colors.error, letterSpacing: "4px" }}>SYSTEM ERROR</div>
           <div style={{ fontSize: "12px", color: colors.muted, maxWidth: "500px", lineHeight: "1.8" }}>
             {this.state.error?.message || "An unexpected error occurred."}
@@ -191,6 +192,8 @@ const PRESETS_CATEGORIES_FALLBACK = [
   "Event-Driven", "Tiger Cubs / Modern HF", "Market Wizards Classic",
   "Mean-Reversion", "Scalping", "Portfolio / Systematic", "Technical Systems",
 ];
+
+const CG_IDS = { BTC: "bitcoin", ETH: "ethereum", SOL: "solana", DOGE: "dogecoin", LINK: "chainlink", AVAX: "avalanche-2", UNI: "uniswap", AAVE: "aave", XRP: "ripple", ADA: "cardano" };
 
 function Dashboard() {
   const { user, profile, signOut, accessToken } = useAuth();
@@ -354,6 +357,7 @@ function Dashboard() {
   const tradesContainerRef = useRef(null);
   const lastStaggeredLogsRef = useRef(0);
   const lastStaggeredTradesRef = useRef(0);
+  const pulseInfinite = useRef(null);
 
   priceRef.current = price;
   accountRef.current = account;
@@ -614,8 +618,7 @@ function Dashboard() {
   }, [connected, getAuthHeaders, positions?.length]);
 
   // ── Price fetch: backend first (Coinbase), then direct CoinGecko when backend fails ─
-  const CG_IDS = { BTC: "bitcoin", ETH: "ethereum", SOL: "solana", DOGE: "dogecoin", LINK: "chainlink", AVAX: "avalanche-2", UNI: "uniswap", AAVE: "aave", XRP: "ripple", ADA: "cardano" };
-  const fetchCoinGeckoDirect = async (sel) => {
+  const fetchCoinGeckoDirect = useCallback(async (sel) => {
     const cgId = CG_IDS[sel] || "bitcoin";
     const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd&include_24hr_change=true`);
     if (!r.ok) return false;
@@ -632,7 +635,7 @@ function Dashboard() {
       return true;
     }
     return false;
-  };
+  }, []);
 
   useEffect(() => {
     const apiBase = BACKEND_BASE;
@@ -689,7 +692,7 @@ function Dashboard() {
       clearInterval(pollId);
       if (staleId) clearInterval(staleId);
     };
-  }, [connected, activeCoins, cbLive]);
+  }, [connected, activeCoins, cbLive, fetchCoinGeckoDirect]);
 
   // ── Coinbase WebSocket — real-time price stream matching TradingView ─────────
   useEffect(() => {
@@ -990,6 +993,7 @@ function Dashboard() {
   // ── Trade Detail Modal (chart screenshots) ──────────────────────────────────
   const [tradeDetail, setTradeDetail] = useState(null);
   const [tradeDetailLoading, setTradeDetailLoading] = useState(false);
+  const [chartModal, setChartModal] = useState(null);  // { symbol, title } or null
 
   const openTradeDetail = useCallback(async (tr) => {
     setTradeDetail({ trade: tr, screenshots: null, context: null, audit: null });
@@ -1167,13 +1171,15 @@ function Dashboard() {
   }, []);
 
   return (
-    <div className="app-root" data-tab={activeTab} style={{ fontFamily: "'Space Mono',monospace", background: "#0A0A0A", color: "#D4D4D4", padding: "20px 24px 80px", fontSize: "12px" }}>
+    <div className="app-root" data-tab={activeTab} style={{ fontFamily: "'Space Mono',monospace", background: "#0A0A0A", color: "#D4D4D4", padding: "14px 16px 68px", fontSize: "12px", width: "100%", maxWidth: "100vw", boxSizing: "border-box", overflowX: "hidden" }}>
       <style>{`
-        .grid{display:grid;grid-template-columns:260px 1fr 260px;gap:14px}
-        .grid-bottom{display:grid;grid-template-columns:300px 1fr 300px;gap:16px;margin-top:16px}
-        .col{display:flex;flex-direction:column;gap:14px}
-        .card{background:rgba(17,17,17,0.55);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border:1px solid rgba(212,175,55,0.1);border-radius:16px;padding:16px;position:relative;box-shadow:0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.04);transition:border-color 0.3s ease,box-shadow 0.3s ease}
+        .grid{display:grid;grid-template-columns:260px 1fr 260px;gap:10px}
+        .grid-bottom{display:grid;grid-template-columns:300px 1fr 300px;gap:28px;margin-top:12px}
+        .col{display:flex;flex-direction:column;gap:28px}
+        .card{background:rgba(17,17,17,0.55);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border:1px solid rgba(212,175,55,0.1);border-radius:14px;padding:24px;position:relative;box-shadow:0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.04);transition:border-color 0.3s ease,box-shadow 0.3s ease;height:auto}
+        .grid-bottom .card:not(.chart-card){padding:24px}
         .card:hover{border-color:rgba(212,175,55,0.2);box-shadow:0 12px 40px rgba(0,0,0,0.45),0 0 24px rgba(212,175,55,0.06),inset 0 1px 0 rgba(255,255,255,0.06)}
+        .control-panel{height:auto}
         .card::before,.card::after{content:'';position:absolute;width:16px;height:16px;pointer-events:none;opacity:0.6;transition:opacity 0.3s ease}
         .card:hover::before,.card:hover::after{opacity:1}
         .card::before{top:-1px;left:-1px;border-top:2px solid rgba(212,175,55,0.5);border-left:2px solid rgba(212,175,55,0.5);border-radius:16px 0 0 0}
@@ -1191,14 +1197,14 @@ function Dashboard() {
         .btn-r{background:rgba(192,57,43,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;box-shadow:0 4px 16px rgba(192,57,43,0.15)}.btn-r:hover:not(:disabled){background:rgba(231,76,60,0.9);box-shadow:0 8px 24px rgba(192,57,43,0.3)}
         .btn-p{background:rgba(212,175,55,0.05);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#D4AF37;border:1px solid rgba(212,175,55,0.2)}.btn-p:hover:not(:disabled){background:rgba(212,175,55,0.1);border-color:rgba(212,175,55,0.35);box-shadow:0 0 20px rgba(212,175,55,0.1)}
         .btn-d{background:rgba(255,255,255,0.03);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#5C5C5C;border:1px solid rgba(255,255,255,0.06);font-size:9px;padding:6px 12px;border-radius:6px}.btn-d:hover:not(:disabled){background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.1)}
-        .row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
-        .tag{display:inline-block;padding:3px 8px;border-radius:6px;font-size:9px;font-weight:700;letter-spacing:.5px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
-        .logrow{padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
-        .trow{padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;justify-content:space-between;align-items:center}
+        .row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+        .tag{display:inline-block;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.5px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+        .logrow{padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+        .trow{padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;justify-content:space-between;align-items:center}
         .dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0;box-shadow:0 0 6px currentColor}
-        .section-label{font-family:'Oswald',sans-serif;font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:#D4AF37;border-left:3px solid rgba(212,175,55,0.6);padding-left:8px}
+        .section-label{font-family:'Oswald',sans-serif;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#D4AF37;border-left:3px solid rgba(212,175,55,0.6);padding-left:6px}
         .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);display:flex;align-items:center;justify-content:center;z-index:9999;animation:fadein 0.2s cubic-bezier(0.4,0,0.2,1);padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
-        .confirm-box{background:rgba(17,17,17,0.72);backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);border:1px solid rgba(212,175,55,0.15);border-radius:20px;padding:28px 32px;width:calc(100% - 32px);max-width:400px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.04),inset 0 1px 0 rgba(255,255,255,0.06);box-sizing:border-box}
+        .confirm-box{background:rgba(17,17,17,0.72);backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);border:1px solid rgba(212,175,55,0.15);border-radius:16px;padding:20px 24px;width:calc(100% - 32px);max-width:min(400px,calc(100vw - 24px));text-align:center;box-shadow:0 24px 64px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.04),inset 0 1px 0 rgba(255,255,255,0.06);box-sizing:border-box}
         select option,select optgroup{background:#111111;color:#D4D4D4;font-family:'Space Mono',monospace;font-size:10px}
         select optgroup{color:#5C5C5C;font-weight:700}
         .chasing-container { position: relative; overflow: hidden; border: none !important; padding: 0 !important; box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 24px rgba(212,175,55,0.15) !important; background: rgba(212,175,55,0.15) !important; }
@@ -1207,27 +1213,27 @@ function Dashboard() {
         .chasing-content { position: absolute; inset: 1.5px; background: #111111; border-radius: 14.5px; z-index: 1; padding: 12px; display: flex; flex-direction: column; }
         .scan-border{animation:scanGlow 1.5s infinite ease-in-out;}
         .app-root{min-height:100vh;min-height:100dvh}
-        .brand-ticker-row{display:flex;align-items:center;margin-bottom:20px;position:relative;overflow:hidden;background:rgba(17,17,17,0.55);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border:1px solid rgba(212,175,55,0.1);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.04)}
+        .brand-ticker-row{display:flex;align-items:center;margin-bottom:12px;position:relative;overflow:hidden;background:rgba(17,17,17,0.55);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border:1px solid rgba(212,175,55,0.1);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.04)}
         .brand-ticker-row::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#D4AF37,#C0392B,#D4AF37);z-index:20;opacity:0.7}
         .brand-ticker-row::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(212,175,55,0.15),transparent);z-index:20}
-        .ironmike-brand{display:flex;align-items:center;gap:14px;padding:10px 0 10px 16px;position:relative;z-index:10;flex-shrink:0;background:rgba(17,17,17,0.7)}
+        .ironmike-brand{display:flex;align-items:center;gap:10px;padding:10px 0 10px 12px;position:relative;z-index:10;flex-shrink:0;background:rgba(17,17,17,0.7)}
         .ironmike-brand::after{content:'';position:absolute;top:0;bottom:0;right:-48px;width:48px;background:linear-gradient(90deg,rgba(17,17,17,0.7) 0%,transparent 100%);z-index:6;pointer-events:none}
         .ticker-wrapper{flex:1;min-width:0;overflow:hidden;position:relative;z-index:1;display:flex;align-items:center}
         .ticker-wrapper .ticker-tape{margin-bottom:0;border:none;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;padding:0;flex:1;min-width:0}
         .ticker-wrapper .ticker-tape::before{display:none}
         /* ── Ticker tape — motion driven by rAF loop in TickerTape.jsx, NOT by CSS animation ── */
-        .ticker-tape{margin-bottom:20px;overflow:hidden;position:relative;background:rgba(10,10,10,0.85);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:10px 0;box-shadow:0 4px 24px rgba(0,0,0,0.5);z-index:1}
-        .ticker-tape::before,.ticker-tape::after{content:'';position:absolute;top:0;bottom:0;width:80px;z-index:3;pointer-events:none}
+        .ticker-tape{margin-bottom:12px;overflow:hidden;position:relative;background:rgba(10,10,10,0.85);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:6px 0;box-shadow:0 4px 24px rgba(0,0,0,0.5);z-index:1}
+        .ticker-tape::before,.ticker-tape::after{content:'';position:absolute;top:0;bottom:0;width:60px;z-index:3;pointer-events:none}
         .ticker-tape::before{left:0;background:linear-gradient(90deg,rgba(10,10,10,0.9) 0%,transparent 100%)}
         .ticker-tape::after{right:0;background:linear-gradient(270deg,rgba(10,10,10,0.9) 0%,transparent 100%)}
         /* No animation here — rAF writes transform directly to this element */
-        .ticker-track{display:flex;align-items:center;gap:32px;will-change:transform;width:max-content;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;backface-visibility:hidden;-webkit-backface-visibility:hidden}
-        .section-gap{margin-bottom:20px}
+        .ticker-track{display:flex;align-items:center;gap:20px;will-change:transform;width:max-content;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+        .section-gap{margin-bottom:12px}
         @keyframes lossToastIn{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
         @keyframes slideDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
         /* ── Unified Nav Tabs for Desktop ── */
-        .desktop-nav { display: flex; gap: 32px; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 0 16px; font-family: 'Montserrat', sans-serif; letter-spacing: 2px; text-transform: uppercase; font-size: 14px; }
-        .desktop-nav-item { padding: 12px 16px; color: #5C5C5C; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; position: relative; }
+        .desktop-nav { display: flex; gap: 24px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 0 12px; font-family: 'Montserrat', sans-serif; letter-spacing: 2px; text-transform: uppercase; font-size: 13px; }
+        .desktop-nav-item { padding: 10px 12px; color: #5C5C5C; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; position: relative; }
         .desktop-nav-item:hover { color: #D4D4D4; }
         .desktop-nav-item.active { color: #D4AF37; font-weight: 600; }
         .desktop-nav-item.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #D4AF37; box-shadow: 0 0 10px rgba(212,175,55,0.5); }
@@ -1247,31 +1253,31 @@ function Dashboard() {
           .app-root[data-tab="logs"] .col.tab-logs > * { flex: 1 1 45%; min-height: 400px; }
         }
         /* ── Hamburger nav drawer ── */
-        .nav-drawer{position:fixed;top:76px;right:0;left:0;z-index:9000;background:rgba(10,10,10,0.97);backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);border-bottom:1px solid rgba(212,175,55,0.15);padding:16px;display:flex;flex-direction:column;gap:10px;animation:slideDown 0.2s cubic-bezier(0.4,0,0.2,1)}
-        .nav-drawer-btn{font-family:'Montserrat', sans-serif;font-size:13px;font-weight:600;letter-spacing:2px;padding:14px 20px;border-radius:10px;border:1px solid rgba(212,175,55,0.15);background:rgba(212,175,55,0.05);color:#D4AF37;cursor:pointer;text-align:center;touch-action:manipulation}
+        .nav-drawer{position:fixed;top:76px;right:0;left:0;z-index:9000;background:rgba(10,10,10,0.97);backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);border-bottom:1px solid rgba(212,175,55,0.15);padding:12px;display:flex;flex-direction:column;gap:8px;animation:slideDown 0.2s cubic-bezier(0.4,0,0.2,1)}
+        .nav-drawer-btn{font-family:'Montserrat', sans-serif;font-size:12px;font-weight:600;letter-spacing:2px;padding:10px 16px;border-radius:8px;border:1px solid rgba(212,175,55,0.15);background:rgba(212,175,55,0.05);color:#D4AF37;cursor:pointer;text-align:center;touch-action:manipulation}
         .nav-drawer-btn:active{background:rgba(212,175,55,0.12)}
         .hamburger-btn{display:none;background:transparent;border:1px solid rgba(212,175,55,0.2);border-radius:8px;color:#D4AF37;cursor:pointer;padding:6px 10px;flex-direction:column;gap:4px;align-items:center;justify-content:center;min-width:36px;min-height:36px;flex-shrink:0}
         .hamburger-btn span{display:block;width:18px;height:2px;background:#D4AF37;border-radius:1px;transition:all 0.2s}
         .mobile-bottom-nav{display:none}
-        .bot-charts-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 24px; }
+        .bot-charts-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 16px; }
         @media(min-width: 1025px) { .bot-charts-grid { grid-template-columns: 1fr 1fr; } }
         /* TABLET 601–1024px */
         @media(max-width:1024px){
-          .app-root{padding:16px 18px 80px}
+          .app-root{padding:12px 14px 72px}
           .grid{grid-template-columns:1fr 1fr!important}
           .grid>.col:first-child{order:2}.grid>.col:nth-child(2){order:1;grid-column:1/-1}.grid>.col:last-child{order:3}
           .grid-bottom{grid-template-columns:1fr 1fr!important}
           .grid-bottom>.col:nth-child(2){grid-column:1/-1}
-          .card{border-radius:12px;padding:18px}
+          .card{border-radius:10px;padding:12px}
           .btn{min-height:44px;padding:10px 18px}
-          .chart-card{height:50vh!important;min-height:400px!important;max-height:600px!important}
+          .chart-card{height:400px!important;min-height:400px!important;max-height:600px!important}
           .control-panel{max-width:100%!important}
           .cp-row1{gap:3px!important;flex-wrap:wrap!important}
           .cp-row1 .btn{min-height:28px!important;padding:3px 10px!important}
         }
         /* PHONE ≤600px */
         @media(max-width:600px){
-          .app-root{padding:8px 8px 120px !important;margin:0;max-width:100%;border-radius:0;font-size:10px}
+          .app-root{padding:6px 6px 90px !important;margin:0;max-width:100%;border-radius:0;font-size:10px}
           .desktop-nav { display: none !important; }
           
           .mobile-bottom-nav{
@@ -1281,80 +1287,121 @@ function Dashboard() {
             padding-bottom:env(safe-area-inset-bottom);
           }
           .mobile-nav-item{
-            flex:1; text-align:center; padding:12px 0;
-            color:#5C5C5C; font-size:10px; font-weight:700;
+            flex:1; text-align:center; padding:10px 0;
+            color:#5C5C5C; font-size:9px; font-weight:700;
             font-family:'Montserrat', sans-serif; letter-spacing:1px;
-            display:flex; flex-direction:column; align-items:center; gap:4px;
+            display:flex; flex-direction:column; align-items:center; gap:3px;
             cursor:pointer; -webkit-tap-highlight-color:transparent;
           }
           .mobile-nav-item.active{color:#D4AF37;}
-          .mobile-nav-item svg{width:18px; height:18px; fill:currentColor;}
+          .mobile-nav-item svg{width:16px; height:16px; fill:currentColor;}
           
-          .grid{grid-template-columns:1fr!important;gap:8px!important}
-          .grid>.col{order:unset!important;grid-column:unset!important;gap:8px!important}
-          .grid-bottom{grid-template-columns:1fr!important;gap:8px!important}
-          .grid-bottom>.col{grid-column:unset!important;gap:8px!important}
-          .header-main{grid-template-columns:1fr!important;grid-template-rows:auto!important;gap:10px!important}
+          .grid{grid-template-columns:1fr!important;gap:4px!important}
+          .grid>.col{order:unset!important;grid-column:unset!important;gap:4px!important}
+          .grid-bottom{grid-template-columns:1fr!important;gap:4px!important}
+          .grid-bottom>.col{grid-column:unset!important;gap:4px!important}
+          .header-main{grid-template-columns:1fr!important;grid-template-rows:auto!important;gap:8px!important}
           .header-main>*{grid-column:1!important;grid-row:auto!important;justify-self:stretch!important}
           .header-price{justify-self:center!important}
-          .header-price div[style*="font-size: 36px"]{font-size:28px!important}
-          .control-panel{padding:8px!important;max-width:100%!important}
-          .cp-row1{gap:4px!important;justify-content:center!important;flex-wrap:wrap!important}
-          .cp-row1 .btn{min-height:28px!important;padding:4px 8px!important;font-size:9px!important}
+          .header-price div[style*="font-size: 36px"]{font-size:24px!important}
+          
+          .control-panel{padding:12px!important;max-width:100%!important}
+          .control-panel > div { padding-bottom: 5px !important; }
+          .cp-row1{gap:6px!important;justify-content:center!important;flex-wrap:wrap!important}
+          .cp-row1 > div { padding: 2px 6px !important; }
+          .cp-row1 > div > div:first-child { font-size: 7px !important; }
+          .cp-row1 > div > div:last-child { font-size: 11px !important; }
+          .cp-row1 .btn{min-height:24px!important;padding:4px 6px!important;font-size:8px!important}
           .cp-row2{justify-content:center!important;gap:4px!important;flex-wrap:wrap!important}
+          
           .status-bar-badges{display:none!important}
-          .status-bar-user{flex:1;min-width:0;font-size:9px!important}
-          .hamburger-btn{display:flex!important}
-          .pos-grid{grid-template-columns:repeat(2,1fr)!important;gap:6px!important}
-          .card{border-radius:10px;padding:10px}
-          .btn{min-height:36px;padding:8px 14px;font-size:10px;border-radius:8px}
-          .live-banner{border-radius:10px;padding:6px 10px;margin-bottom:10px;gap:6px}
-          .live-banner span[style*="font-size: 14px"]{font-size:11px!important}
-          .brand-ticker-row{flex-direction:column;overflow:visible;align-items:stretch;position:relative}
-          .ironmike-brand{padding:6px 60px 6px 10px;gap:10px;justify-content:flex-start}
+          .status-bar-user{flex:1;min-width:0;font-size:8px!important}
+          .hamburger-btn{display:flex!important; min-width:32px; min-height:32px;}
+          .pos-grid{grid-template-columns:repeat(2,1fr)!important;gap:4px!important}
+          
+          .card{border-radius:8px;padding:8px}
+          .btn{min-height:32px;padding:6px 12px;font-size:9px;border-radius:6px}
+          .live-banner{border-radius:8px;padding:4px 8px;margin-bottom:8px;gap:4px}
+          .live-banner span[style*="font-size: 14px"]{font-size:10px!important}
+          .brand-ticker-row{flex-direction:column;overflow:visible;align-items:stretch;position:relative;margin-bottom:12px}
+          .ironmike-brand{padding:12px 40px 12px 12px;gap:8px;justify-content:flex-start}
           .ironmike-brand::after{display:none}
-          .ticker-wrapper{width:100%}
-          .ticker-wrapper .ticker-tape{border-top:1px solid rgba(255,255,255,0.05);padding:6px 0;margin-bottom:0}
-          .ironmike-brand img{width:36px!important;height:36px!important}
-          .ironmike-brand div div:first-child{font-size:20px!important}
-          .coin-btn{min-height:36px;padding:8px 12px;font-size:10px!important;-webkit-tap-highlight-color:transparent}
-          .chart-card{height:50vh!important;min-height:350px!important;max-height:500px!important}
-          .section-gap{margin-bottom:10px}
-          .row{padding:4px 0;font-size:10px!important}
-          .section-label{font-size:10px!important;padding-left:6px!important}
-          .trow{padding:4px 0;font-size:10px!important}
-          .logrow{padding:3px 0;font-size:9px!important}
+          .ticker-wrapper{width:100%; overflow:hidden;}
+          .ticker-wrapper .ticker-tape{border-top:1px solid rgba(255,255,255,0.05);padding:8px 0;margin-bottom:0;}
+          .ironmike-brand img{width:32px!important;height:32px!important}
+          .ironmike-brand div div:first-child{font-size:16px!important}
+          .coin-btn{min-height:32px;padding:6px 10px;font-size:9px!important;-webkit-tap-highlight-color:transparent}
+          .chart-card{height:50vh!important;min-height:300px!important;max-height:450px!important}
+          .section-gap{margin-bottom:6px}
+          .row{padding:3px 0;font-size:9px!important}
+          .section-label{font-size:9px!important;padding-left:4px!important;margin-bottom:6px!important}
+          .trow{padding:3px 0;font-size:9px!important}
+          .logrow{padding:2px 0;font-size:8px!important;line-height:1.4!important}
         }
         /* NARROW ≤400px: Z Fold cover, Galaxy S etc */
         @media(max-width:400px){
-          .app-root{padding:6px 6px 70px !important}
-          .card{padding:8px}
-          .section-label{font-size:9px!important;letter-spacing:1px!important}
+          .app-root{padding:4px 4px 64px !important}
+          .card{padding:6px; border-radius:6px}
+          .section-label{font-size:8px!important;letter-spacing:0.5px!important}
           .pos-grid{grid-template-columns:1fr!important}
-          .cp-row1 .btn{font-size:8px!important;padding:3px 6px!important;letter-spacing:0.5px!important}
-          .cp-row2 .btn{font-size:8px!important;padding:3px 6px!important}
-          .status-bar{font-size:8px!important}
-          .ironmike-brand img{width:32px!important;height:32px!important}
-          .ironmike-brand div div:first-child{font-size:16px!important;letter-spacing:3px!important}
-          .section-gap{margin-bottom:8px}
-          .ticker-wrapper .ticker-tape{padding:4px 0}
+          .cp-row1 .btn{font-size:7px!important;padding:2px 4px!important;letter-spacing:0.5px!important}
+          .cp-row1 > div > div:last-child { font-size: 11px !important; }
+          .cp-row2 .btn{font-size:7px!important;padding:2px 4px!important}
+          .status-bar{font-size:7px!important}
+          .ironmike-brand img{width:28px!important;height:28px!important}
+          .ironmike-brand div div:first-child{font-size:14px!important;letter-spacing:2px!important}
+          .section-gap{margin-bottom:6px}
+          .header-price div[style*="font-size: 36px"]{font-size:20px!important}
+          .ticker-wrapper .ticker-tape{padding:3px 0}
           .analytics-grid, .memory-grid { grid-template-columns: 1fr !important; }
+          
+          .nav-drawer { padding: 8px !important; }
+          .nav-drawer > div { padding-left: 8px !important; padding-right: 8px !important; padding-bottom: 8px !important; }
+          .nav-drawer-btn { padding: 10px 12px !important; font-size: 11px !important; }
+          .confirm-box { padding: 16px !important; }
+          div[style*="padding: 20px"], div[style*="padding: 24px"], div[style*="padding: 30px"], div[style*="padding: 40px"] {
+             padding: 12px 10px !important;
+          }
         }
         /* ULTRA-NARROW ≤280px */
         @media(max-width:280px){
-          .app-root{padding:6px 6px 76px !important; font-size: 9px !important;}
-          .card{padding:8px 6px;border-radius:10px}
-          .section-label{font-size:8px!important;letter-spacing:0.5px!important}
-          .btn{font-size:8px!important;padding:6px 8px!important;letter-spacing:0.5px!important; min-height: 32px !important;}
-          .brand-ticker-row{border-radius:10px}
-          .ironmike-brand img{width:28px!important;height:28px!important}
-          .ironmike-brand{gap:6px!important;padding:8px 44px 4px 6px!important}
-          .ironmike-brand div div:first-child{font-size:12px!important;letter-spacing:1px!important}
-          .section-gap{margin-bottom:8px}
-          .grid-bottom{gap:8px!important}
-          .col{gap:8px!important}
-          .tag{padding: 2px 5px !important; font-size: 7px !important;}
-          .analytics-grid, .memory-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
+          .app-root{padding:2px 2px 60px !important; font-size: 8px !important;}
+          .ticker-track{gap:12px!important}
+          .coin-btn{min-height:28px!important;padding:4px 8px!important;font-size:8px!important;gap:4px!important}
+          .coin-btn img{width:16px!important;height:16px!important}
+          .coin-btn .ticker-chg{min-width:36px!important;font-size:8px!important}
+          .cp-row2{flex-wrap:wrap!important;gap:2px!important}
+          .cp-row2 button{font-size:8px!important;padding:2px 4px!important}
+          .cp-row2 input[type="number"]{width:44px!important;font-size:9px!important}
+          .card{padding:4px;border-radius:4px}
+          .section-label{font-size:7px!important;letter-spacing:0.5px!important;margin-bottom:4px!important}
+          .btn{font-size:7px!important;padding:4px 6px!important;letter-spacing:0.5px!important; min-height: 24px !important;}
+          .brand-ticker-row{border-radius:6px;margin-bottom:8px}
+          .ironmike-brand img{width:24px!important;height:24px!important}
+          .ironmike-brand{gap:4px!important;padding:4px 36px 4px 4px!important}
+          .ironmike-brand div div:first-child{font-size:11px!important;letter-spacing:1px!important}
+          .section-gap{margin-bottom:4px}
+          .grid-bottom{gap:4px!important}
+          .col{gap:4px!important}
+          
+          .control-panel{padding:4px!important;}
+          .control-panel > div { padding-bottom: 3px !important; margin-bottom: 2px !important; }
+          .cp-row1 > div { padding: 1px 4px !important; }
+          .cp-row1 > div > div:last-child { font-size: 10px !important; }
+          
+          .tag{padding: 2px 4px !important; font-size: 6px !important;}
+          .analytics-grid, .memory-grid { grid-template-columns: 1fr !important; gap: 4px !important; }
+          .row{padding:2px 0;font-size:8px!important}
+          .trow{padding:2px 0;font-size:8px!important}
+          .header-price div[style*="font-size: 36px"]{font-size:18px!important}
+          
+          .nav-drawer { padding: 4px !important; }
+          .nav-drawer > div { padding-left: 4px !important; padding-right: 4px !important; padding-bottom: 4px !important; }
+          .nav-drawer-btn { padding: 8px 10px !important; font-size: 10px !important; }
+          .confirm-box { padding: 12px 10px !important; }
+          div[style*="padding: 20px"], div[style*="padding: 24px"], div[style*="padding: 30px"], div[style*="padding: 40px"] {
+             padding: 8px 6px !important;
+          }
         }
       `}</style>
 
@@ -1498,12 +1545,13 @@ function Dashboard() {
 
       {/* ══ FULL-WIDTH CHART ══ */}
       {activeTab === "trade" && (
-        <div className="section-gap tab-trade">
+        <div className="section-gap tab-trade" style={{ marginTop: "24px" }}>
           <ChartSection
             chartSymbol={chartSymbol} setChartSymbol={setChartSymbol}
             selectedCoin={selectedCoin} positions={positions} price={price}
             marketTickers={marketTickers}
             multiExchangePrices={multiExchangePrices} setMultiExchangePrices={setMultiExchangePrices}
+            onChartExpand={(sym) => setChartModal({ symbol: sym, title: null })}
           />
         </div>
       )}
@@ -1516,7 +1564,7 @@ function Dashboard() {
           </div>
           <div className="bot-charts-grid">
             {positions.length > 0 ? positions.map(pos => (
-              <div key={pos.id} className="card chart-card" style={{ height: "400px", display: "flex", flexDirection: "column", padding: "12px" }}>
+              <div key={pos.id} className="card chart-card" style={{ display: "flex", flexDirection: "column", padding: "12px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                   <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "14px", color: "#D4AF37", letterSpacing: "2px" }}>
                     {pos.symbol} - {pos.side.toUpperCase()}
@@ -1525,12 +1573,26 @@ function Dashboard() {
                     {pos.side.toUpperCase()} @ {pos.entry}
                   </span>
                 </div>
-                <div style={{ flex: 1, minHeight: 0 }}>
+                <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+                  <button
+                    type="button"
+                    onClick={() => setChartModal({ symbol: `BINANCE:${pos.symbol}USDT`, title: `${pos.symbol} - ${pos.side?.toUpperCase()}` })}
+                    style={{
+                      position: "absolute", top: "8px", right: "8px", zIndex: 10,
+                      display: "flex", alignItems: "center", gap: "4px", padding: "6px 10px",
+                      borderRadius: "4px", background: "rgba(0,0,0,0.7)", color: "#D4AF37",
+                      fontSize: "9px", letterSpacing: "1px", border: "1px solid rgba(212,175,55,0.3)",
+                      cursor: "pointer",
+                    }}
+                    title="Click to expand chart"
+                  >
+                    <Maximize2 size={12} /> EXPAND
+                  </button>
                   <TradingViewChart symbol={`BINANCE:${pos.symbol}USDT`} />
                 </div>
               </div>
             )) : (
-              <div className="card chart-card chasing-container" style={{ height: "400px" }}>
+              <div className="card chart-card chasing-container">
                 <div className="chasing-light"></div>
                 <div className="chasing-content">
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
@@ -1539,7 +1601,21 @@ function Dashboard() {
                     </span>
                     <span className="tag" style={{ background: "#D4AF3733", color: "#D4AF37", animation: "pulse 1.5s infinite" }}>SEARCHING</span>
                   </div>
-                  <div style={{ flex: 1, minHeight: 0 }}>
+                  <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+                    <button
+                      type="button"
+                      onClick={() => setChartModal({ symbol: `BINANCE:${chartScanCoin}USDT`, title: `BOT SCAN: ${chartScanCoin}` })}
+                      style={{
+                        position: "absolute", top: "8px", right: "8px", zIndex: 10,
+                        display: "flex", alignItems: "center", gap: "4px", padding: "6px 10px",
+                        borderRadius: "4px", background: "rgba(0,0,0,0.7)", color: "#D4AF37",
+                        fontSize: "9px", letterSpacing: "1px", border: "1px solid rgba(212,175,55,0.3)",
+                        cursor: "pointer",
+                      }}
+                      title="Click to expand chart"
+                    >
+                      <Maximize2 size={12} /> EXPAND
+                    </button>
                     <TradingViewChart symbol={`BINANCE:${chartScanCoin}USDT`} />
                   </div>
                 </div>
@@ -1624,6 +1700,15 @@ function Dashboard() {
         activeCoins={activeCoins} exportTrades={exportTrades}
         tradeTypeBadge={tradeTypeBadge} openTradeDetail={openTradeDetail}
       />
+
+      {/* ══ CHART EXPAND MODAL ══ */}
+      {chartModal && (
+        <ChartModal
+          symbol={chartModal.symbol}
+          title={chartModal.title}
+          onClose={() => setChartModal(null)}
+        />
+      )}
 
       {/* ══ TRADE DETAIL MODAL (Chart Screenshots) ══ */}
       <TradeDetailModal

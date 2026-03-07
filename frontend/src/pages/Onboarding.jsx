@@ -7,7 +7,17 @@ import { colors, radii, typography } from "../theme.js";
 import { Check, AlertTriangle, ArrowRight, ArrowLeft, Lightbulb, Info, X } from "lucide-react";
 
 const EXCHANGES = [
-  { id: "coinbase", name: "Coinbase", type: "coinbase_oauth", desc: "Linked via server — no API key needed" },
+  {
+    id: "coinbase",
+    name: "Coinbase",
+    type: "api_key",
+    desc: "API Key — create a restricted key",
+    keyPlaceholder: "API Key (Key Name or ID)",
+    secretPlaceholder: "API Secret / Private Key",
+    keyHint: "Coinbase Advanced API, CDP keys, or Legacy API keys are supported. Provide the Key Name as the API Key and the Private Key as the secret.",
+    keyPattern: /.+/,
+    keyPatternHint: "API Key is required.",
+  },
   {
     id: "kraken",
     name: "Kraken",
@@ -173,31 +183,7 @@ export default function Onboarding() {
     setCoins(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
   }
 
-  async function handleConnectCoinbase() {
-    if (!accessToken) {
-      setKeyError("Please sign in to connect Coinbase");
-      return;
-    }
-    setKeySaving(true);
-    setKeyError("");
-    try {
-      const base = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || "";
-      const connectUrl = base ? `${base}/auth/exchanges/connect` : "/auth/exchanges/connect";
-      const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` };
-      const connectRes = await fetch(connectUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ exchange: "coinbase", connection_type: "coinbase_oauth" }),
-      });
-      if (!connectRes.ok) throw new Error("Failed to connect Coinbase");
-      setConnected(prev => ({ ...prev, coinbase: true }));
-      setKeyModal(null);
-    } catch (err) {
-      setKeyError(err.message || "Failed to connect. Is the backend running?");
-    } finally {
-      setKeySaving(false);
-    }
-  }
+
 
   async function handleConnectOnchain() {
     if (!walletAddress?.trim()) {
@@ -542,28 +528,6 @@ export default function Onboarding() {
           {keyModal && (() => {
             const exDef = EXCHANGES.find(e => e.id === keyModal);
             const closeModal = () => { setKeyModal(null); setApiKey(""); setApiSecret(""); setWalletAddress(""); setKeyError(""); };
-
-            /* ── COINBASE: direct connect ── */
-            if (keyModal === "coinbase") {
-              return (
-                <div style={styles.modalOverlay} onClick={closeModal}>
-                  <div style={styles.modal} onClick={e => e.stopPropagation()}>
-                    <h3 style={styles.modalTitle}>Connect Coinbase</h3>
-                    <div style={styles.keyHintBanner}>
-                      <Info size={14} style={{ color: colors.gold, marginRight: 6 }} />
-                      Coinbase is connected via your account credentials. Click Connect below to link your Coinbase account to your profile.
-                    </div>
-                    {keyError && <div style={styles.error}>{keyError}</div>}
-                    <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                      <button style={styles.skipBtn} onClick={closeModal}>Cancel</button>
-                      <button style={styles.nextBtn} onClick={handleConnectCoinbase} disabled={keySaving}>
-                        {keySaving ? "Connecting..." : "Connect"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
 
             /* ── ONCHAIN: wallet address ── */
             if (keyModal === "onchain") {
@@ -1024,6 +988,13 @@ const responsiveCss = `
   .onboarding-card {
     padding: 16px 10px !important;
     border-radius: 12px !important;
+  }
+}
+@media (max-width: 280px) {
+  .onboarding-card {
+    padding: 14px 8px !important;
+    border-radius: 10px !important;
+    max-width: calc(100vw - 16px) !important;
   }
 }
 `;
