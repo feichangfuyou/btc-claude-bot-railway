@@ -64,6 +64,30 @@ export function ChartModal({ symbol, title, onClose }) {
         ref={popIn}
         onClick={(e) => e.stopPropagation()}
       >
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: "16px",
+            right: "16px",
+            background: "rgba(0,0,0,0.7)",
+            border: "1px solid rgba(255, 23, 68, 0.4)",
+            color: "#FF1744",
+            borderRadius: "50%",
+            width: "40px",
+            height: "40px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            zIndex: 10000,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+          }}
+          title="Close Chart"
+        >
+          <X size={24} />
+        </button>
         <div
           style={{
             display: "flex",
@@ -82,22 +106,6 @@ export function ChartModal({ symbol, title, onClose }) {
           >
             {label}
           </span>
-          <button
-            type="button"
-            className="btn btn-d"
-            onClick={onClose}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              fontSize: "12px",
-              color: "#FF1744",
-              borderColor: "#FF174433",
-              padding: "6px 14px",
-            }}
-          >
-            <X size={14} /> CLOSE
-          </button>
         </div>
         <div
           style={{
@@ -107,6 +115,7 @@ export function ChartModal({ symbol, title, onClose }) {
             borderRadius: "8px",
             border: "1px solid #1e1e1e",
             overflow: "hidden",
+            position: "relative",
           }}
         >
           <TradingViewChart symbol={symbol} />
