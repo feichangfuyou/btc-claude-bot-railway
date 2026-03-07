@@ -39,7 +39,7 @@ class UserBotInstance:
     def __init__(self, user_id: str, config: UserConfig):
         self.user_id = user_id
         self.config = config
-        self.router = OrderRouter(config.connected_exchanges)
+        self.router = OrderRouter(config.connected_exchanges, user_id=user_id)
 
         self.running = False
         self.balance = config.start_balance

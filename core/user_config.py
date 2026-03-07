@@ -273,18 +273,24 @@ def complete_onboarding(user_id: str):
 def get_user_exchange_keys(user_id: str, exchange: str) -> Optional[dict]:
     """Load exchange credentials for a user. Decrypts api_key_enc/api_secret_enc if encrypted."""
     sb = get_supabase()
-    result = (
-        sb.table("user_exchanges")
-        .select("*")
-        .eq("user_id", user_id)
-        .eq("exchange", exchange)
-        .eq("is_active", True)
-        .single()
-        .execute()
-    )
-    data = result.data
-    if not data:
-        return None
+    try:
+        result = (
+            sb.table("user_exchanges")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("exchange", exchange)
+            .eq("is_active", True)
+            .single()
+            .execute()
+        )
+        data = result.data
+        if not data:
+            return None
+    except Exception as e:
+        # Supabase throws an exception on .single() if 0 rows returned
+        if "0 rows" in str(e) or "contains no rows" in str(e) or "PGRST116" in str(e):
+            return None
+        raise e
     # Decrypt if stored encrypted; legacy plaintext is returned as-is (decrypt returns None)
     api_key = data.get("api_key_enc")
     api_secret = data.get("api_secret_enc")

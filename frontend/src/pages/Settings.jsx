@@ -150,7 +150,44 @@ const EXCHANGES_META = {
     keyPattern: /.+/,
     keyPatternHint: "API Key is required.",
   },
+  bybit: {
+    name: "Bybit",
+    keyPlaceholder: "API Key",
+    secretPlaceholder: "API Secret",
+    keyHint: "Bybit API keys should have 'Unified Trading' or 'Spot & Futures' permissions.",
+    keyPattern: /.+/,
+    keyPatternHint: "API Key is required.",
+  },
+  okx: {
+    name: "OKX",
+    keyPlaceholder: "API Key",
+    secretPlaceholder: "API Secret",
+    passphrasePlaceholder: "API Passphrase",
+    requirePassphrase: true,
+    keyHint: "OKX API keys. Ensure 'Trade' permission is enabled.",
+    keyPattern: /.+/,
+    keyPatternHint: "API Key is required.",
+  },
+  kucoin: {
+    name: "KuCoin",
+    keyPlaceholder: "API Key",
+    secretPlaceholder: "API Secret",
+    passphrasePlaceholder: "API Passphrase",
+    requirePassphrase: true,
+    keyHint: "KuCoin API keys. Ensure 'Spot Trading' and 'Futures Trading' are enabled.",
+    keyPattern: /.+/,
+    keyPatternHint: "API Key is required.",
+  },
+  mexc: {
+    name: "MEXC",
+    keyPlaceholder: "API Key",
+    secretPlaceholder: "API Secret",
+    keyHint: "MEXC API keys. Ensure 'Spot' and/or 'Futures' trade permissions are enabled.",
+    keyPattern: /.+/,
+    keyPatternHint: "API Key is required.",
+  },
 };
+const AVAILABLE_EXCHANGES = ["coinbase", "kraken", "binance", "bybit", "okx", "kucoin", "mexc", "onchain"];
 export default function Settings() {
   const { user, profile, signOut, accessToken } = useAuth();
   const getAuthHeaders = useAuthHeaders();
@@ -171,9 +208,11 @@ export default function Settings() {
     max_position_size: 0.1,
   });
 
-  const [keyModal, setKeyModal] = useState(null);
+  const [keyModal, setKeyModal] = useState(false);
+  const [selectedPlatform, setSelectedPlatform] = useState("coinbase");
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
+  const [apiPassphrase, setApiPassphrase] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
   const [keyError, setKeyError] = useState("");
 
@@ -291,7 +330,11 @@ export default function Settings() {
       setKeyError("Both API key and secret are required.");
       return;
     }
-    const exMeta = EXCHANGES_META[keyModal];
+    const exMeta = EXCHANGES_META[selectedPlatform];
+    if (exMeta?.requirePassphrase && !apiPassphrase?.trim()) {
+      setKeyError(`API Passphrase is required for ${exMeta.name}.`);
+      return;
+    }
     if (exMeta?.keyPattern && !exMeta.keyPattern.test(apiKey.trim())) {
       setKeyError(`Invalid ${exMeta.name} API key format. ${exMeta.keyPatternHint}`);
       return;
@@ -308,29 +351,40 @@ export default function Settings() {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${accessToken}`,
       };
+      const payload = {
+        exchange: selectedPlatform,
+        api_key: apiKey.trim(),
+        api_secret: apiSecret.trim(),
+      };
+      if (apiPassphrase) {
+        payload.api_passphrase = apiPassphrase.trim();
+      }
+
       const res = await fetch(validateUrl, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          exchange: keyModal,
-          api_key: apiKey.trim(),
-          api_secret: apiSecret.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!data.valid) {
         setKeyError(data.error || "Invalid API credentials — please check your key and secret");
         return;
       }
+      
+      const connectPayload = {
+        exchange: selectedPlatform,
+        connection_type: "api_key",
+        api_key: apiKey.trim(),
+        api_secret: apiSecret.trim(),
+      };
+      if (apiPassphrase) {
+        connectPayload.api_passphrase = apiPassphrase.trim();
+      }
+
       const connectRes = await fetch(connectUrl, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          exchange: keyModal,
-          connection_type: "api_key",
-          api_key: apiKey.trim(),
-          api_secret: apiSecret.trim(),
-        }),
+        body: JSON.stringify(connectPayload),
       });
       if (!connectRes.ok) {
         const errData = await connectRes.json().catch(() => ({}));
@@ -338,9 +392,10 @@ export default function Settings() {
       }
       const { data: exData } = await supabase.from("user_exchanges").select("exchange, connection_type, is_active").eq("user_id", user.id);
       setExchanges(exData || []);
-      setKeyModal(null);
+      setKeyModal(false);
       setApiKey("");
       setApiSecret("");
+      setApiPassphrase("");
       setKeyError("");
     } catch (err) {
       setKeyError(err.message || "Failed to save. Is the backend running?");
@@ -415,36 +470,43 @@ export default function Settings() {
 
           {/* Connected Exchanges */}
           <section style={styles.section}>
-            <h2 style={styles.sectionTitle}>Connected Exchanges</h2>
-            {["coinbase", "kraken", "binance", "onchain"].map(ex => {
-              const conn = exchanges.find(e => e.exchange === ex && e.is_active);
-              const connectedCount = exchanges.filter(e => e.is_active).length;
-              const maxExchanges = TIER_MAX_EXCHANGES[profile?.subscription_tier || "none"] ?? 0;
-              const atLimit = !conn && connectedCount >= maxExchanges;
-              const exLabel = ex === "coinbase" ? "Coinbase" : ex === "onchain" ? "On-Chain" : ex.charAt(0).toUpperCase() + ex.slice(1);
-              const btnLabel = ex === "onchain" ? "Add Wallet" : "Add Key";
-              return (
-                <div key={ex} style={styles.exchangeRow}>
-                  <div>
-                    <div style={styles.exchangeName}>{exLabel}</div>
-                    <div style={{ fontSize: 10, color: conn ? colors.success : colors.muted }}>
-                      {conn ? `Connected (${conn.connection_type})` : "Not connected"}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>Connected Exchanges</h2>
+              {exchanges.filter(e => e.is_active).length < (TIER_MAX_EXCHANGES[profile?.subscription_tier || "none"] ?? 0) ? (
+                <button 
+                  style={{...styles.connectBtn, padding: "6px 16px"}}
+                  onClick={() => { setKeyModal(true); setSelectedPlatform("coinbase"); setKeyError(""); setApiKey(""); setApiSecret(""); setApiPassphrase(""); setWalletAddress(""); }}
+                >
+                  + Add Exchange
+                </button>
+              ) : (
+                <button style={{...styles.connectBtn, padding: "6px 16px"}} onClick={() => navigate("/billing")}>
+                  Upgrade to add more
+                </button>
+              )}
+            </div>
+            
+            {exchanges.filter(e => e.is_active).length === 0 ? (
+               <div style={{ color: colors.muted, fontSize: 12, padding: "16px 0", textAlign: "center", background: "rgba(255,255,255,0.02)", borderRadius: 8 }}>
+                 No exchanges connected yet.
+               </div>
+            ) : (
+              exchanges.filter(e => e.is_active).map(conn => {
+                const ex = conn.exchange;
+                const exLabel = ex === "coinbase" ? "Coinbase" : ex === "onchain" ? "On-Chain" : ex.charAt(0).toUpperCase() + ex.slice(1);
+                return (
+                  <div key={ex} style={styles.exchangeRow}>
+                    <div>
+                      <div style={styles.exchangeName}>{exLabel}</div>
+                      <div style={{ fontSize: 10, color: colors.success }}>
+                        Connected ({conn.connection_type})
+                      </div>
                     </div>
-                  </div>
-                  {conn ? (
                     <button style={styles.disconnectBtn} onClick={() => handleDisconnect(ex)}>Disconnect</button>
-                  ) : atLimit ? (
-                    <button style={styles.connectBtn} onClick={() => navigate("/billing")}>
-                      Upgrade to add more
-                    </button>
-                  ) : (
-                    <button style={styles.connectBtn} onClick={() => { setKeyModal(ex); setKeyError(""); setApiKey(""); setApiSecret(""); setWalletAddress(""); }}>
-                      {btnLabel}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+                  </div>
+                );
+              })
+            )}
           </section>
 
           {/* Trading Preferences */}
@@ -727,15 +789,34 @@ export default function Settings() {
 
           {/* Exchange Connection Modals */}
           {keyModal && (() => {
-            const exMeta = EXCHANGES_META[keyModal];
-            const closeModal = () => { setKeyModal(null); setApiKey(""); setApiSecret(""); setWalletAddress(""); setKeyError(""); };
+            const closeModal = () => { setKeyModal(false); setApiKey(""); setApiSecret(""); setApiPassphrase(""); setWalletAddress(""); setKeyError(""); };
 
-            /* ── ONCHAIN: wallet address ── */
-            if (keyModal === "onchain") {
-              return (
-                <div style={styles.modalOverlay} onClick={closeModal}>
-                  <div style={styles.modal} className="settings-modal" onClick={e => e.stopPropagation()}>
-                    <h3 style={styles.modalTitle}>Add On-Chain Wallet</h3>
+            return (
+              <div style={styles.modalOverlay} onClick={closeModal}>
+                <div style={styles.modal} className="settings-modal" onClick={e => e.stopPropagation()}>
+                  <h3 style={styles.modalTitle}>Connect New Exchange</h3>
+                  
+                  <select 
+                    value={selectedPlatform} 
+                    onChange={e => {
+                        setSelectedPlatform(e.target.value); 
+                        setKeyError(""); 
+                        setApiKey(""); 
+                        setApiSecret(""); 
+                        setApiPassphrase(""); 
+                        setWalletAddress("");
+                    }} 
+                    style={{...styles.select, marginBottom: 16}}
+                  >
+                    {AVAILABLE_EXCHANGES.map(ex => (
+                      <option key={ex} value={ex}>
+                        {ex === "onchain" ? "On-Chain Wallet (Base/ETH)" : EXCHANGES_META[ex]?.name || ex}
+                      </option>
+                    ))}
+                  </select>
+
+                  {selectedPlatform === "onchain" ? (
+                    <>
                      <div style={styles.keyHintBanner}>
                        <Info size={14} style={{ color: colors.gold, marginRight: 6 }} />
                        Enter your wallet address (e.g. Base/Ethereum). The bot uses Coinbase AgentKit to execute on-chain trades — no private key is stored.
@@ -756,63 +837,67 @@ export default function Settings() {
                       <button style={styles.backBtn} onClick={closeModal}>Cancel</button>
                       <button style={styles.saveBtn} onClick={handleConnectOnchain} disabled={!walletAddress.trim()}>Save Wallet</button>
                     </div>
-                  </div>
-                </div>
-              );
-            }
+                    </>
+                  ) : (
+                    <>
+                      {EXCHANGES_META[selectedPlatform]?.keyHint && (
+                        <div style={styles.keyHintBanner}>
+                          <Info size={14} style={{ color: colors.gold, marginRight: 6 }} />
+                          {EXCHANGES_META[selectedPlatform].keyHint}
+                        </div>
+                      )}
 
-            /* ── KRAKEN / BINANCE: full API key + validation ── */
-            const exName = exMeta?.name || (keyModal.charAt(0).toUpperCase() + keyModal.slice(1));
-            return (
-              <div style={styles.modalOverlay} onClick={closeModal}>
-                <div style={styles.modal} className="settings-modal" onClick={e => e.stopPropagation()}>
-                  <h3 style={styles.modalTitle}>Add {exName} API Key</h3>
+                      {keyError && <div style={styles.error}>{keyError}</div>}
 
-                   {exMeta?.keyHint && (
-                     <div style={styles.keyHintBanner}>
-                       <Info size={14} style={{ color: colors.gold, marginRight: 6 }} />
-                       {exMeta.keyHint}
-                     </div>
-                   )}
+                      <input
+                        id={`settings-api-key-${selectedPlatform}`}
+                        type="text"
+                        placeholder={EXCHANGES_META[selectedPlatform]?.keyPlaceholder || "API Key"}
+                        value={apiKey}
+                        onChange={e => { setApiKey(e.target.value); setKeyError(""); }}
+                        style={styles.input}
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      {EXCHANGES_META[selectedPlatform]?.keyPatternHint && (
+                        <div style={styles.fieldHint}>{EXCHANGES_META[selectedPlatform].keyPatternHint}</div>
+                      )}
+                      <input
+                        id={`settings-api-secret-${selectedPlatform}`}
+                        type="password"
+                        placeholder={EXCHANGES_META[selectedPlatform]?.secretPlaceholder || "API Secret"}
+                        value={apiSecret}
+                        onChange={e => { setApiSecret(e.target.value); setKeyError(""); }}
+                        style={{ ...styles.input, marginTop: 10 }}
+                        autoComplete="new-password"
+                      />
+                      {EXCHANGES_META[selectedPlatform]?.requirePassphrase && (
+                        <input
+                          id={`settings-api-passphrase-${selectedPlatform}`}
+                          type="password"
+                          placeholder={EXCHANGES_META[selectedPlatform]?.passphrasePlaceholder || "API Passphrase"}
+                          value={apiPassphrase}
+                          onChange={e => { setApiPassphrase(e.target.value); setKeyError(""); }}
+                          style={{ ...styles.input, marginTop: 10 }}
+                          autoComplete="new-password"
+                        />
+                      )}
 
-                  {keyError && <div style={styles.error}>{keyError}</div>}
+                      <div style={styles.keyInfo}>
+                        <div style={styles.keyInfoTitle}>Enable these permissions on your key:</div>
+                        <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> View / Query Funds &amp; Balances</div>
+                        <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> Query Orders &amp; Trade History</div>
+                        <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> Spot Trading (Create &amp; Modify Orders)</div>
+                        <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> Futures / Derivatives Trading</div>
+                        <div style={styles.keyPerm}><X size={12} style={{ color: colors.error }} /> Withdraw Funds — leave <strong>OFF</strong></div>
+                      </div>
 
-                  <input
-                    id={`settings-api-key-${keyModal}`}
-                    type="text"
-                    placeholder={exMeta?.keyPlaceholder || "API Key"}
-                    value={apiKey}
-                    onChange={e => { setApiKey(e.target.value); setKeyError(""); }}
-                    style={styles.input}
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                  {exMeta?.keyPatternHint && (
-                    <div style={styles.fieldHint}>{exMeta.keyPatternHint}</div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                        <button style={styles.backBtn} onClick={closeModal}>Cancel</button>
+                        <button style={styles.saveBtn} onClick={handleAddKey} disabled={!apiKey.trim() || !apiSecret.trim() || (EXCHANGES_META[selectedPlatform]?.requirePassphrase && !apiPassphrase.trim())}>Save Key</button>
+                      </div>
+                    </>
                   )}
-                  <input
-                    id={`settings-api-secret-${keyModal}`}
-                    type="password"
-                    placeholder={exMeta?.secretPlaceholder || "API Secret"}
-                    value={apiSecret}
-                    onChange={e => { setApiSecret(e.target.value); setKeyError(""); }}
-                    style={{ ...styles.input, marginTop: 10 }}
-                    autoComplete="new-password"
-                  />
-
-                  <div style={styles.keyInfo}>
-                    <div style={styles.keyInfoTitle}>Enable these permissions on your key:</div>
-                    <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> View / Query Funds &amp; Balances</div>
-                    <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> Query Orders &amp; Trade History</div>
-                    <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> Spot Trading (Create &amp; Modify Orders)</div>
-                    <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> Futures / Derivatives Trading</div>
-                    <div style={styles.keyPerm}><X size={12} style={{ color: colors.error }} /> Withdraw Funds — leave <strong>OFF</strong></div>
-                  </div>
-
-                  <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                    <button style={styles.backBtn} onClick={closeModal}>Cancel</button>
-                    <button style={styles.saveBtn} onClick={handleAddKey} disabled={!apiKey.trim() || !apiSecret.trim()}>Save Key</button>
-                  </div>
                 </div>
               </div>
             );

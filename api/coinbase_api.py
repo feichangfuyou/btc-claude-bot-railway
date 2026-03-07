@@ -146,13 +146,15 @@ async def create_perpetual_order(
     side: str,
     size_usd: float,
     leverage: int = 2,
+    api_key: str | None = None,
+    api_secret: str | None = None,
 ) -> str | None:
     """
     Create a market order for a perpetual product (e.g. BTC-PERP-INTX).
     size_usd = notional (quote size).
     Returns order_id on success, None on failure.
     """
-    client = _get_client()
+    client = _get_client_with_keys(api_key, api_secret)
     if not client:
         return None
 
@@ -190,6 +192,8 @@ async def create_perpetual_order(
 async def close_perpetual_position(
     product_id: str,
     size: float,
+    api_key: str | None = None,
+    api_secret: str | None = None,
 ) -> bool:
     """
     Close an open perpetual position on Coinbase.
@@ -197,7 +201,7 @@ async def close_perpetual_position(
     size: contract size in base currency (positive)
     Returns True on success, False on failure.
     """
-    client = _get_client()
+    client = _get_client_with_keys(api_key, api_secret)
     if not client:
         return False
 
@@ -226,7 +230,11 @@ async def close_perpetual_position(
         return False
 
 
-async def list_perpetuals_positions(portfolio_uuid: str | None = None) -> list:
+async def list_perpetuals_positions(
+    portfolio_uuid: str | None = None,
+    api_key: str | None = None,
+    api_secret: str | None = None,
+) -> list:
     """
     List open perpetual positions from Coinbase. Requires portfolio UUID.
     Returns a list of position dicts in bot.open_positions format for merge.
@@ -235,7 +243,7 @@ async def list_perpetuals_positions(portfolio_uuid: str | None = None) -> list:
     if not puuid:
         return []
 
-    client = _get_client()
+    client = _get_client_with_keys(api_key, api_secret)
     if not client:
         return []
 

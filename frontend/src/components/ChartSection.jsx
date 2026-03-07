@@ -165,46 +165,45 @@ export const ChartSection = memo(function ChartSection({
             )}
           </div>
         </div>
-        {positions.length > 0 && (
-          <div style={{ display: "flex", gap: "10px", fontSize: "9px", alignItems: "center", flexWrap: "wrap" }}>
-            {positions.filter(p => p.symbol === selectedCoin).map(pos => (
-              <div key={pos.id} style={{ display: "flex", gap: "8px", padding: "2px 6px", borderRadius: "3px", background: pos.side === "buy" ? "#00E67608" : "#FF174408" }}>
-                <span style={{ color: pos.side === "buy" ? "#00E676" : "#FF1744", fontWeight: "700" }}>{pos.side?.toUpperCase()}</span>
-                <span style={{ color: "#D4AF37" }}>E $<AnimatedNumber value={pos.entry || 0} format={(v) => v.toLocaleString()} duration={150} /></span>
-                <span style={{ color: "#00E676" }}>TP $<AnimatedNumber value={pos.tp || 0} format={(v) => v.toLocaleString()} duration={150} /></span>
-                <span style={{ color: "#FF1744" }}>SL $<AnimatedNumber value={pos.sl || 0} format={(v) => v.toLocaleString()} duration={150} /></span>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            {positions.length > 0 && (
+              <div style={{ display: "flex", gap: "10px", fontSize: "9px", alignItems: "center", flexWrap: "wrap" }}>
+                {positions.filter(p => p.symbol === selectedCoin).map(pos => (
+                  <div key={pos.id} style={{ display: "flex", gap: "8px", padding: "2px 6px", borderRadius: "3px", background: pos.side === "buy" ? "#00E67608" : "#FF174408" }}>
+                    <span style={{ color: pos.side === "buy" ? "#00E676" : "#FF1744", fontWeight: "700" }}>{pos.side?.toUpperCase()}</span>
+                    <span style={{ color: "#D4AF37" }}>E $<AnimatedNumber value={pos.entry || 0} format={(v) => v.toLocaleString()} duration={150} /></span>
+                    <span style={{ color: "#00E676" }}>TP $<AnimatedNumber value={pos.tp || 0} format={(v) => v.toLocaleString()} duration={150} /></span>
+                    <span style={{ color: "#FF1744" }}>SL $<AnimatedNumber value={pos.sl || 0} format={(v) => v.toLocaleString()} duration={150} /></span>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+            {onChartExpand && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onChartExpand(chartSymbol); }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  padding: "4px 8px",
+                  borderRadius: "4px",
+                  background: "transparent",
+                  color: "#D4AF37",
+                  fontSize: "9px",
+                  fontWeight: "600",
+                  letterSpacing: "1px",
+                  border: "1px solid rgba(212,175,55,0.3)",
+                  cursor: "pointer",
+                }}
+                title="Click to expand chart"
+              >
+                <Maximize2 size={12} /> EXPAND
+              </button>
+            )}
           </div>
-        )}
-      </div>
+        </div>
       <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-        {onChartExpand && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onChartExpand(chartSymbol); }}
-            style={{
-              position: "absolute",
-              top: "8px",
-              right: "8px",
-              zIndex: 10,
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              padding: "6px 10px",
-              borderRadius: "4px",
-              background: "rgba(0,0,0,0.7)",
-              color: "#D4AF37",
-              fontSize: "9px",
-              letterSpacing: "1px",
-              border: "1px solid rgba(212,175,55,0.3)",
-              cursor: "pointer",
-            }}
-            title="Click to expand chart"
-          >
-            <Maximize2 size={12} /> EXPAND
-          </button>
-        )}
         <TradingViewChart symbol={chartSymbol} />
       </div>
     </div>

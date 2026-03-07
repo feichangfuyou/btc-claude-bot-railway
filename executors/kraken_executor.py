@@ -181,8 +181,6 @@ def _set_kraken_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, de
     )
 
 
-def _set_paper_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision):
-    bot.account["balance"] = round(bot.account["balance"] - usd_sz, 2)
     new_pos = {
         "id": int(time.time() * 1000),
         "symbol": symbol,
@@ -199,3 +197,31 @@ def _set_paper_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, dec
     bot.open_positions.append(new_pos)
     bot.persist_position()
     bot.persist_account()
+
+class KrakenExecutor:
+    """Executor for Kraken Spot exchange."""
+
+    def __init__(self, api_key: str | None = None, api_secret: str | None = None):
+        self.api_key = api_key
+        self.api_secret = api_secret
+
+    async def execute_trade(self, symbol: str, side: str, usd_size: float) -> dict | None:
+        """Place a market order on Kraken. Returns standardized result."""
+        try:
+            txid = await add_market_order_by_quote(symbol, side, usd_size, self.api_key, self.api_secret)
+            if not txid:
+                return None
+                
+            return {
+                "id": txid,
+                "exchange": "kraken",
+                "symbol": symbol,
+                "side": side,
+                "status": "filled", # Kraken market orders are usually instant
+                "usd_size": usd_size,
+            }
+        except Exception as e:
+            from core.database import file_log
+            file_log(f"KrakenExecutor trade error: {e}", "error")
+            return None
+

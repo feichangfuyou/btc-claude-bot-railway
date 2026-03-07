@@ -192,21 +192,55 @@ def _set_coinbase_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, 
     )
 
 
-def _set_paper_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision):
-    bot.account["balance"] = round(bot.account["balance"] - usd_sz, 2)
-    new_pos = {
-        "id": int(time.time() * 1000),
-        "symbol": symbol,
-        "side": action,
-        "entry": entry,
-        "tp": tp,
-        "sl": sl,
-        "coin_size": coin_sz,
-        "btc_size": coin_sz,
-        "usd_size": usd_sz,
-        "open_ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "confidence": decision.get("confidence", 0),
-    }
     bot.open_positions.append(new_pos)
     bot.persist_position()
     bot.persist_account()
+
+class CoinbaseExecutor:
+    """Executor for Coinbase Advanced Trade Spot exchange."""
+
+    def __init__(self, api_key: str | None = None, api_secret: str | None = None):
+        self.api_key = api_key
+        self.api_secret = api_secret
+
+    async def execute_trade(self, symbol: str, side: str, usd_size: float) -> dict | None:
+        """Place a market order on Coinbase. Returns standardized result."""
+        try:
+            # quote_size_usd works for both buy and sell? No, for sell we usually need base_size.
+            # However, for the 'unification', if we only have usd_size, we might need to fetch price first.
+            # But create_spot_market_order handles quote_size_usd for BUYS.
+            
+            if side == "buy":
+                res = await create_spot_market_order(
+                    symbol, "buy", quote_size_usd=usd_size, api_key=self.api_key, api_secret=self.api_secret
+                )
+            else:
+                # For sell, we need to know the base amount.
+                # Since we are in the router, we might only have usd_size.
+                # Let's use the API to calculate it if needed, or assume the caller knows.
+                # For now, let's fetch the price.
+                from api.coinbase_api import get_ticker
+                price, _ = await get_ticker(symbol)
+                if not price:
+                    return None
+                base_size = usd_size / price
+                res = await create_spot_market_order(
+                    symbol, "sell", base_size=base_size, api_key=self.api_key, api_secret=self.api_secret
+                )
+                
+            if not res:
+                return None
+                
+            return {
+                "id": res,
+                "exchange": "coinbase",
+                "symbol": symbol,
+                "side": side,
+                "status": "filled",
+                "usd_size": usd_size,
+            }
+        except Exception as e:
+            from core.database import file_log
+            file_log(f"CoinbaseExecutor trade error: {e}", "error")
+            return None
+

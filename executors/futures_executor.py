@@ -17,6 +17,7 @@ from core.config import (
     PERP_PRODUCT_IDS,
 )
 from core.database import db_save_state, db_save_trade, file_log
+from core.key_resolution import resolve_exchange_keys
 from learning.trade_memory import record_trade_memory, run_learning_cycle
 from utils.notifications import send_notification
 
@@ -110,12 +111,20 @@ def close_futures_position(bot, pos: dict, exit_price: float, reason: str):
 
     # Live mode: close on exchange first
     if FUTURES_LIVE and product_id and coin_size > 0:
+        keys = resolve_exchange_keys(
+            getattr(bot, "active_user_id", None),
+            getattr(bot, "active_user_email", None),
+            "coinbase",
+        )
+        api_key, api_secret = keys or (None, None)
         try:
             from api.coinbase_api import close_perpetual_position
 
             loop = asyncio.get_running_loop()
             future = asyncio.run_coroutine_threadsafe(
-                close_perpetual_position(product_id=product_id, size=coin_size),
+                close_perpetual_position(
+                    product_id=product_id, size=coin_size, api_key=api_key, api_secret=api_secret
+                ),
                 loop,
             )
             ok = future.result(timeout=15)
@@ -250,11 +259,20 @@ async def execute_futures_live(
     try:
         from api.coinbase_api import create_perpetual_order
 
+        keys = resolve_exchange_keys(
+            getattr(bot, "active_user_id", None),
+            getattr(bot, "active_user_email", None),
+            "coinbase",
+        )
+        api_key, api_secret = keys or (None, None)
+
         order_id = await create_perpetual_order(
             product_id=product_id,
             side=action,
             size_usd=usd_sz * leverage,  # notional
             leverage=leverage,
+            api_key=api_key,
+            api_secret=api_secret,
         )
         if not order_id:
             bot.add_log(f"Futures order failed [{symbol}] — falling back to paper", "warning")

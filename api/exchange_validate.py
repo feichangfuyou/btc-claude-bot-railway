@@ -106,9 +106,41 @@ async def validate_binance_keys(api_key: str, api_secret: str) -> tuple[bool, st
     return True, ""
 
 
-async def validate_exchange_keys(exchange: str, api_key: str, api_secret: str) -> tuple[bool, str]:
+async def validate_coinbase_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
     """
-    Validate API keys for the given exchange.
+    Validate Coinbase API keys by initializing the client and fetching accounts.
+    Returns (valid, error_message).
+    """
+    if not api_key or not api_secret:
+        return False, "API key and secret are required"
+    
+    from api.coinbase_api import _get_client_with_keys
+    client = _get_client_with_keys(api_key.strip(), api_secret.strip())
+    if not client:
+        return False, "Could not initialize Coinbase client. Invalid key configuration."
+    
+    def _sync() -> tuple[bool, str]:
+        try:
+            # Quick un-paginated call to check auth
+            client.get_accounts(limit=1)
+            return (True, "")
+        except Exception as e:
+            msg = str(e)
+            if "unauthorized" in msg.lower() or "invalid" in msg.lower():
+                return (False, "Invalid API key or secret — please check your credentials")
+            return (False, f"Coinbase error: {msg}")
+            
+    import asyncio
+    try:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _sync)
+    except Exception as e:
+        return False, f"Connection error: {e}"
+
+
+async def validate_exchange_keys(exchange: str, api_key: str, api_secret: str, api_passphrase: str = "") -> tuple[bool, str]:
+    """
+    Validate API keys for the given exchange using custom endpoints or ccxt.
     Returns (valid, error_message).
     """
     exchange = (exchange or "").strip().lower()
@@ -116,4 +148,31 @@ async def validate_exchange_keys(exchange: str, api_key: str, api_secret: str) -
         return await validate_kraken_keys(api_key, api_secret)
     if exchange == "binance":
         return await validate_binance_keys(api_key, api_secret)
-    return False, f"Validation not supported for {exchange}"
+    if exchange == "coinbase":
+        return await validate_coinbase_keys(api_key, api_secret)
+        
+    # For new exchanges like bybit, okx, kucoin, mexc, we'll validate via ccxt
+    try:
+        import ccxt.async_support as ccxt
+    except ImportError:
+        return False, "ccxt library is not installed on the server."
+        
+    if not hasattr(ccxt, exchange):
+        return False, f"Exchange '{exchange}' is not supported."
+        
+    try:
+        ex_class = getattr(ccxt, exchange)
+        ex = ex_class({
+            "apiKey": api_key,
+            "secret": api_secret,
+            **({"password": api_passphrase} if api_passphrase else {})
+        })
+        # Check balances to validate key
+        await ex.fetch_balance()
+        await ex.close()
+        return True, ""
+    except ccxt.AuthenticationError as e:
+        return False, "Invalid API key, secret, or passphrase."
+    except Exception as e:
+        return False, f"Connection or validation error: {str(e)}"
+

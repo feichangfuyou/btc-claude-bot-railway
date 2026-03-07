@@ -1595,27 +1595,28 @@ function Dashboard() {
               <div className="card chart-card chasing-container">
                 <div className="chasing-light"></div>
                 <div className="chasing-content">
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", alignItems: "center" }}>
                     <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "14px", color: "#D4AF37", letterSpacing: "2px" }}>
                       BOT SCAN: {fastScanCoin}
                     </span>
-                    <span className="tag" style={{ background: "#D4AF3733", color: "#D4AF37", animation: "pulse 1.5s infinite" }}>SEARCHING</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span className="tag" style={{ background: "#D4AF3733", color: "#D4AF37", animation: "pulse 1.5s infinite" }}>SEARCHING</span>
+                      <button
+                        type="button"
+                        onClick={() => setChartModal({ symbol: `BINANCE:${chartScanCoin}USDT`, title: `BOT SCAN: ${chartScanCoin}` })}
+                        style={{
+                          display: "flex", alignItems: "center", gap: "4px", padding: "4px 8px",
+                          borderRadius: "4px", background: "transparent", color: "#D4AF37",
+                          fontSize: "9px", fontWeight: "600", letterSpacing: "1px", border: "1px solid rgba(212,175,55,0.3)",
+                          cursor: "pointer",
+                        }}
+                        title="Click to expand chart"
+                      >
+                        <Maximize2 size={12} /> EXPAND
+                      </button>
+                    </div>
                   </div>
                   <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-                    <button
-                      type="button"
-                      onClick={() => setChartModal({ symbol: `BINANCE:${chartScanCoin}USDT`, title: `BOT SCAN: ${chartScanCoin}` })}
-                      style={{
-                        position: "absolute", top: "8px", right: "8px", zIndex: 10,
-                        display: "flex", alignItems: "center", gap: "4px", padding: "6px 10px",
-                        borderRadius: "4px", background: "rgba(0,0,0,0.7)", color: "#D4AF37",
-                        fontSize: "9px", letterSpacing: "1px", border: "1px solid rgba(212,175,55,0.3)",
-                        cursor: "pointer",
-                      }}
-                      title="Click to expand chart"
-                    >
-                      <Maximize2 size={12} /> EXPAND
-                    </button>
                     <TradingViewChart symbol={`BINANCE:${chartScanCoin}USDT`} />
                   </div>
                 </div>

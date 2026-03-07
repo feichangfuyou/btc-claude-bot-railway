@@ -118,7 +118,7 @@ async def validate_exchange_api_keys(
     api_secret = body.get("api_secret") or ""
     if not exchange:
         return {"valid": False, "error": "Exchange is required"}
-    if exchange not in ("kraken", "binance"):
+    if exchange not in ("kraken", "binance", "coinbase"):
         return {"valid": False, "error": f"Validation not supported for {exchange}"}
     valid, err = await validate_exchange_keys(exchange, api_key, api_secret)
     if valid:

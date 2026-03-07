@@ -8,8 +8,9 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
-logger = logging.getLogger("claudebot.router")
+from core.user_config import get_user_exchange_keys
 
+logger = logging.getLogger("claudebot.router")
 
 @dataclass
 class RouteDecision:
@@ -18,12 +19,12 @@ class RouteDecision:
     price: Optional[float] = None
     split: Optional[list] = None
 
-
 class OrderRouter:
     """Routes orders to the best available exchange for a user."""
 
-    def __init__(self, connected_exchanges: list[str]):
+    def __init__(self, connected_exchanges: list[str], user_id: str = ""):
         self.connected = set(connected_exchanges)
+        self.user_id = user_id
 
     def has_exchange(self, exchange: str) -> bool:
         return exchange in self.connected
@@ -86,6 +87,18 @@ class OrderRouter:
                 "USDC",
                 "WBTC",
                 "cbBTC",
+            },
+            "bybit": {
+                "BTC", "ETH", "SOL", "LINK", "DOGE", "AVAX", "UNI", "AAVE", "XRP", "ADA", "BNB", "DOT", "MATIC", "PEPE", "SHIB",
+            },
+            "okx": {
+                "BTC", "ETH", "SOL", "LINK", "DOGE", "AVAX", "UNI", "AAVE", "XRP", "ADA", "BNB", "DOT", "MATIC", "PEPE", "SHIB",
+            },
+            "kucoin": {
+                "BTC", "ETH", "SOL", "LINK", "DOGE", "AVAX", "UNI", "AAVE", "XRP", "ADA", "BNB", "DOT", "MATIC", "PEPE", "SHIB",
+            },
+            "mexc": {
+                "BTC", "ETH", "SOL", "LINK", "DOGE", "AVAX", "UNI", "AAVE", "XRP", "ADA", "BNB", "DOT", "MATIC", "PEPE", "SHIB",
             },
         }
         available = []
@@ -184,8 +197,76 @@ class OrderRouter:
 
     def _prefer_exchange(self, available: list[str]) -> str:
         """Preference order when no price data available."""
-        preference = ["coinbase", "kraken", "binance", "onchain"]
+        preference = ["coinbase", "kraken", "binance", "bybit", "okx", "kucoin", "mexc", "onchain"]
         for p in preference:
             if p in available:
                 return p
         return available[0]
+
+    async def place_order(self, symbol: str, action: str, amount_usd: float) -> dict | None:
+        """Fully automated routing and execution entrypoint."""
+        if not self.user_id:
+            logger.error("Cannot place order: user_id not set on router instance")
+            return {"success": False, "error": "user_id missing"}
+
+        decision = self.route(symbol, action, amount_usd)
+        target = decision.exchange
+
+        # Normalize action to exchange 'side' (buy/sell)
+        side = action.lower()
+        if side in ["close", "take_profit"]:
+            side = "sell"
+        elif side not in ["buy", "sell"]:
+            side = "buy"  # Default to buy for safety? Or stay as is. Let's keep buy for signals.
+
+        if target == "paper":
+            return {"success": True, "paper": True, "exchange": "paper"}
+
+        keys = get_user_exchange_keys(self.user_id, target)
+        if not keys:
+            return {"success": False, "error": f"Keys not found for {target}"}
+
+        try:
+            if target == "coinbase":
+                from executors.coinbase_spot_executor import CoinbaseExecutor
+                api_key = keys.get("api_key_enc") or keys.get("api_key")
+                secret = keys.get("api_secret_enc") or keys.get("api_secret")
+                ex = CoinbaseExecutor(api_key, secret)
+                res = await ex.execute_trade(symbol, side, amount_usd)
+                if res:
+                    return {"success": True, "result": res}
+
+            elif target == "kraken":
+                from executors.kraken_executor import KrakenExecutor
+                api_key = keys.get("api_key_enc") or keys.get("api_key")
+                secret = keys.get("api_secret_enc") or keys.get("api_secret")
+                ex = KrakenExecutor(api_key, secret)
+                res = await ex.execute_trade(symbol, side, amount_usd)
+                if res:
+                    return {"success": True, "result": res}
+
+            elif target == "binance":
+                from executors.binance_executor import BinanceExecutor
+                api_key = keys.get("api_key_enc") or keys.get("api_key")
+                secret = keys.get("api_secret_enc") or keys.get("api_secret")
+                ex = BinanceExecutor(api_key, secret)
+                res = await ex.execute_trade(symbol, side, amount_usd)
+                if res:
+                    return {"success": True, "result": res}
+
+            elif target in ["bybit", "okx", "kucoin", "mexc"]:
+                from executors.ccxt_executor import CCXTExecutor
+                api_key = keys.get("api_key_enc") or keys.get("api_key")
+                secret = keys.get("api_secret_enc") or keys.get("api_secret")
+                api_passphrase = keys.get("api_passphrase_enc") or keys.get("api_passphrase")
+                ex = CCXTExecutor(target, api_key, secret, api_passphrase)
+                res = await ex.execute_trade(symbol, side, amount_usd)
+                await ex.close()
+                if res:
+                    return {"success": True, "result": res}
+                    
+            return {"success": False, "error": f"Execution failed on {target}"}
+
+        except Exception as e:
+            logger.error(f"Routing execution error on {target}: {e}")
+            return {"success": False, "error": str(e)}
