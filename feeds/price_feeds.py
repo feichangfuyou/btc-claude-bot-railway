@@ -50,17 +50,37 @@ async def _fetch_binance_prices(bot, only_fill_missing: bool = False) -> bool:
 async def _fetch_kraken_fallback_prices(bot) -> bool:
     """Fill in missing prices from Kraken when Coinbase/Binance have gaps."""
     try:
-        from api.kraken_api import get_ticker
+        from core.config import KRAKEN_PAIRS
+        missing = [sym for sym in bot.coins.keys() if not (bot.coins.get(sym) and bot.coins.get(sym).price > 0)]
+        if not missing:
+            return False
 
         updated = False
-        for sym in ACTIVE_COINS:
-            cs = bot.coins.get(sym)
-            if cs and cs.price > 0:
-                continue
-            price, vol = await get_ticker(sym)
-            if price > 0:
-                bot.update_coin_price(sym, price, vol, 0.0)
-                updated = True
+        # Batch max 20 pairs per request
+        for i in range(0, len(missing), 20):
+            chunk = missing[i:i + 20]
+            pair_to_sym = {KRAKEN_PAIRS.get(s, f"{s}USD"): s for s in chunk}
+            try:
+                async with httpx.AsyncClient(timeout=_httpx_timeout) as client:
+                    r = await client.get(
+                        "https://api.kraken.com/0/public/Ticker",
+                        params={"pair": ",".join(pair_to_sym.keys())},
+                    )
+                    if r.status_code == 200:
+                        d = r.json()
+                        pairs_data = d.get("result", {})
+                        for pair_id, v in pairs_data.items():
+                            if not isinstance(v, dict):
+                                continue
+                            sym = pair_to_sym.get(pair_id)
+                            if sym:
+                                c = v.get("c") or [0]
+                                p = float(c[0]) if c else 0
+                                if p > 0:
+                                    bot.update_coin_price(sym, p, 0.0, 0.0)
+                                    updated = True
+            except Exception:
+                pass
         return updated
     except Exception:
         return False
@@ -69,7 +89,7 @@ async def _fetch_kraken_fallback_prices(bot) -> bool:
 async def _fetch_coingecko_fallback_prices(bot) -> bool:
     """Tertiary fallback using CoinGecko public API."""
     try:
-        url = coingecko_url_for_coins(ACTIVE_COINS)
+        url = coingecko_url_for_coins(list(bot.coins.keys()))
         async with httpx.AsyncClient(timeout=_httpx_timeout) as client:
             r = await client.get(url)
             if r.status_code != 200:
@@ -78,7 +98,7 @@ async def _fetch_coingecko_fallback_prices(bot) -> bool:
             updated = False
             from strategy.symbol_registry import get_coingecko_id
 
-            for sym in ACTIVE_COINS:
+            for sym in bot.coins.keys():
                 cs = bot.coins.get(sym)
                 if cs and cs.price > 0:
                     continue
@@ -157,10 +177,17 @@ async def _fetch_single_coinbase_stats(client: httpx.AsyncClient, sym: str) -> t
 
 
 async def _fetch_coinbase_rest_prices(bot) -> bool:
-    """Fetch all product stats in parallel — price + 24h change + volume."""
+    """Fetch all product stats in parallel — price + 24h change + volume.
+    Uses a semaphore to prevent rate-limiting."""
     updated = False
+    sem = asyncio.Semaphore(5)
+    
+    async def fetch_with_sem(client, sym):
+        async with sem:
+            return await _fetch_single_coinbase_stats(client, sym)
+
     async with httpx.AsyncClient(timeout=_httpx_timeout) as client:
-        tasks = [_fetch_single_coinbase_stats(client, sym) for sym in ACTIVE_COINS]
+        tasks = [fetch_with_sem(client, sym) for sym in bot.coins.keys()]
         results = await asyncio.gather(*tasks)
         for r in results:
             if isinstance(r, tuple) and len(r) >= 4 and r[1] > 0:
@@ -199,9 +226,10 @@ async def bootstrap_prices_async(bot, broadcast_price) -> bool:
 async def coinbase_ws_loop(bot, broadcast, broadcast_price):
     """Stream live prices from Coinbase Advanced Trade WS. Never exits — always retries.
     Subscribes to both ticker (24h stats) and market_trades (last-executed-trade price, matches TradingView)."""
-    product_ids = [coinbase_product_id(s) for s in ACTIVE_COINS]
+    # product_ids = [coinbase_product_id(s) for s in ACTIVE_COINS] - moved inside loop
     last_broadcast: dict[str, float] = {}
     BROADCAST_INTERVAL = 0.05  # 50ms — ~20 Hz for tick-by-tick feel like TradingView
+    current_product_ids = set()
 
     # Bootstrap already runs at startup; re-run here only if WS loop restarts after long outage
     if bot.min_price_age() == float("inf"):
@@ -209,39 +237,105 @@ async def coinbase_ws_loop(bot, broadcast, broadcast_price):
 
     while True:
         try:
-            bot.add_log(f"📡 Connecting to Coinbase WS for {len(product_ids)} coins...", "info")
             async with websockets.connect(
                 COINBASE_WS_URL,
-                ping_interval=20,
-                ping_timeout=20,
+                ping_interval=15,
+                ping_timeout=15,
                 open_timeout=10,
+                close_timeout=5,
             ) as ws:
+                # Dynamic products based on bot.coins (allows adding coins via UI without restart)
+                product_ids = [coinbase_product_id(s) for s in bot.coins.keys()]
+                current_product_ids = set(product_ids)
+
                 # Ticker: 24h stats (volume, change). Batches updates — can lag vs TradingView.
                 await ws.send(json.dumps(_sign_subscribe("ticker", product_ids)))
                 # Market trades: actual last-executed price — matches TradingView chart exactly.
                 await ws.send(json.dumps(_sign_subscribe("market_trades", product_ids)))
 
                 bot.coinbase_connected = True
-                coins_str = ", ".join(ACTIVE_COINS)
+                coins_str = ", ".join(bot.coins.keys())
                 bot.add_log(f"✅ Coinbase WS connected — ticker + market_trades for {coins_str}", "success")
                 await broadcast({"type": "coinbase_status", "coinbase_connected": True})
 
-                async for raw in ws:
-                    msg = json.loads(raw)
-                    channel = msg.get("channel", "")
+                async def monitor_subscription():
+                    """Task to check for new coins and trigger a reconnect if needed."""
+                    while bot.coinbase_connected:
+                        await asyncio.sleep(10)
+                        now_ids = set([coinbase_product_id(s) for s in bot.coins.keys()])
+                        if now_ids != current_product_ids:
+                            bot.add_log("🔄 New coins detected — re-subscribing WS feed...", "info")
+                            await ws.close() # This will trigger the outer retry loop
+                            break
 
-                    # market_trades: last-executed price — aligns with TradingView
-                    if channel == "market_trades":
-                        for event in msg.get("events", []):
-                            for trade in event.get("trades", []):
-                                product = trade.get("product_id", "")
-                                symbol = _extract_symbol_from_product(product)
-                                if not symbol:
-                                    continue
-                                try:
-                                    p = float(trade.get("price", 0))
-                                    if p > 0:
-                                        bot.update_coin_price(symbol, p, 0.0, 0.0)
+                monitor_task = asyncio.create_task(monitor_subscription())
+
+                try:
+                    async for raw in ws:
+                        msg = json.loads(raw)
+                        channel = msg.get("channel", "")
+
+                        # market_trades: last-executed price — aligns with TradingView
+                        if channel == "market_trades":
+                            for event in msg.get("events", []):
+                                for trade in event.get("trades", []):
+                                    product = trade.get("product_id", "")
+                                    symbol = _extract_symbol_from_product(product)
+                                    if not symbol:
+                                        continue
+                                    try:
+                                        p = float(trade.get("price", 0))
+                                        if p > 0:
+                                            bot.update_coin_price(symbol, p, 0.0, 0.0)
+                                            now = time.monotonic()
+                                            if now - last_broadcast.get(symbol, 0) >= BROADCAST_INTERVAL:
+                                                last_broadcast[symbol] = now
+                                                await broadcast_price(symbol)
+                                            if bot._trade_just_closed_flag:
+                                                bot._trade_just_closed_flag = False
+                                                await broadcast(
+                                                    {
+                                                        "type": "trade_update",
+                                                        "open_position": bot.open_position,
+                                                        "open_positions": bot.open_positions,
+                                                        "trades": bot.trades[:10],
+                                                        "account": bot.account,
+                                                    }
+                                                )
+                                    except (ValueError, TypeError):
+                                        continue
+                            continue
+
+                        # ticker: 24h stats (batched — can lag). Only use price for bootstrap; else just 24h change.
+                        if channel == "ticker":
+                            for event in msg.get("events", [msg]):
+                                for ticker in event.get("tickers", [event]):
+                                    product = ticker.get("product_id", "")
+                                    symbol = _extract_symbol_from_product(product)
+                                    if not symbol:
+                                        price_str = ticker.get("price") or ticker.get("last_trade_price")
+                                        if price_str and not product:
+                                            symbol = "BTC"
+                                        else:
+                                            continue
+
+                                    price_str = (
+                                        ticker.get("price") or ticker.get("last_trade_price") or ticker.get("best_bid")
+                                    )
+                                    if not price_str:
+                                        continue
+                                    try:
+                                        p = float(price_str)
+                                        vol = float(ticker.get("volume_24_h") or ticker.get("volume") or 0)
+                                        chg24 = float(ticker.get("price_percent_chg_24_h", 0) or 0)
+                                        if p <= 0:
+                                            continue
+                                        cs = bot.coins.get(symbol)
+                                        # Use ticker price only if no price yet (bootstrap); else market_trades owns price
+                                        if not cs or cs.price <= 0:
+                                            bot.update_coin_price(symbol, p, vol, chg24)
+                                        else:
+                                            bot.update_coin_24h_change(symbol, chg24)
                                         now = time.monotonic()
                                         if now - last_broadcast.get(symbol, 0) >= BROADCAST_INTERVAL:
                                             last_broadcast[symbol] = now
@@ -257,57 +351,14 @@ async def coinbase_ws_loop(bot, broadcast, broadcast_price):
                                                     "account": bot.account,
                                                 }
                                             )
-                                except (ValueError, TypeError):
-                                    continue
-                        continue
-
-                    # ticker: 24h stats (batched — can lag). Only use price for bootstrap; else just 24h change.
-                    if channel == "ticker":
-                        for event in msg.get("events", [msg]):
-                            for ticker in event.get("tickers", [event]):
-                                product = ticker.get("product_id", "")
-                                symbol = _extract_symbol_from_product(product)
-                                if not symbol:
-                                    price_str = ticker.get("price") or ticker.get("last_trade_price")
-                                    if price_str and not product:
-                                        symbol = "BTC"
-                                    else:
+                                    except (ValueError, TypeError):
                                         continue
 
-                                price_str = (
-                                    ticker.get("price") or ticker.get("last_trade_price") or ticker.get("best_bid")
-                                )
-                                if not price_str:
-                                    continue
-                                try:
-                                    p = float(price_str)
-                                    vol = float(ticker.get("volume_24_h") or ticker.get("volume") or 0)
-                                    chg24 = float(ticker.get("price_percent_chg_24_h", 0) or 0)
-                                    if p <= 0:
-                                        continue
-                                    cs = bot.coins.get(symbol)
-                                    # Use ticker price only if no price yet (bootstrap); else market_trades owns price
-                                    if not cs or cs.price <= 0:
-                                        bot.update_coin_price(symbol, p, vol, chg24)
-                                    else:
-                                        bot.update_coin_24h_change(symbol, chg24)
-                                    now = time.monotonic()
-                                    if now - last_broadcast.get(symbol, 0) >= BROADCAST_INTERVAL:
-                                        last_broadcast[symbol] = now
-                                        await broadcast_price(symbol)
-                                    if bot._trade_just_closed_flag:
-                                        bot._trade_just_closed_flag = False
-                                        await broadcast(
-                                            {
-                                                "type": "trade_update",
-                                                "open_position": bot.open_position,
-                                                "open_positions": bot.open_positions,
-                                                "trades": bot.trades[:10],
-                                                "account": bot.account,
-                                            }
-                                        )
-                                except (ValueError, TypeError):
-                                    continue
+                    # Check if monitor task failed or was triggered
+                    if monitor_task.done():
+                        break
+                finally:
+                    monitor_task.cancel()
 
         except (
             websockets.exceptions.ConnectionClosed,
@@ -338,7 +389,7 @@ async def coinbase_rest_fallback(bot, broadcast, broadcast_price):
     Kraken used as tertiary fallback when Coinbase fails.
     Runs ~30min then returns so coinbase_ws_loop can retry WS. Never raises."""
     bot.add_log(
-        f"🔄 Coinbase REST fallback active for {len(ACTIVE_COINS)} coins ({FALLBACK_POLL_SEC}s polling)",
+        f"🔄 Coinbase REST fallback active for {len(bot.coins)} coins ({FALLBACK_POLL_SEC}s polling)",
         "warning",
     )
     consecutive_failures = 0
@@ -407,7 +458,7 @@ async def stats_refresh_cycle(bot, broadcast_price):
     while True:
         try:
             async with httpx.AsyncClient(timeout=_httpx_timeout) as client:
-                tasks = [_fetch_single_coinbase_stats(client, sym) for sym in ACTIVE_COINS]
+                tasks = [_fetch_single_coinbase_stats(client, sym) for sym in bot.coins.keys()]
                 results = await asyncio.gather(*tasks)
                 for r in results:
                     if isinstance(r, tuple) and len(r) >= 4 and r[1] > 0:
@@ -423,14 +474,20 @@ async def bootstrap_candles(bot) -> bool:
     try:
         from tools.backtester import fetch_historical_candles
 
-        for sym in ACTIVE_COINS:
-            candles = fetch_historical_candles(sym, days=7, use_hourly=True)
-            if not candles:
-                continue
-            prices = [c["price"] for c in candles]
-            volumes = [c.get("volume", 0) for c in candles]
-            cs = bot.get_coin(sym)
-            cs.backfill_prices(prices, volumes)
+        loop = asyncio.get_running_loop()
+        sem = asyncio.Semaphore(10)
+
+        async def fetch_and_fill(sym):
+            async with sem:
+                candles = await loop.run_in_executor(None, fetch_historical_candles, sym, 7, "usd", True)
+                if candles:
+                    prices = [c["price"] for c in candles]
+                    volumes = [c.get("volume", 0) for c in candles]
+                    cs = bot.get_coin(sym)
+                    cs.backfill_prices(prices, volumes)
+
+        tasks = [fetch_and_fill(sym) for sym in bot.coins.keys()]
+        await asyncio.gather(*tasks)
         return True
     except Exception as e:
         bot.add_log(f"Bootstrap candles: {str(e)[:50]} — indicators will warm from live feed", "dim")

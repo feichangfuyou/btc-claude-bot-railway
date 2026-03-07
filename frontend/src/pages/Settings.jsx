@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
 import { supabase } from "../supabaseClient.js";
 import { colors, typography } from "../theme.js";
+import { ArrowLeft, Check, ArrowRight, Lightbulb, Zap, X, Info } from "lucide-react";
 
 const PRESETS_FALLBACK = [
   { id: "default", name: "Default (Balanced)", category: "General" },
@@ -109,24 +110,63 @@ const PRESETS_FALLBACK = [
   { id: "pairs_trade", name: "Pairs Trading", category: "Technical Systems" },
 ];
 
-const ALL_COINS = ["BTC", "ETH", "SOL", "LINK", "DOGE", "AVAX", "UNI", "AAVE", "XRP", "ADA", "BNB", "DOT"];
+const COIN_CATEGORIES = {
+  "Major": ["BTC", "ETH", "XRP", "BNB", "SOL", "ADA", "DOGE", "TRX", "TON", "LTC"],
+  "Large Cap Alts": ["AVAX", "DOT", "LINK", "NEAR", "APT", "SUI", "OP", "ARB", "ATOM", "ICP", "STX", "VET", "FIL", "HBAR", "ETC", "MNT", "XLM", "BCH"],
+  "Meme": ["DOGE", "SHIB", "PEPE", "FLOKI", "BONK", "WIF", "MEME", "BOME", "COQ", "BRETT", "MOG", "NEIRO", "PNUT", "TURBO", "POPCAT", "MEW", "CAT", "FWOG"],
+  "DeFi": ["UNI", "AAVE", "MKR", "CRV", "LDO", "COMP", "SNX", "BAL", "YFI", "1INCH", "SUSHI", "DYDX", "GMX", "PENDLE", "ENA", "ETHFI", "EIGEN", "MORPHO"],
+  "L2 / Ecosystem": ["OP", "ARB", "MATIC", "STRK", "IMX", "ZK", "MANTA", "SCROLL", "METIS", "BOBA", "BLAST", "BASE", "CYBER", "TAIKO"],
+  "Gaming / Meta": ["AXS", "SAND", "MANA", "ENJ", "GALA", "ILV", "GODS", "YGG", "PYR", "RON", "SLP", "PRIME", "BEAM", "MAGIC"],
+  "AI / Data": ["FET", "AGIX", "OCEAN", "RNDR", "WLD", "TAO", "GRT", "NMR", "ARKM", "AIXBT", "VIRTUAL", "KAITO", "ATH"],
+  "RWA / Infra": ["ONDO", "POLYX", "CFG", "MPL", "TRU", "PRCL", "ALTA", "QRDO", "POL", "CELESTIA", "TIA", "PYTH", "JTO", "JUP", "WEN"],
+};
+const ALL_COINS = [...new Set(Object.values(COIN_CATEGORIES).flat())];
+const COIN_CATEGORY_KEYS = ["All", ...Object.keys(COIN_CATEGORIES)];
 
-const TIER_MAX_EXCHANGES = { starter: 1, pro: 3, elite: 10 };
+const TIER_MAX_EXCHANGES = { none: 0, starter: 1, pro: 3, elite: 10 };
 
+const EXCHANGES_META = {
+  kraken: {
+    name: "Kraken",
+    keyPlaceholder: "API Key (e.g. XXXX-XXXX-XXXX-XXXX)",
+    secretPlaceholder: "Private Key / API Secret",
+    keyHint: "Kraken API keys are alphanumeric strings (usually 56 characters). Enable Spot trading, Futures trading, and margin permissions. The only permission to leave OFF is Withdraw Funds.",
+    keyPattern: /^[A-Za-z0-9+/=]{40,90}$/,
+    keyPatternHint: "Must be 40–90 alphanumeric characters (no spaces).",
+  },
+  binance: {
+    name: "Binance",
+    keyPlaceholder: "API Key (64 characters)",
+    secretPlaceholder: "Secret Key (64 characters)",
+    keyHint: "Binance API keys are exactly 64 hexadecimal characters. Enable Spot trading AND Futures trading. The only permission to leave OFF is Enable Withdrawals.",
+    keyPattern: /^[A-Za-z0-9]{60,70}$/,
+    keyPatternHint: "Must be exactly 64 alphanumeric characters (no spaces or dashes).",
+  },
+};
 export default function Settings() {
   const { user, profile, signOut, accessToken } = useAuth();
   const getAuthHeaders = useAuthHeaders();
   const navigate = useNavigate();
   const [prefs, setPrefs] = useState(null);
+  const [coinCategory, setCoinCategory] = useState("All");
+  const [coinSearch, setCoinSearch] = useState("");
+  const [customCoin, setCustomCoin] = useState("");
   const [exchanges, setExchanges] = useState([]);
   const [presets, setPresets] = useState(PRESETS_FALLBACK);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [backendConfig, setBackendConfig] = useState({
+    min_trade_usd: 75,
+    min_profit_after_costs: 5,
+    round_trip_fee: 0.012,
+    max_position_size: 0.1,
+  });
 
   const [keyModal, setKeyModal] = useState(null);
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
   const [keyError, setKeyError] = useState("");
 
   useEffect(() => {
@@ -152,8 +192,14 @@ export default function Settings() {
   useEffect(() => {
     const base = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || "";
     const url = base ? `${base}/api/presets` : "/api/presets";
+    const configUrl = base ? `${base}/api/config` : "/api/config";
+    
     fetch(url, { headers: getAuthHeaders() }).then(r => r.ok && r.json()).then(d => {
       if (d?.presets?.length) setPresets(d.presets);
+    }).catch(() => { });
+
+    fetch(configUrl, { headers: getAuthHeaders() }).then(r => r.ok && r.json()).then(d => {
+      if (d) setBackendConfig(prev => ({ ...prev, ...d }));
     }).catch(() => { });
   }, [getAuthHeaders]);
 
@@ -175,7 +221,18 @@ export default function Settings() {
     setSaving(true);
     try {
       const { user_id, id, created_at, updated_at, ...rest } = toSave;
+      // Save to Supabase directly
       await supabase.from("user_preferences").update(rest).eq("user_id", user.id);
+      // Also call backend to bust server-side user_config cache (takes effect instantly on bot)
+      if (accessToken) {
+        const base = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || "";
+        const prefsUrl = base ? `${base}/auth/preferences` : "/auth/preferences";
+        fetch(prefsUrl, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
+          body: JSON.stringify(rest),
+        }).catch(() => {}); // fire-and-forget; Supabase save already succeeded
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
@@ -185,9 +242,78 @@ export default function Settings() {
     }
   }
 
+  async function handleConnectCoinbase() {
+    // Coinbase uses OAuth / AgentKit — no API key validation needed, just record the connection
+    if (!accessToken) {
+      setKeyError("Please sign in to connect Coinbase");
+      return;
+    }
+    try {
+      const base = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || "";
+      const connectUrl = base ? `${base}/auth/exchanges/connect` : "/auth/exchanges/connect";
+      const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` };
+      const connectRes = await fetch(connectUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ exchange: "coinbase", connection_type: "coinbase_oauth" }),
+      });
+      if (!connectRes.ok) {
+        const errData = await connectRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to connect Coinbase");
+      }
+      const { data: exData } = await supabase.from("user_exchanges").select("exchange, connection_type, is_active").eq("user_id", user.id);
+      setExchanges(exData || []);
+      setKeyModal(null);
+      setKeyError("");
+    } catch (err) {
+      setKeyError(err.message || "Failed to connect. Is the backend running?");
+    }
+  }
+
+  async function handleConnectOnchain() {
+    if (!walletAddress?.trim()) {
+      setKeyError("Wallet address is required.");
+      return;
+    }
+    if (!accessToken) {
+      setKeyError("Please sign in to connect on-chain.");
+      return;
+    }
+    try {
+      const base = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || "";
+      const connectUrl = base ? `${base}/auth/exchanges/connect` : "/auth/exchanges/connect";
+      const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` };
+      const connectRes = await fetch(connectUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          exchange: "onchain",
+          connection_type: "wallet",
+          wallet_address: walletAddress.trim(),
+        }),
+      });
+      if (!connectRes.ok) {
+        const errData = await connectRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to save wallet");
+      }
+      const { data: exData } = await supabase.from("user_exchanges").select("exchange, connection_type, is_active").eq("user_id", user.id);
+      setExchanges(exData || []);
+      setKeyModal(null);
+      setWalletAddress("");
+      setKeyError("");
+    } catch (err) {
+      setKeyError(err.message || "Failed to save. Is the backend running?");
+    }
+  }
+
   async function handleAddKey() {
     if (!apiKey?.trim() || !apiSecret?.trim()) {
-      setKeyError("Both API key and secret are required");
+      setKeyError("Both API key and secret are required.");
+      return;
+    }
+    const exMeta = EXCHANGES_META[keyModal];
+    if (exMeta?.keyPattern && !exMeta.keyPattern.test(apiKey.trim())) {
+      setKeyError(`Invalid ${exMeta.name} API key format. ${exMeta.keyPatternHint}`);
       return;
     }
     if (!accessToken) {
@@ -278,7 +404,7 @@ export default function Settings() {
       <div style={styles.container}>
         <div style={styles.page} className="settings-page">
           <div style={styles.header}>
-            <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>&larr; Dashboard</button>
+            <button style={styles.backBtn} onClick={() => navigate("/dashboard")}><ArrowLeft size={14} style={{ marginRight: "4px", verticalAlign: "middle" }} /> Dashboard</button>
             <h1 style={styles.title}>SETTINGS</h1>
           </div>
 
@@ -291,8 +417,19 @@ export default function Settings() {
             </div>
             <div style={styles.row}>
               <span style={styles.rowLabel}>Plan</span>
-              <span style={{ color: colors.gold, textTransform: "capitalize" }}>{profile?.subscription_tier || "Starter"}</span>
+              <span style={{ color: colors.gold, textTransform: "capitalize" }}>{profile?.subscription_tier || "None"}</span>
             </div>
+            {(user?.email === "feichangfuyou@gmail.com" || profile?.role === "admin") && (
+              <div style={styles.row}>
+                <span style={styles.rowLabel}>Administration</span>
+                <button 
+                  style={{ ...styles.legalBtn, borderColor: colors.gold, color: colors.gold }} 
+                  onClick={() => navigate("/admin")}
+                >
+                  OPEN ADMIN CONSOLE <ArrowRight size={14} style={{ marginLeft: "4px", verticalAlign: "middle" }} />
+                </button>
+              </div>
+            )}
             <button style={styles.dangerBtn} onClick={signOut}>Sign Out</button>
           </section>
 
@@ -302,12 +439,14 @@ export default function Settings() {
             {["coinbase", "kraken", "binance", "onchain"].map(ex => {
               const conn = exchanges.find(e => e.exchange === ex && e.is_active);
               const connectedCount = exchanges.filter(e => e.is_active).length;
-              const maxExchanges = TIER_MAX_EXCHANGES[profile?.subscription_tier || "starter"] ?? 1;
+              const maxExchanges = TIER_MAX_EXCHANGES[profile?.subscription_tier || "none"] ?? 0;
               const atLimit = !conn && connectedCount >= maxExchanges;
+              const exLabel = ex === "coinbase" ? "Coinbase" : ex === "onchain" ? "On-Chain" : ex.charAt(0).toUpperCase() + ex.slice(1);
+              const btnLabel = ex === "coinbase" ? "Connect" : ex === "onchain" ? "Add Wallet" : "Add Key";
               return (
                 <div key={ex} style={styles.exchangeRow}>
                   <div>
-                    <div style={styles.exchangeName}>{ex.charAt(0).toUpperCase() + ex.slice(1)}</div>
+                    <div style={styles.exchangeName}>{exLabel}</div>
                     <div style={{ fontSize: 10, color: conn ? colors.success : colors.muted }}>
                       {conn ? `Connected (${conn.connection_type})` : "Not connected"}
                     </div>
@@ -319,8 +458,8 @@ export default function Settings() {
                       Upgrade to add more
                     </button>
                   ) : (
-                    <button style={styles.connectBtn} onClick={() => setKeyModal(ex)}>
-                      {ex === "coinbase" ? "Connect" : "Add Key"}
+                    <button style={styles.connectBtn} onClick={() => { setKeyModal(ex); setKeyError(""); setApiKey(""); setApiSecret(""); setWalletAddress(""); }}>
+                      {btnLabel}
                     </button>
                   )}
                 </div>
@@ -367,17 +506,148 @@ export default function Settings() {
               ))}
             </div>
 
-            <label style={styles.label}>Coins</label>
-            <div style={styles.coinGrid}>
-              {ALL_COINS.map(c => (
+            <label style={styles.label}>Coins to Trade</label>
+
+            {/* Category Tab Bar */}
+            <div style={styles.coinCatBar}>
+              {COIN_CATEGORY_KEYS.map(cat => (
                 <button
-                  key={c}
-                  style={{ ...styles.coinBtn, ...((prefs.coins || []).includes(c) ? styles.coinActive : {}) }}
-                  onClick={() => toggleCoin(c)}
+                  key={cat}
+                  id={`coin-cat-${cat.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
+                  style={{
+                    ...styles.coinCatBtn,
+                    ...(coinCategory === cat ? styles.coinCatActive : {}),
+                  }}
+                  onClick={() => setCoinCategory(cat)}
                 >
-                  {c}
+                  {cat}
+                  {cat !== "All" && (() => {
+                    const catCoins = COIN_CATEGORIES[cat] || [];
+                    const selected = (prefs.coins || []).filter(c => catCoins.includes(c)).length;
+                    return selected > 0 ? (
+                      <span style={styles.coinCatBadge}>{selected}</span>
+                    ) : null;
+                  })()}
+                  {cat === "All" && (() => {
+                    const total = (prefs.coins || []).length;
+                    return total > 0 ? (
+                      <span style={styles.coinCatBadge}>{total}</span>
+                    ) : null;
+                  })()}
                 </button>
               ))}
+            </div>
+
+            {/* Per-category select/clear helpers */}
+            {coinCategory !== "All" && (
+              <div style={styles.coinCatActions}>
+                <button style={styles.coinCatActionBtn} onClick={() => {
+                  const cats = COIN_CATEGORIES[coinCategory] || [];
+                  const current = prefs.coins || [];
+                  const merged = [...new Set([...current, ...cats])];
+                  updatePref("coins", merged);
+                }}>
+                  Select All
+                </button>
+                <button style={styles.coinCatActionBtn} onClick={() => {
+                  const cats = COIN_CATEGORIES[coinCategory] || [];
+                  const current = prefs.coins || [];
+                  updatePref("coins", current.filter(c => !cats.includes(c)));
+                }}>
+                  Clear
+                </button>
+                <span style={styles.coinCatCount}>
+                  {(prefs.coins || []).filter(c => (COIN_CATEGORIES[coinCategory] || []).includes(c)).length}
+                  /{(COIN_CATEGORIES[coinCategory] || []).length} selected
+                </span>
+              </div>
+            )}
+            {coinCategory === "All" && (
+              <div style={styles.coinCatActions}>
+                <button style={styles.coinCatActionBtn} onClick={() => updatePref("coins", [...ALL_COINS])}>
+                  Select All
+                </button>
+                <button style={styles.coinCatActionBtn} onClick={() => updatePref("coins", [])}>
+                  Clear All
+                </button>
+                <span style={styles.coinCatCount}>
+                  {(prefs.coins || []).length}/{ALL_COINS.length} selected
+                </span>
+              </div>
+            )}
+
+            {/* Search and Custom Symbol Input */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <input
+                type="text"
+                placeholder="Search symbols..."
+                value={coinSearch}
+                onChange={e => setCoinSearch(e.target.value)}
+                style={{ ...styles.input, flex: 2, padding: "6px 10px" }}
+              />
+              <div style={{ display: "flex", flex: 1, gap: 4 }}>
+                <input
+                  type="text"
+                  placeholder="+ Symbol"
+                  value={customCoin}
+                  onChange={e => setCustomCoin(e.target.value.toUpperCase())}
+                  onKeyPress={e => {
+                    if (e.key === "Enter" && customCoin.trim()) {
+                      const c = customCoin.trim().toUpperCase();
+                      if (!ALL_COINS.includes(c) && !(prefs.coins || []).includes(c)) {
+                        toggleCoin(c);
+                        setCustomCoin("");
+                      }
+                    }
+                  }}
+                  style={{ ...styles.input, padding: "6px 10px", width: "100%" }}
+                />
+                <button 
+                  onClick={() => {
+                    if (customCoin.trim()) {
+                      const c = customCoin.trim().toUpperCase();
+                      if (!ALL_COINS.includes(c) && !(prefs.coins || []).includes(c)) {
+                        toggleCoin(c);
+                        setCustomCoin("");
+                      }
+                    }
+                  }}
+                  style={{ ...styles.coinCatActionBtn, padding: "0 10px", height: "auto" }}
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+
+            {/* Coin Chip Grid */}
+            <div style={styles.coinGrid}>
+              {(coinCategory === "Selected" ? (prefs.coins || []) : (coinCategory === "All" ? ALL_COINS : (COIN_CATEGORIES[coinCategory] || [])))
+                .filter(c => !coinSearch || c.toLowerCase().includes(coinSearch.toLowerCase()))
+                .map(c => (
+                  <button
+                    key={c}
+                    id={`coin-toggle-${c.toLowerCase()}`}
+                    style={{ ...styles.coinBtn, ...((prefs.coins || []).includes(c) ? styles.coinActive : {}) }}
+                    onClick={() => toggleCoin(c)}
+                  >
+                    {c}{!ALL_COINS.includes(c) ? " (custom)" : ""}
+                  </button>
+                ))}
+              {/* If in 'All' tab, we also want to show custom coins that aren't in the global list */}
+              {coinCategory === "All" && (prefs.coins || [])
+                .filter(c => !ALL_COINS.includes(c))
+                .filter(c => !coinSearch || c.toLowerCase().includes(coinSearch.toLowerCase()))
+                .map(c => (
+                  <button
+                    key={c}
+                    id={`coin-toggle-${c.toLowerCase()}`}
+                    style={{ ...styles.coinBtn, ...styles.coinActive }}
+                    onClick={() => toggleCoin(c)}
+                  >
+                    {c} (custom)
+                  </button>
+                ))
+              }
             </div>
 
             <label style={styles.label}>Paper Trading</label>
@@ -412,28 +682,181 @@ export default function Settings() {
               </button>
             </div>
 
+            {/* Minimum Capital Requirements Info Panel */}
+            <div style={styles.capitalBox}>
+              <div style={styles.capitalHeader}>
+                <Lightbulb size={20} color={colors.gold} />
+                <span style={styles.capitalTitle}>Real Money Requirements</span>
+              </div>
+              <p style={styles.capitalIntro}>
+                Before switching to <strong style={{ color: "#e05f5f" }}>live trading</strong>, make sure your account meets these minimums — the bot enforces them automatically.
+              </p>
+              <div style={styles.capitalGrid} className="capital-grid">
+                <div style={styles.capitalItem}>
+                  <div style={styles.capitalValue}>${backendConfig.min_trade_usd}</div>
+                  <div style={styles.capitalLabel}>Min trade size</div>
+                  <div style={styles.capitalSub}>Per position. Smaller trades are rejected.</div>
+                </div>
+                <div style={styles.capitalItem}>
+                  <div style={styles.capitalValue}>${Math.round(backendConfig.min_trade_usd / backendConfig.max_position_size)}</div>
+                  <div style={styles.capitalLabel}>Recommended balance</div>
+                  <div style={styles.capitalSub}>{(backendConfig.max_position_size * 100).toFixed(0)}% position = ${backendConfig.min_trade_usd} trade. Below ${Math.round(backendConfig.min_trade_usd / backendConfig.max_position_size)} blocks most trades.</div>
+                </div>
+                <div style={styles.capitalItem}>
+                  <div style={styles.capitalValue}>{(backendConfig.round_trip_fee * 100).toFixed(1)}%</div>
+                  <div style={styles.capitalLabel}>Round-trip fees</div>
+                  <div style={styles.capitalSub}>{(backendConfig.round_trip_fee * 50).toFixed(1)}% in + {(backendConfig.round_trip_fee * 50).toFixed(1)}% out (taker fee).</div>
+                </div>
+                <div style={styles.capitalItem}>
+                  <div style={styles.capitalValue}>${backendConfig.min_profit_after_costs}</div>
+                  <div style={styles.capitalLabel}>Min net profit at TP</div>
+                  <div style={styles.capitalSub}>Each trade&apos;s take-profit must clear ${backendConfig.min_profit_after_costs} after all fees or it&apos;s rejected.</div>
+                </div>
+              </div>
+              <div style={styles.capitalNote}>
+                <Zap size={14} /> <strong>Why these limits?</strong> A ${backendConfig.min_trade_usd} trade costs ~${(backendConfig.min_trade_usd * backendConfig.round_trip_fee).toFixed(2)} in exchange fees + AI costs. We require the take-profit to net at least ${backendConfig.min_profit_after_costs} above all costs.
+              </div>
+            </div>
+
             <div style={styles.saveRow}>
               <button style={styles.saveBtn} onClick={handleSave} disabled={saving}>
-                {saving ? "Saving..." : saved ? "\u2713 Saved" : "Save Changes"}
+                {saving ? "Saving..." : saved ? <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><Check size={14} /> Saved</span> : "Save Changes"}
               </button>
             </div>
           </section>
 
-          {/* API Key Modal */}
-          {keyModal && (
-            <div style={styles.modalOverlay} onClick={() => setKeyModal(null)}>
-              <div style={styles.modal} className="settings-modal" onClick={e => e.stopPropagation()}>
-                <h3 style={styles.modalTitle}>Add {keyModal.charAt(0).toUpperCase() + keyModal.slice(1)} API Key</h3>
-                {keyError && <div style={styles.error}>{keyError}</div>}
-                <input type="text" placeholder="API Key" value={apiKey} onChange={e => setApiKey(e.target.value)} style={styles.input} />
-                <input type="password" placeholder="API Secret" value={apiSecret} onChange={e => setApiSecret(e.target.value)} style={{ ...styles.input, marginTop: 8 }} />
-                <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                  <button style={styles.backBtn} onClick={() => { setKeyModal(null); setKeyError(""); }}>Cancel</button>
-                  <button style={styles.saveBtn} onClick={handleAddKey}>Save Key</button>
+          {/* Support & Legal */}
+          <section style={styles.section}>
+            <h2 style={styles.sectionTitle}>Support & Legal</h2>
+            <div style={styles.row}>
+              <span style={styles.rowLabel}>Privacy Policy</span>
+              <button style={styles.legalBtn} onClick={() => navigate("/privacy")}>Read Policy</button>
+            </div>
+            <div style={styles.row}>
+              <span style={styles.rowLabel}>Terms of Service</span>
+              <button style={styles.legalBtn} onClick={() => navigate("/terms")}>Read Terms</button>
+            </div>
+            <div style={styles.row}>
+              <span style={styles.rowLabel}>Support</span>
+              <button style={styles.legalBtn} onClick={() => window.location.href = "mailto:support@doyou.trade"}>Email Support</button>
+            </div>
+            <div style={{ marginTop: 16, textAlign: "center", color: "#3a3a3a", fontSize: 9, letterSpacing: 1, fontFamily: "'Montserrat', sans-serif" }}>
+              © 2025 DOYOU.TRADE
+            </div>
+          </section>
+
+          {/* Exchange Connection Modals */}
+          {keyModal && (() => {
+            const exMeta = EXCHANGES_META[keyModal];
+            const closeModal = () => { setKeyModal(null); setApiKey(""); setApiSecret(""); setWalletAddress(""); setKeyError(""); };
+
+            /* ── COINBASE: direct connect (no API key needed) ── */
+            if (keyModal === "coinbase") {
+              return (
+                <div style={styles.modalOverlay} onClick={closeModal}>
+                  <div style={styles.modal} className="settings-modal" onClick={e => e.stopPropagation()}>
+                    <h3 style={styles.modalTitle}>Connect Coinbase</h3>
+                     <div style={styles.keyHintBanner}>
+                       <Info size={14} style={{ color: colors.gold, marginRight: 6 }} />
+                       Coinbase is connected via your account credentials (the API keys you entered in the server .env). Click Connect to link your Coinbase account to your bot profile.
+                     </div>
+                    {keyError && <div style={styles.error}>{keyError}</div>}
+                    <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                      <button style={styles.backBtn} onClick={closeModal}>Cancel</button>
+                      <button style={styles.saveBtn} onClick={handleConnectCoinbase}>Connect</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            /* ── ONCHAIN: wallet address ── */
+            if (keyModal === "onchain") {
+              return (
+                <div style={styles.modalOverlay} onClick={closeModal}>
+                  <div style={styles.modal} className="settings-modal" onClick={e => e.stopPropagation()}>
+                    <h3 style={styles.modalTitle}>Add On-Chain Wallet</h3>
+                     <div style={styles.keyHintBanner}>
+                       <Info size={14} style={{ color: colors.gold, marginRight: 6 }} />
+                       Enter your wallet address (e.g. Base/Ethereum). The bot uses Coinbase AgentKit to execute on-chain trades — no private key is stored.
+                     </div>
+                    {keyError && <div style={styles.error}>{keyError}</div>}
+                    <input
+                      id="settings-wallet-address"
+                      type="text"
+                      placeholder="0x... wallet address"
+                      value={walletAddress}
+                      onChange={e => { setWalletAddress(e.target.value); setKeyError(""); }}
+                      style={styles.input}
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <div style={styles.fieldHint}>Your Base / Ethereum wallet address (starts with 0x).</div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                      <button style={styles.backBtn} onClick={closeModal}>Cancel</button>
+                      <button style={styles.saveBtn} onClick={handleConnectOnchain} disabled={!walletAddress.trim()}>Save Wallet</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            /* ── KRAKEN / BINANCE: full API key + validation ── */
+            const exName = exMeta?.name || (keyModal.charAt(0).toUpperCase() + keyModal.slice(1));
+            return (
+              <div style={styles.modalOverlay} onClick={closeModal}>
+                <div style={styles.modal} className="settings-modal" onClick={e => e.stopPropagation()}>
+                  <h3 style={styles.modalTitle}>Add {exName} API Key</h3>
+
+                   {exMeta?.keyHint && (
+                     <div style={styles.keyHintBanner}>
+                       <Info size={14} style={{ color: colors.gold, marginRight: 6 }} />
+                       {exMeta.keyHint}
+                     </div>
+                   )}
+
+                  {keyError && <div style={styles.error}>{keyError}</div>}
+
+                  <input
+                    id={`settings-api-key-${keyModal}`}
+                    type="text"
+                    placeholder={exMeta?.keyPlaceholder || "API Key"}
+                    value={apiKey}
+                    onChange={e => { setApiKey(e.target.value); setKeyError(""); }}
+                    style={styles.input}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  {exMeta?.keyPatternHint && (
+                    <div style={styles.fieldHint}>{exMeta.keyPatternHint}</div>
+                  )}
+                  <input
+                    id={`settings-api-secret-${keyModal}`}
+                    type="password"
+                    placeholder={exMeta?.secretPlaceholder || "API Secret"}
+                    value={apiSecret}
+                    onChange={e => { setApiSecret(e.target.value); setKeyError(""); }}
+                    style={{ ...styles.input, marginTop: 10 }}
+                    autoComplete="new-password"
+                  />
+
+                  <div style={styles.keyInfo}>
+                    <div style={styles.keyInfoTitle}>Enable these permissions on your key:</div>
+                    <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> View / Query Funds &amp; Balances</div>
+                    <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> Query Orders &amp; Trade History</div>
+                    <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> Spot Trading (Create &amp; Modify Orders)</div>
+                    <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> Futures / Derivatives Trading</div>
+                    <div style={styles.keyPerm}><X size={12} style={{ color: colors.error }} /> Withdraw Funds — leave <strong>OFF</strong></div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                    <button style={styles.backBtn} onClick={closeModal}>Cancel</button>
+                    <button style={styles.saveBtn} onClick={handleAddKey} disabled={!apiKey.trim() || !apiSecret.trim()}>Save Key</button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </>
@@ -484,7 +907,7 @@ const styles = {
     transition: "border-color 0.3s ease, box-shadow 0.3s ease",
   },
   sectionTitle: {
-    fontFamily: "'Oswald', sans-serif",
+    fontFamily: "'Montserrat', sans-serif",
     fontSize: 14,
     fontWeight: 600,
     letterSpacing: 2,
@@ -501,6 +924,80 @@ const styles = {
   },
   rowLabel: { color: colors.muted },
   label: { fontSize: 11, color: "#888", letterSpacing: 1, display: "block", marginTop: 14, marginBottom: 6 },
+  capitalBox: {
+    marginTop: 20,
+    background: "rgba(212,175,55,0.04)",
+    border: "1px solid rgba(212,175,55,0.18)",
+    borderRadius: 14,
+    padding: "16px 18px",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+  },
+  capitalHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  capitalIcon: { fontSize: 16 },
+  capitalTitle: {
+    fontFamily: "'Montserrat', sans-serif",
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: 2,
+    color: colors.gold,
+    textTransform: "uppercase",
+  },
+  capitalIntro: {
+    fontSize: 11,
+    color: colors.muted,
+    lineHeight: 1.6,
+    margin: "0 0 14px",
+  },
+  capitalGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 10,
+    marginBottom: 12,
+  },
+  // We'll handle grid responsiveness in responsiveCss via a class
+  capitalItem: {
+    background: "rgba(0,0,0,0.25)",
+    border: "1px solid rgba(255,255,255,0.05)",
+    borderRadius: 10,
+    padding: "10px 12px",
+  },
+  capitalValue: {
+    fontFamily: "'Montserrat', sans-serif",
+    fontSize: 22,
+    fontWeight: 700,
+    color: colors.gold,
+    letterSpacing: 1,
+    lineHeight: 1,
+    marginBottom: 3,
+  },
+  capitalLabel: {
+    fontSize: 10,
+    fontWeight: 600,
+    color: "#ccc",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 3,
+  },
+  capitalSub: {
+    fontSize: 10,
+    color: "#666",
+    lineHeight: 1.4,
+  },
+  capitalNote: {
+    fontSize: 10,
+    color: "#888",
+    lineHeight: 1.6,
+    background: "rgba(0,0,0,0.2)",
+    border: "1px solid rgba(255,255,255,0.04)",
+    borderRadius: 8,
+    padding: "8px 10px",
+  },
   select: {
     fontFamily: "'Space Mono', monospace",
     fontSize: 12,
@@ -546,21 +1043,88 @@ const styles = {
     transition: "all 0.2s ease",
   },
   riskActive: { borderColor: `${colors.gold}66`, color: colors.gold, background: `${colors.gold}0D` },
-  coinGrid: { display: "flex", flexWrap: "wrap", gap: 6 },
+  coinCatBar: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 5,
+    marginBottom: 8,
+    padding: "6px",
+    background: "rgba(0,0,0,0.2)",
+    borderRadius: 10,
+    border: "1px solid rgba(255,255,255,0.04)",
+  },
+  coinCatBtn: {
+    fontFamily: "'Space Mono', monospace",
+    fontSize: 10,
+    padding: "4px 9px",
+    background: "transparent",
+    border: "1px solid rgba(255,255,255,0.07)",
+    borderRadius: 6,
+    color: "#888",
+    cursor: "pointer",
+    transition: "all 0.18s ease",
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    whiteSpace: "nowrap",
+    letterSpacing: 0.5,
+  },
+  coinCatActive: {
+    background: `${colors.gold}18`,
+    borderColor: `${colors.gold}55`,
+    color: colors.gold,
+    boxShadow: `0 0 8px ${colors.gold}22`,
+  },
+  coinCatBadge: {
+    background: `${colors.gold}33`,
+    color: colors.gold,
+    fontSize: 9,
+    fontWeight: 700,
+    borderRadius: 20,
+    padding: "1px 5px",
+    minWidth: 14,
+    textAlign: "center",
+  },
+  coinCatActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  coinCatActionBtn: {
+    fontFamily: "'Space Mono', monospace",
+    fontSize: 9,
+    padding: "3px 8px",
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.07)",
+    borderRadius: 5,
+    color: "#888",
+    cursor: "pointer",
+    transition: "all 0.15s ease",
+    letterSpacing: 0.3,
+  },
+  coinCatCount: {
+    fontSize: 10,
+    color: "#555",
+    marginLeft: "auto",
+    fontFamily: "'Space Mono', monospace",
+  },
+  coinGrid: { display: "flex", flexWrap: "wrap", gap: 5, maxHeight: 220, overflowY: "auto", paddingRight: 2 },
   coinBtn: {
     fontFamily: "'Space Mono', monospace",
-    fontSize: 11,
+    fontSize: 10,
     padding: "5px 10px",
     background: "rgba(10,10,10,0.5)",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",
     border: "1px solid rgba(255,255,255,0.06)",
-    borderRadius: 8,
-    color: "#D4D4D4",
+    borderRadius: 7,
+    color: "#A0A0A0",
     cursor: "pointer",
-    transition: "all 0.2s ease",
+    transition: "all 0.18s ease",
+    letterSpacing: 0.5,
   },
-  coinActive: { borderColor: `${colors.gold}66`, color: colors.gold, background: `${colors.gold}0D` },
+  coinActive: { borderColor: `${colors.gold}66`, color: colors.gold, background: `${colors.gold}11`, boxShadow: `0 0 6px ${colors.gold}22` },
   exchangeRow: {
     display: "flex",
     alignItems: "center",
@@ -570,7 +1134,7 @@ const styles = {
   },
   exchangeName: { fontSize: 13, fontWeight: 600 },
   connectBtn: {
-    fontFamily: "'Oswald', sans-serif",
+    fontFamily: "'Montserrat', sans-serif",
     fontSize: 11,
     letterSpacing: 1,
     padding: "5px 12px",
@@ -604,9 +1168,20 @@ const styles = {
     marginTop: 12,
     transition: "all 0.2s ease",
   },
+  legalBtn: {
+    fontFamily: "'Space Mono', monospace",
+    fontSize: 10,
+    padding: "4px 10px",
+    background: "rgba(255,255,255,0.03)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 6,
+    color: colors.muted,
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+  },
   saveRow: { marginTop: 20, textAlign: "right" },
   saveBtn: {
-    fontFamily: "'Oswald', sans-serif",
+    fontFamily: "'Montserrat', sans-serif",
     fontSize: 13,
     fontWeight: 600,
     letterSpacing: 2,
@@ -659,6 +1234,32 @@ const styles = {
     padding: "8px 12px",
     marginBottom: 12,
   },
+  keyHintBanner: {
+    fontSize: 11,
+    color: "#aaa",
+    lineHeight: 1.6,
+    background: "rgba(212,175,55,0.05)",
+    border: "1px solid rgba(212,175,55,0.15)",
+    borderRadius: 8,
+    padding: "10px 12px",
+    marginBottom: 12,
+  },
+  fieldHint: {
+    fontSize: 10,
+    color: "#666",
+    marginTop: 4,
+    marginBottom: 4,
+    paddingLeft: 2,
+  },
+  keyInfo: {
+    background: "rgba(10,10,10,0.4)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+  },
+  keyInfoTitle: { fontSize: 11, color: "#888", marginBottom: 6 },
+  keyPerm: { fontSize: 11, padding: "2px 0", display: "flex", gap: 6, alignItems: "center" },
 };
 
 const responsiveCss = `
@@ -688,6 +1289,29 @@ const responsiveCss = `
     margin: 8px !important;
     max-width: calc(100vw - 16px) !important;
     padding: 16px 12px !important;
+  }
+  .settings-page {
+    padding: 0 !important;
+  }
+  /* Accessing sub-styles via CSS since they are inline-first */
+  [class*="capitalGrid"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (max-width: 280px) {
+  .settings-page section {
+    padding: 12px 10px !important;
+    border-radius: 12px !important;
+  }
+  .settings-page h1 {
+    font-size: 20px !important;
+    letter-spacing: 2px !important;
+  }
+  .settings-page h2 {
+    font-size: 12px !important;
+  }
+  .settings-page button, .settings-page select, .settings-page input {
+    font-size: 10px !important;
   }
 }
 `;

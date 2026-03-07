@@ -1,7 +1,7 @@
 {
-  "name": "DoYou Trade — AI-Powered Crypto Trading",
-  "short_name": "DoYou Trade",
-  "description": "AI-powered multi-coin trading engine with Claude. Trade smarter with institutional strategies.",
+  "name": "DoYou.trade — Advanced AI Trading Terminal",
+  "short_name": "DoYou.trade",
+  "description": "The world's most advanced AI-powered trading terminal. Automate your crypto strategy with the Brain. Professional-grade algorithmic trading for everyone.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -42,18 +42,24 @@
     }
   ],
   "categories": ["finance", "business", "productivity"],
-  "prefer_related_applications": true,
-  "related_applications": [
-    {
-      "platform": "play",
-      "id": "com.doyou.trade"
-    },
-    {
-      "platform": "itunes",
-      "url": "https://apps.apple.com/app/doyou-trade/id0000000000"
-    }
-  ],
+  "prefer_related_applications": false,
   "screenshots": [],
   "lang": "en-US",
-  "dir": "ltr"
+  "dir": "ltr",
+  "shortcuts": [
+    {
+      "name": "Live Terminal",
+      "short_name": "Terminal",
+      "description": "Open your AI trading terminal",
+      "url": "/login",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Join Now",
+      "short_name": "Signup",
+      "description": "Create a new trading account",
+      "url": "/signup",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
 }

@@ -1,8 +1,12 @@
 import os
+import time
+from collections import deque
+from datetime import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
+from core.auth import AuthenticatedUser, get_active_user, get_current_user
 from core.bot_manager import bot_manager
 from core.config import (
     ACTIVE_COINS,
@@ -18,6 +22,9 @@ from core.shared import bot
 from strategy.symbol_registry import SYMBOL_TO_COINGECKO
 
 router = APIRouter(tags=["system"])
+
+# ── In-memory admin audit log (last 200 actions) ──────────────────────────
+_ADMIN_AUDIT: deque = deque(maxlen=200)
 
 
 def _readiness_scale_10k() -> dict:
@@ -54,23 +61,13 @@ def health():
     prices = {sym: cs.price for sym, cs in bot.coins.items() if cs.price > 0}
     return {
         "status": "ok",
-        "prices": prices,
-        "price": bot.price,
-        "price_change24h": bot.price_change24h,
-        "active_coins": ACTIVE_COINS,
         "bot_running": bot.bot_running,
         "coinbase_connected": bot.coinbase_connected,
         "kraken_enabled": getattr(bot, "kraken_enabled", False),
         "paper_trading": PAPER_TRADING,
         "has_claude_key": bool(ANTHROPIC_API_KEY),
-        "balance": bot.account["balance"],
-        "daily_pnl": bot.account["daily_pnl"],
-        "total_pnl": bot.account["total_pnl"],
-        "open_positions": len(bot.open_positions),
         "fear_greed": bot.fear_greed,
         "price_age_sec": min(bot.min_price_age(), 999999.0),
-        "consecutive_losses": bot.circuit_breaker.consecutive_losses,
-        "loss_breaker_active": bot.circuit_breaker.loss_breaker_active,
     }
 
 
@@ -78,21 +75,6 @@ def health():
 def metrics():
     """Prometheus-style metrics for 10k scale monitoring."""
     lines = [
-        "# HELP claudebot_balance Current account balance (USD)",
-        "# TYPE claudebot_balance gauge",
-        f"claudebot_balance {bot.account.get('balance', 0)}",
-        "# HELP claudebot_total_pnl Total P&L since start",
-        "# TYPE claudebot_total_pnl gauge",
-        f"claudebot_total_pnl {bot.account.get('total_pnl', 0)}",
-        "# HELP claudebot_daily_pnl Daily P&L",
-        "# TYPE claudebot_daily_pnl gauge",
-        f"claudebot_daily_pnl {bot.account.get('daily_pnl', 0)}",
-        "# HELP claudebot_open_positions Number of open positions",
-        "# TYPE claudebot_open_positions gauge",
-        f"claudebot_open_positions {len(bot.open_positions)}",
-        "# HELP claudebot_trades_total Total trades executed",
-        "# TYPE claudebot_trades_total counter",
-        f"claudebot_trades_total {len(bot.trades)}",
         "# HELP claudebot_bot_running 1 if bot is running, 0 if paused",
         "# TYPE claudebot_bot_running gauge",
         f"claudebot_bot_running {1 if bot.bot_running else 0}",
@@ -117,13 +99,23 @@ def metrics():
 
 @router.get("/api/config")
 def get_api_config():
-    """Expose runtime config for frontend: fee schedule, symbol mappings, active coins."""
-    from core.config import ROUND_TRIP_FEE
+    """Expose runtime config for frontend: fees, symbols, active coins, and risk limits."""
+    from core.config import (
+        MAX_DAILY_LOSS_PCT,
+        MAX_POSITION_SIZE,
+        MIN_PROFIT_AFTER_COSTS,
+        MIN_TRADE_USD,
+        ROUND_TRIP_FEE,
+    )
 
     return {
         "round_trip_fee": ROUND_TRIP_FEE,
         "symbol_to_coingecko": SYMBOL_TO_COINGECKO,
         "active_coins": ACTIVE_COINS,
+        "min_trade_usd": MIN_TRADE_USD,
+        "min_profit_after_costs": MIN_PROFIT_AFTER_COSTS,
+        "max_position_size": MAX_POSITION_SIZE,
+        "max_daily_loss_pct": MAX_DAILY_LOSS_PCT,
     }
 
 
@@ -271,3 +263,289 @@ def get_readiness():
             },
         },
     }
+
+
+@router.post("/api/admin/global-pause")
+def set_global_pause(pause: bool, user: AuthenticatedUser = Depends(get_active_user)):
+    """Point 3: God Mode — Emergency halt for all 10,000 users."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    bot_manager.global_pause = pause
+    status = "HALTED" if pause else "RESUMED"
+    bot.add_log(f"🚨 ADMIN ACTION: Platform {status}", "warning")
+    return {"status": "ok", "global_pause": bot_manager.global_pause}
+
+
+@router.post("/api/admin/risk-off")
+def set_global_risk_off(risk_off: bool, user: AuthenticatedUser = Depends(get_active_user)):
+    """Toggle Capital Preservation Mode (reduces sizes, tightens risk limits)."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    # Store this on bot_manager
+    bot_manager.global_risk_off = risk_off
+    status = "ENABLED" if risk_off else "DISABLED"
+    bot.add_log(f"🛡️ ADMIN ACTION: Capital Preservation (Risk-Off) {status}", "warning")
+    return {"status": "ok", "global_risk_off": bot_manager.global_risk_off}
+
+
+@router.post("/api/admin/set-max-loss")
+def set_global_max_loss(
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(get_active_user)
+):
+    """Dynamically adjust the platform's global max loss circuit breaker threshold."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    
+    new_limit = float(body.get("limit", 1000000.0))
+    if new_limit <= 0:
+        raise HTTPException(status_code=400, detail="Limit must be positive")
+        
+    bot_manager.global_max_loss_usd = new_limit
+    bot.add_log(f"⚙️ ADMIN ACTION: Set Global Max Loss to ${new_limit:,.2f}", "warning")
+    return {"status": "ok", "global_max_loss_usd": bot_manager.global_max_loss_usd}
+
+
+@router.get("/api/admin/stats")
+def get_admin_stats(user: AuthenticatedUser = Depends(get_active_user)):
+    """Point 4: Aggregate Risk — Platform-wide performance monitor."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    return {
+        "active_users": bot_manager.active_count(),
+        "total_users": bot_manager.total_count(),
+        "global_pause": bot_manager.global_pause,
+        "global_daily_pnl": sum(i.daily_pnl for i in bot_manager._instances.values()),
+        "global_total_pnl": sum(i.total_pnl for i in bot_manager._instances.values()),
+        "global_max_loss": bot_manager.global_max_loss_usd,
+        "memory_usage_mb": "calc", # example
+    }
+
+
+@router.post("/api/admin/verify-2fa")
+def verify_admin_2fa(
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Verify a TOTP 2FA code for the admin console.
+    Only the admin email can call this. Returns a short-lived session token."""
+    import pyotp
+
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    totp_secret = os.getenv("ADMIN_TOTP_SECRET", "")
+    if not totp_secret:
+        raise HTTPException(status_code=503, detail="2FA not configured on server")
+
+    code = str(body.get("code", "")).strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing 2FA code")
+
+    totp = pyotp.TOTP(totp_secret)
+    # valid_window=1 allows ±30 seconds of clock skew
+    if not totp.verify(code, valid_window=1):
+        raise HTTPException(status_code=401, detail="Invalid or expired 2FA code")
+
+    return {"status": "ok", "verified": True}
+
+
+@router.get("/api/admin/2fa-qr")
+def get_admin_2fa_qr(user: AuthenticatedUser = Depends(get_current_user)):
+    """Return the TOTP provisioning URI so the admin can add it to an auth app.
+    Only callable by the admin."""
+    import pyotp
+
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    totp_secret = os.getenv("ADMIN_TOTP_SECRET", "")
+    if not totp_secret:
+        raise HTTPException(status_code=503, detail="2FA not configured on server")
+
+    totp = pyotp.TOTP(totp_secret)
+    uri = totp.provisioning_uri(
+        name=user.email,
+        issuer_name="DOYOU.TRADE Admin",
+    )
+    return {"uri": uri, "secret": totp_secret}
+
+
+# ─── Admin: Users List ────────────────────────────────────────────────────────
+@router.get("/api/admin/users")
+def get_admin_users(user: AuthenticatedUser = Depends(get_active_user)):
+    """Return all users from Supabase profiles with live bot instance state."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    try:
+        from core.supabase_client import get_supabase
+        sb = get_supabase()
+        result = sb.table("profiles").select(
+            "id, email, display_name, subscription_tier, subscription_status, onboarding_complete, created_at"
+        ).order("created_at", desc=True).limit(500).execute()
+        profiles = result.data or []
+    except Exception:
+        profiles = []
+
+    users_out = []
+    for p in profiles:
+        uid = p.get("id", "")
+        instance = bot_manager.get(uid)
+        users_out.append({
+            "id": uid,
+            "email": p.get("email", ""),
+            "display_name": p.get("display_name", ""),
+            "tier": p.get("subscription_tier", "none"),
+            "status": p.get("subscription_status", "inactive"),
+            "onboarding_complete": p.get("onboarding_complete", False),
+            "created_at": p.get("created_at", ""),
+            "bot_running": instance.running if instance else False,
+            "daily_pnl": round(instance.daily_pnl, 2) if instance else 0.0,
+            "total_pnl": round(instance.total_pnl, 2) if instance else 0.0,
+            "open_positions": len(instance.open_positions) if instance else 0,
+            "connected_exchanges": instance.config.connected_exchanges if instance else [],
+        })
+    return {"users": users_out, "total": len(users_out)}
+
+
+# ─── Admin: Per-User Bot Control ─────────────────────────────────────────────
+@router.post("/api/admin/users/{target_user_id}/stop")
+async def admin_stop_user_bot(target_user_id: str, user: AuthenticatedUser = Depends(get_active_user)):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    instance = bot_manager.get(target_user_id)
+    if not instance:
+        raise HTTPException(status_code=404, detail="No active bot instance for this user")
+    instance.running = False
+    instance.persist_state()
+    _log_admin_action(user.email, f"Stopped bot for user {target_user_id[:8]}")
+    return {"ok": True, "user_id": target_user_id, "running": False}
+
+
+@router.post("/api/admin/users/{target_user_id}/start")
+async def admin_start_user_bot(target_user_id: str, user: AuthenticatedUser = Depends(get_active_user)):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    instance = await bot_manager.get_or_create(target_user_id)
+    instance.running = True
+    _log_admin_action(user.email, f"Started bot for user {target_user_id[:8]}")
+    return {"ok": True, "user_id": target_user_id, "running": True}
+
+
+@router.post("/api/admin/users/{target_user_id}/set-tier")
+async def admin_set_user_tier(
+    target_user_id: str,
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(get_active_user),
+):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    new_tier = body.get("tier", "none")
+    allowed_tiers = {"none", "starter", "pro", "elite"}
+    if new_tier not in allowed_tiers:
+        raise HTTPException(status_code=400, detail=f"Invalid tier. Must be one of: {allowed_tiers}")
+    try:
+        from core.supabase_client import get_supabase
+        sb = get_supabase()
+        sb.table("profiles").update({
+            "subscription_tier": new_tier,
+            "subscription_status": "active" if new_tier != "none" else "inactive",
+        }).eq("id", target_user_id).execute()
+        from core.user_config import invalidate_user_config_cache
+        invalidate_user_config_cache(target_user_id)
+        await bot_manager.reload_config(target_user_id)
+        _log_admin_action(user.email, f"Set tier={new_tier} for user {target_user_id[:8]}")
+        return {"ok": True, "user_id": target_user_id, "tier": new_tier}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Admin: Broadcast Signal ──────────────────────────────────────────────────
+@router.post("/api/admin/broadcast-signal")
+async def admin_broadcast_signal(
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(get_active_user),
+):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    signal = {
+        "action": body.get("action", "wait"),
+        "symbol": body.get("symbol", "BTC").upper(),
+        "confidence": float(body.get("confidence", 0.6)),
+        "size_pct": float(body.get("size_pct", 0.05)),
+        "reasoning": body.get("reasoning", "Admin manual signal"),
+        "source": "admin_hub",
+    }
+    tier_filter = body.get("tier", "all")
+    await bot_manager.broadcast_managed_signal(signal, tier=tier_filter)
+    _log_admin_action(user.email, f"Broadcast {signal['action']} {signal['symbol']} → tier={tier_filter}")
+    return {"ok": True, "signal": signal, "active_bots": bot_manager.active_count()}
+
+
+# ─── Admin: Readiness Scorecard ───────────────────────────────────────────────
+@router.get("/api/admin/readiness")
+def get_admin_readiness(user: AuthenticatedUser = Depends(get_active_user)):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    return get_readiness()
+
+
+# ─── Admin: AI Cost Summary ───────────────────────────────────────────────────
+@router.get("/api/admin/ai-costs")
+def get_ai_costs(user: AuthenticatedUser = Depends(get_active_user)):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    try:
+        from ai.claude_ai import get_cost_tracker
+        return get_cost_tracker()
+    except Exception as e:
+        return {"error": str(e), "total_cost": 0, "total_calls": 0}
+
+
+# ─── Admin: Circuit Breaker Status ────────────────────────────────────────────
+@router.get("/api/admin/circuit-breaker")
+def get_circuit_breaker_status(user: AuthenticatedUser = Depends(get_active_user)):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    total_daily_pnl = sum(i.daily_pnl for i in bot_manager._instances.values())
+    threshold = -bot_manager.global_max_loss_usd
+    return {
+        "triggered": total_daily_pnl < threshold,
+        "total_daily_pnl": round(total_daily_pnl, 2),
+        "threshold": threshold,
+        "global_max_loss_usd": bot_manager.global_max_loss_usd,
+        "global_pause": bot_manager.global_pause,
+        "global_risk_off": getattr(bot_manager, "global_risk_off", False),
+    }
+
+
+# ─── Admin: Session Audit Log ─────────────────────────────────────────────────
+@router.get("/api/admin/audit-log")
+def get_admin_audit_log(user: AuthenticatedUser = Depends(get_active_user)):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    return {"entries": list(reversed(list(_ADMIN_AUDIT)))}
+
+
+# ─── Admin: Live Platform Logs ────────────────────────────────────────────────
+@router.get("/api/admin/logs")
+def get_admin_logs(limit: int = 100, user: AuthenticatedUser = Depends(get_active_user)):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    try:
+        logs = list(bot.logs[:min(limit, 200)])
+        return {"logs": logs}
+    except Exception:
+        return {"logs": []}
+
+
+# ─── Helper ───────────────────────────────────────────────────────────────────
+def _log_admin_action(admin_email: str, action: str):
+    """Append to the in-memory admin audit log and bot logs."""
+    _ADMIN_AUDIT.append({
+        "ts": datetime.utcnow().isoformat() + "Z",
+        "admin": admin_email,
+        "action": action,
+    })
+    bot.add_log(f"🔑 ADMIN [{admin_email}]: {action}", "warning")

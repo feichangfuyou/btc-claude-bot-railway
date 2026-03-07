@@ -3,45 +3,53 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
 import { colors, typography } from "../theme.js";
+import { ArrowLeft, Check, Lightbulb, Zap, Shield, Code2 } from "lucide-react";
 
 const TIERS = [
   {
     id: "starter",
     name: "Starter",
-    price: "$29",
+    price: "$49",
     period: "/mo",
-    features: ["1 exchange", "Basic strategies", "Paper + live trading", "Email support"],
-    color: "#888",
+    features: ["1 exchange", "Claude Haiku AI", "Top 10 Coins", "Paper + live trading"],
+    color: colors.muted,
   },
   {
     id: "pro",
     name: "Pro",
-    price: "$79",
+    price: "$99",
     period: "/mo",
-    features: ["Up to 3 exchanges", "All strategies", "Smart order routing", "Priority AI", "Telegram alerts"],
+    features: ["Up to 3 exchanges", "Claude Sonnet 3.5 AI", "50+ Coins", "Smart routing", "Priority support"],
     color: colors.gold,
     popular: true,
   },
   {
     id: "elite",
     name: "Elite",
-    price: "$149",
+    price: "$199",
     period: "/mo",
-    features: ["All exchanges + on-chain", "Cross-exchange arbitrage", "DeFi integration", "Futures trading", "Dedicated support"],
+    features: ["Unlimited exchanges", "Claude Opus 4.6 AI", "All 100+ Coins", "Futures (10x leverage)", "On-chain + Vision"],
     color: colors.success,
   },
 ];
 
 const BACKEND_BASE = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || (import.meta.env.DEV ? "http://localhost:8000" : "");
 
+const DEV_EMAIL = "feichangfuyou@gmail.com";
+
 export default function Billing() {
-  const { profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const getAuthHeaders = useAuthHeaders();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const currentTier = profile?.subscription_tier || "starter";
+
+  // Dev account always gets elite — overrides Supabase profile state
+  const isDevUser = user?.email?.toLowerCase() === DEV_EMAIL || profile?.role === "admin";
+  const currentTier = isDevUser
+    ? "elite"
+    : (profile?.subscription_status === "active" ? (profile?.subscription_tier || "none") : "none");
 
   useEffect(() => {
     const success = searchParams.get("success");
@@ -86,14 +94,31 @@ export default function Billing() {
       <div style={styles.container}>
         <div style={styles.page} className="billing-page">
           <div style={styles.header}>
-            <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>&larr; Dashboard</button>
+            <button style={styles.backBtn} onClick={() => navigate("/dashboard")}><ArrowLeft size={14} style={{ marginRight: "4px", verticalAlign: "middle" }} /> Dashboard</button>
             <h1 style={styles.title}>BILLING</h1>
           </div>
 
+          {/* Dev account banner */}
+          {isDevUser && (
+            <div style={styles.devBanner}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Code2 size={18} color={colors.gold} />
+                <div>
+                  <div style={{ fontFamily: typography.fontButton, fontSize: 13, color: colors.gold, letterSpacing: 2 }}>DEVELOPER ACCOUNT</div>
+                  <div style={{ fontSize: 10, color: colors.muted, marginTop: 2 }}>Full Elite access granted — billing does not apply to this account</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(212,175,55,0.12)", border: "1px solid rgba(212,175,55,0.3)", borderRadius: 8, padding: "4px 10px" }}>
+                <Shield size={12} color={colors.gold} />
+                <span style={{ fontFamily: typography.fontButton, fontSize: 10, color: colors.gold, letterSpacing: 1 }}>ELITE</span>
+              </div>
+            </div>
+          )}
+
           <div style={styles.currentPlan}>
             <span style={{ color: colors.muted, fontSize: 11 }}>Current Plan:</span>
-            <span style={{ color: colors.gold, fontFamily: typography.fontButton, fontSize: 16, letterSpacing: 2, textTransform: "uppercase" }}>
-              {currentTier}
+            <span style={{ color: isDevUser ? colors.success : colors.gold, fontFamily: typography.fontButton, fontSize: 16, letterSpacing: 2, textTransform: "uppercase" }}>
+              {isDevUser ? "Elite — Developer" : (currentTier === "none" ? "No Active Plan" : currentTier)}
             </span>
           </div>
 
@@ -129,11 +154,15 @@ export default function Billing() {
                 <ul style={styles.featureList}>
                   {tier.features.map((f, i) => (
                     <li key={i} style={styles.featureItem}>
-                      <span style={{ color: colors.success }}>&#10003;</span> {f}
+                      <Check size={12} style={{ color: colors.success }} /> {f}
                     </li>
                   ))}
                 </ul>
-                {currentTier === tier.id ? (
+                {isDevUser && tier.id === "elite" ? (
+                  <div style={{ ...styles.currentBadge, borderColor: "rgba(212,175,55,0.4)", color: colors.gold, background: "rgba(212,175,55,0.06)" }}>✦ Developer Access</div>
+                ) : isDevUser ? (
+                  <div style={{ ...styles.currentBadge, color: colors.muted, borderColor: "rgba(255,255,255,0.06)" }}>Included in Dev</div>
+                ) : currentTier === tier.id ? (
                   <div style={styles.currentBadge}>Current Plan</div>
                 ) : (
                   <button
@@ -161,13 +190,46 @@ export default function Billing() {
               <div style={styles.faqQ}>Do you touch my funds?</div>
               <div style={styles.faqA}>Never. Your exchange API keys are encrypted with AES-256 and stored securely. We never see your private keys or enable withdrawals. The bot executes trades through your own exchange account using restricted API keys.</div>
             </div>
+
+            {/* Capital Requirements Callout */}
+            <div style={styles.faqItem}>
+              <div style={styles.faqQ} id="capital-requirements">
+                <Lightbulb size={16} /> How much capital do I need to trade live?
+              </div>
+              <div style={styles.faqA}>
+                The bot enforces strict minimums to ensure every trade is actually profitable after fees and AI costs:
+              </div>
+              <div style={styles.capitalCallout}>
+                <div style={styles.capitalCalloutGrid}>
+                  <div style={styles.calloutStat}>
+                    <span style={styles.calloutVal}>$75</span>
+                    <span style={styles.calloutLbl}>Min trade size — trades below this are auto-rejected</span>
+                  </div>
+                  <div style={styles.calloutStat}>
+                    <span style={styles.calloutVal}>$750</span>
+                    <span style={styles.calloutLbl}>Recommended starting balance — ensures 10% position = $75</span>
+                  </div>
+                  <div style={styles.calloutStat}>
+                    <span style={styles.calloutVal}>1.2%</span>
+                    <span style={styles.calloutLbl}>Round-trip fees per trade (0.6% in + 0.6% out)</span>
+                  </div>
+                  <div style={styles.calloutStat}>
+                    <span style={styles.calloutVal}>$5</span>
+                    <span style={styles.calloutLbl}>Minimum net profit at take-profit after all costs</span>
+                  </div>
+                </div>
+                <div style={styles.calloutNote}>
+                  <Zap size={14} /> The bot will silently block any trade that can't clear $5 net profit at its take-profit price — protecting you from entering trades where fees eat all the gains.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         <div style={styles.legalFooter}>
-          <Link to="/terms" target="_blank" style={styles.legalLink}>Terms of Service</Link>
+          <Link to="/terms" style={styles.legalLink}>Terms of Service</Link>
           <span style={{ color: "#333" }}> · </span>
-          <Link to="/privacy" target="_blank" style={styles.legalLink}>Privacy Policy</Link>
+          <Link to="/privacy" style={styles.legalLink}>Privacy Policy</Link>
           <span style={{ color: "#333" }}> · </span>
           <a href="mailto:support@doyou.trade" style={styles.legalLink}>Support</a>
         </div>
@@ -208,6 +270,19 @@ const styles = {
     cursor: "pointer",
     transition: "all 0.2s ease",
   },
+  devBanner: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    background: "linear-gradient(135deg, rgba(212,175,55,0.06), rgba(212,175,55,0.02))",
+    border: "1px solid rgba(212,175,55,0.2)",
+    borderRadius: 14,
+    padding: "14px 18px",
+    marginBottom: 20,
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    boxShadow: "0 4px 20px rgba(212,175,55,0.06), inset 0 1px 0 rgba(212,175,55,0.1)",
+  },
   currentPlan: {
     display: "flex",
     alignItems: "center",
@@ -240,7 +315,7 @@ const styles = {
     top: -10,
     left: "50%",
     transform: "translateX(-50%)",
-    fontFamily: "'Oswald', sans-serif",
+    fontFamily: "'Montserrat', sans-serif",
     fontSize: 9,
     letterSpacing: 2,
     padding: "3px 12px",
@@ -251,14 +326,14 @@ const styles = {
     boxShadow: "0 4px 12px rgba(212,175,55,0.3)",
   },
   tierName: {
-    fontFamily: "'Bebas Neue', sans-serif",
+    fontFamily: "'Montserrat', sans-serif",
     fontSize: 22,
     letterSpacing: 3,
     marginBottom: 4,
   },
   tierPrice: { marginBottom: 16 },
   priceAmount: {
-    fontFamily: "'Bebas Neue', sans-serif",
+    fontFamily: "'Montserrat', sans-serif",
     fontSize: 36,
     letterSpacing: 2,
   },
@@ -275,7 +350,7 @@ const styles = {
     background: "rgba(39,174,96,0.05)",
   },
   selectBtn: {
-    fontFamily: "'Oswald', sans-serif",
+    fontFamily: "'Montserrat', sans-serif",
     fontSize: 13,
     fontWeight: 600,
     letterSpacing: 2,
@@ -301,6 +376,49 @@ const styles = {
   faqItem: { marginBottom: 16 },
   faqQ: { fontSize: 12, fontWeight: 600, marginBottom: 4 },
   faqA: { fontSize: 11, color: colors.muted, lineHeight: 1.6 },
+  capitalCallout: {
+    marginTop: 12,
+    background: "rgba(212,175,55,0.04)",
+    border: "1px solid rgba(212,175,55,0.16)",
+    borderRadius: 12,
+    padding: "14px 16px",
+  },
+  capitalCalloutGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 8,
+    marginBottom: 10,
+  },
+  calloutStat: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 3,
+    background: "rgba(0,0,0,0.2)",
+    border: "1px solid rgba(255,255,255,0.04)",
+    borderRadius: 8,
+    padding: "9px 11px",
+  },
+  calloutVal: {
+    fontFamily: "'Montserrat', sans-serif",
+    fontSize: 20,
+    fontWeight: 700,
+    color: colors.gold,
+    lineHeight: 1,
+  },
+  calloutLbl: {
+    fontSize: 10,
+    color: "#777",
+    lineHeight: 1.4,
+  },
+  calloutNote: {
+    fontSize: 10,
+    color: "#777",
+    lineHeight: 1.6,
+    background: "rgba(0,0,0,0.18)",
+    border: "1px solid rgba(255,255,255,0.04)",
+    borderRadius: 8,
+    padding: "7px 10px",
+  },
   legalFooter: {
     textAlign: "center",
     marginTop: 24,

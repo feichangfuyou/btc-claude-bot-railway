@@ -42,6 +42,12 @@ ROUND_TRIP_FEE = TAKER_FEE * 2  # 1.2% total for buy + sell
 ONCHAIN_SLIPPAGE = 0.01  # 1% slippage on CDP swaps
 GAS_COST_USD = 0.03  # ~$0.03 per Base network swap
 
+# --- Paper Trading Realism ---
+# Simulate "walking the book" on CEX entries/exits (0.1% per leg = 0.2% round trip)
+PAPER_SLIPPAGE_PCT = 0.001
+# Estimated 8h funding rate for futures (simulates carry cost for longs/shorts)
+EST_8H_FUNDING_RATE = 0.0001
+
 SCOUT_INPUT_COST_PER_MTOK = 0.25  # $0.25 per 1M input tokens (Haiku 3)
 SCOUT_OUTPUT_COST_PER_MTOK = 1.25  # $1.25 per 1M output tokens (Haiku 3)
 TRADE_INPUT_COST_PER_MTOK = 5.0  # $5 per 1M input tokens (Opus 4.6)

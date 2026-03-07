@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
 const EFFECTIVE_DATE = "March 5, 2026";
 const COMPANY = "DoYou.Trade";
@@ -6,10 +8,17 @@ const CONTACT_EMAIL = "support@doyou.trade";
 
 export default function Privacy() {
     const navigate = useNavigate();
+
+    useEffect(() => {
+        document.title = "Privacy Policy — DoYou.trade";
+        const meta = document.querySelector('meta[name="description"]');
+        if (meta) meta.setAttribute("content", "Privacy Policy for DoYou.trade. Learn how we protect your encrypted API keys and trading data with non-custodial security standards.");
+    }, []);
+
     return (
         <div style={s.page}>
             <div style={s.content}>
-                <button style={s.back} onClick={() => navigate(-1)}>← Back</button>
+                <button style={s.back} onClick={() => navigate(-1)}><ArrowLeft size={14} style={{ verticalAlign: "middle", marginRight: "4px" }} /> Back</button>
                 <h1 style={s.h1}>Privacy Policy</h1>
                 <p style={s.meta}>Effective: {EFFECTIVE_DATE}</p>
 
@@ -125,7 +134,7 @@ const s = {
         display: "block",
     },
     h1: {
-        fontFamily: "'Bebas Neue', sans-serif",
+        fontFamily: "'Montserrat', sans-serif",
         fontSize: 40,
         letterSpacing: 4,
         color: "#D4AF37",
@@ -143,7 +152,7 @@ const s = {
         borderBottom: "1px solid rgba(255,255,255,0.04)",
     },
     h2: {
-        fontFamily: "'Oswald', sans-serif",
+        fontFamily: "'Montserrat', sans-serif",
         fontSize: 14,
         letterSpacing: 2,
         color: "#888",

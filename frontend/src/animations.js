@@ -61,3 +61,68 @@ export function fadeIn(el, duration = 200) {
   el.style.opacity = "0";
   animate(el, { opacity: [0, 1], duration, ease: "out" });
 }
+
+/**
+ * Slide-up and fade-in for section/container mounting.
+ */
+export function slideUp(els, duration = 400, delay = 0) {
+  if (!els) return;
+  const arr = els instanceof NodeList || Array.isArray(els) ? Array.from(els) : [els];
+  if (!arr.length) return;
+
+  arr.forEach(el => {
+    if (el && el.style) {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(12px)";
+    }
+  });
+
+  animate(arr, {
+    opacity: [0, 1],
+    y: [12, 0],
+    duration,
+    delay,
+    ease: "outElastic(1, 1.2)",
+  });
+}
+
+/**
+ * Pop-in effect for modals or impactful cards.
+ */
+export function popIn(els, duration = 500, delay = 0) {
+  if (!els) return;
+  const arr = els instanceof NodeList || Array.isArray(els) ? Array.from(els) : [els];
+  if (!arr.length) return;
+
+  arr.forEach(el => {
+    if (el && el.style) {
+      el.style.opacity = "0";
+      el.style.transform = "scale(0.92)";
+    }
+  });
+
+  animate(arr, {
+    opacity: [0, 1],
+    scale: [0.92, 1],
+    duration,
+    delay,
+    ease: "outElastic(1, 0.8)",
+  });
+}
+
+/**
+ * Gentle infinite pulse for indicators (like live dots).
+ */
+export function pulseInfinite(els, duration = 2000) {
+  if (!els) return;
+  const arr = els instanceof NodeList || Array.isArray(els) ? Array.from(els) : [els];
+  if (!arr.length) return;
+
+  return animate(arr, {
+    opacity: [0.3, 1],
+    duration,
+    direction: "alternate",
+    loop: true,
+    ease: "inOutSine"
+  });
+}

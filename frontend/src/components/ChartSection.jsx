@@ -1,12 +1,13 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, memo } from "react";
 import TradingViewChart from "../TradingViewChart.jsx";
 import AnimatedNumber from "../AnimatedNumber.jsx";
+import { Search, Zap } from "lucide-react";
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL
   || (import.meta.env.DEV ? "http://localhost:8000" : "");
 const API_SECRET = import.meta.env.DEV ? (import.meta.env.VITE_BOT_API_SECRET || "") : "";
 
-export function ChartSection({
+export const ChartSection = memo(function ChartSection({
   chartSymbol, setChartSymbol, selectedCoin, positions, price,
   marketTickers, multiExchangePrices, setMultiExchangePrices,
 }) {
@@ -46,7 +47,7 @@ export function ChartSection({
     <div className="card chart-card" style={{ height: "65vh", minHeight: "500px", maxHeight: "700px", display: "flex", flexDirection: "column", padding: "12px", position: "relative", zIndex: 1, overflow: "hidden" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", padding: "0 4px", flexWrap: "wrap", gap: "10px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-          <span style={{ fontFamily: "'Oswald',sans-serif", fontSize: "14px", color: "#D4D4D4", fontWeight: "600", letterSpacing: "3px" }}>
+          <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "14px", color: "#D4D4D4", fontWeight: "800", letterSpacing: "3px" }}>
             {chartSymbol.includes(":")
               ? (() => { const [, pair] = chartSymbol.split(":"); const base = (pair || "").replace(/USDT?$/i, ""); return `${base} / ${(pair || "").includes("USDT") ? "USDT" : "USD"}`; })()
               : `${chartSymbol} / USD`}
@@ -55,7 +56,7 @@ export function ChartSection({
           {/* Ticker search */}
           <div ref={tickerSearchRef} style={{ position: "relative" }}>
             <div style={{ display: "flex", alignItems: "center", background: "#111111", border: "1px solid #1e1e1e", borderRadius: "6px", padding: "2px 8px", gap: "6px" }}>
-              <span style={{ fontSize: "10px", color: "#5C5C5C" }}>🔍</span>
+              <Search size={10} color="#5C5C5C" />
               <input
                 type="text"
                 placeholder="Search ticker..."
@@ -95,26 +96,26 @@ export function ChartSection({
                     opts.push({ label: `${sym} — Coinbase Spot`, symbol: `COINBASE:${sym}USD`, exchange: "coinbase", type: "spot", sym });
                     opts.push({ label: `${sym} — Kraken Spot`, symbol: `KRAKEN:${sym}USD`, exchange: "kraken", type: "spot", sym });
                     // Futures / Perps
-                    opts.push({ label: `${sym} — Binance Perp ⚡`, symbol: `BINANCE:${sym}USDT.P`, exchange: "binance", type: "futures", sym });
-                    opts.push({ label: `${sym} — Coinbase Fut ⚡`, symbol: `COINBASE:${sym}USD_PERP`, exchange: "coinbase", type: "futures", sym });
-                    opts.push({ label: `${sym} — Kraken Fut ⚡`, symbol: `KRAKEN:PF_${sym}USD`, exchange: "kraken", type: "futures", sym });
+                    opts.push({ label: `${sym} — Binance Perp`, symbol: `BINANCE:${sym}USDT.P`, exchange: "binance", type: "futures", sym });
+                    opts.push({ label: `${sym} — Coinbase Fut`, symbol: `COINBASE:${sym}USD_PERP`, exchange: "coinbase", type: "futures", sym });
+                    opts.push({ label: `${sym} — Kraken Fut`, symbol: `KRAKEN:PF_${sym}USD`, exchange: "kraken", type: "futures", sym });
                   }
                   if (q && !matches.some(t => (t.sym || "").toUpperCase() === q)) {
                     opts.push({ label: `${q} — Binance Spot`, symbol: `BINANCE:${q}USDT`, exchange: "binance", type: "spot", sym: q });
                     opts.push({ label: `${q} — Coinbase Spot`, symbol: `COINBASE:${q}USD`, exchange: "coinbase", type: "spot", sym: q });
                     opts.push({ label: `${q} — Kraken Spot`, symbol: `KRAKEN:${q}USD`, exchange: "kraken", type: "spot", sym: q });
-                    opts.push({ label: `${q} — Binance Perp ⚡`, symbol: `BINANCE:${q}USDT.P`, exchange: "binance", type: "futures", sym: q });
-                    opts.push({ label: `${q} — Coinbase Fut ⚡`, symbol: `COINBASE:${q}USD_PERP`, exchange: "coinbase", type: "futures", sym: q });
-                    opts.push({ label: `${q} — Kraken Fut ⚡`, symbol: `KRAKEN:PF_${q}USD`, exchange: "kraken", type: "futures", sym: q });
+                    opts.push({ label: `${q} — Binance Perp`, symbol: `BINANCE:${q}USDT.P`, exchange: "binance", type: "futures", sym: q });
+                    opts.push({ label: `${q} — Coinbase Fut`, symbol: `COINBASE:${q}USD_PERP`, exchange: "coinbase", type: "futures", sym: q });
+                    opts.push({ label: `${q} — Kraken Fut`, symbol: `KRAKEN:PF_${q}USD`, exchange: "kraken", type: "futures", sym: q });
                   }
                   if (opts.length === 0) {
                     for (const sym of ["BTC", "ETH", "SOL", "XRP", "DOGE"]) {
                       opts.push({ label: `${sym} — Binance Spot`, symbol: `BINANCE:${sym}USDT`, exchange: "binance", type: "spot", sym });
                       opts.push({ label: `${sym} — Coinbase Spot`, symbol: `COINBASE:${sym}USD`, exchange: "coinbase", type: "spot", sym });
                       opts.push({ label: `${sym} — Kraken Spot`, symbol: `KRAKEN:${sym}USD`, exchange: "kraken", type: "spot", sym });
-                      opts.push({ label: `${sym} — Binance Perp ⚡`, symbol: `BINANCE:${sym}USDT.P`, exchange: "binance", type: "futures", sym });
-                      opts.push({ label: `${sym} — Coinbase Fut ⚡`, symbol: `COINBASE:${sym}USD_PERP`, exchange: "coinbase", type: "futures", sym });
-                      opts.push({ label: `${sym} — Kraken Fut ⚡`, symbol: `KRAKEN:PF_${sym}USD`, exchange: "kraken", type: "futures", sym });
+                      opts.push({ label: <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{sym} — Binance Perp <Zap size={10} fill="currentColor" /></span>, symbol: `BINANCE:${sym}USDT.P`, exchange: "binance", type: "futures", sym });
+                      opts.push({ label: <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{sym} — Coinbase Fut <Zap size={10} fill="currentColor" /></span>, symbol: `COINBASE:${sym}USD_PERP`, exchange: "coinbase", type: "futures", sym });
+                      opts.push({ label: <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{sym} — Kraken Fut <Zap size={10} fill="currentColor" /></span>, symbol: `KRAKEN:PF_${sym}USD`, exchange: "kraken", type: "futures", sym });
                     }
                   }
                   return opts;
@@ -181,4 +182,4 @@ export function ChartSection({
       </div>
     </div>
   );
-}
+});

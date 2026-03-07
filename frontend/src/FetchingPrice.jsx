@@ -43,7 +43,7 @@ export default function FetchingPrice({ style = {} }) {
     <div
       ref={elRef}
       style={{
-        fontFamily: "'Bebas Neue', sans-serif",
+        fontFamily: "'Montserrat', sans-serif",
         fontSize: "24px",
         color: `${colors.gold}66`,
         letterSpacing: "3px",

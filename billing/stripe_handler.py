@@ -32,9 +32,47 @@ TIER_PRICES = {
 }
 
 TIER_LIMITS = {
-    "starter": {"max_exchanges": 1, "futures": False, "onchain": False, "smart_routing": False},
-    "pro": {"max_exchanges": 3, "futures": False, "onchain": False, "smart_routing": True},
-    "elite": {"max_exchanges": 10, "futures": True, "onchain": True, "smart_routing": True},
+    "none": {
+        "max_exchanges": 0,
+        "futures": False,
+        "onchain": False,
+        "smart_routing": False,
+        "ai_model": "claude-3-haiku-20240307",
+        "min_interval": 3600,
+        "vision": False,
+        "max_coins": 0,
+        "can_trade": False,
+    },
+    "starter": {
+        "max_exchanges": 1,
+        "futures": False,
+        "onchain": False,
+        "smart_routing": False,
+        "ai_model": "claude-3-haiku-20240307",
+        "min_interval": 300,
+        "vision": False,
+        "max_coins": 10,
+    },
+    "pro": {
+        "max_exchanges": 3,
+        "futures": False,
+        "onchain": False,
+        "smart_routing": True,
+        "ai_model": "claude-sonnet-4-6",
+        "min_interval": 90,
+        "vision": False,
+        "max_coins": 50,
+    },
+    "elite": {
+        "max_exchanges": 10,
+        "futures": True,
+        "onchain": True,
+        "smart_routing": True,
+        "ai_model": "claude-opus-4-6",
+        "min_interval": 30,
+        "vision": True,
+        "max_coins": 100,
+    },
 }
 
 
@@ -132,7 +170,7 @@ def _tier_from_price_id(price_id: str) -> str:
 
 
 def _handle_subscription_updated(data: dict) -> None:
-    """Update profile when subscription changes (upgrade/downgrade)."""
+    """Update profile when subscription changes (upgrade/downgrade/delinquent)."""
     try:
         from core.supabase_client import get_supabase
         from core.user_config import invalidate_user_config_cache
@@ -157,12 +195,66 @@ def _handle_subscription_updated(data: dict) -> None:
                 ).execute()
                 invalidate_user_config_cache(user_id)
                 logger.info(f"Updated subscription for user {user_id[:8]} -> {tier}")
+                # If subscription is delinquent/failed, stop the bot immediately
+                if status in ("past_due", "unpaid", "incomplete_expired"):
+                    _stop_user_bot(user_id, reason=f"subscription {status}")
     except Exception as e:
         logger.error(f"Failed to handle subscription.updated: {e}")
 
 
+def _stop_user_bot(user_id: str, reason: str = "subscription cancelled") -> None:
+    """Immediately stop a user's running bot. Safe to call from a sync thread.
+
+    This function runs in the Stripe webhook handler thread (via run_in_executor),
+    so we:
+      1. Synchronously set running=False on the instance (no async needed)
+      2. Persist the state synchronously
+      3. Schedule the async cleanup + WebSocket notification on the event loop
+    """
+    try:
+        import asyncio
+
+        from core.bot_manager import bot_manager
+
+        instance = bot_manager.get(user_id)
+        if instance and instance.running:
+            instance.running = False
+            try:
+                instance.persist_state()
+            except Exception:
+                pass
+            logger.warning(f"Bot stopped for user {user_id[:8]}: {reason}")
+
+            # Schedule async cleanup + real-time WebSocket notification
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    async def _async_cleanup():
+                        try:
+                            from core.backend import broadcast
+                            await broadcast(
+                                {
+                                    "type": "bot_status",
+                                    "bot_running": False,
+                                    "reason": reason,
+                                },
+                                user_id=user_id,
+                            )
+                        except Exception:
+                            pass
+                        await bot_manager.remove(user_id)
+
+                    asyncio.run_coroutine_threadsafe(_async_cleanup(), loop)
+            except Exception as e:
+                logger.warning(f"Failed to schedule async bot cleanup for {user_id[:8]}: {e}")
+        else:
+            logger.info(f"No active bot instance to stop for user {user_id[:8]} ({reason})")
+    except Exception as e:
+        logger.error(f"Failed to stop bot for user {user_id[:8]}: {e}")
+
+
 def _handle_subscription_deleted(data: dict) -> None:
-    """Downgrade profile when subscription is cancelled."""
+    """Downgrade profile and immediately stop the bot when subscription is cancelled."""
     try:
         from core.supabase_client import get_supabase
         from core.user_config import invalidate_user_config_cache
@@ -178,6 +270,8 @@ def _handle_subscription_deleted(data: dict) -> None:
                 ).execute()
                 invalidate_user_config_cache(user_id)
                 logger.info(f"Cancelled subscription for user {user_id[:8]}")
+                # Kill the bot immediately — no free trading after cancellation
+                _stop_user_bot(user_id, reason="subscription cancelled")
     except Exception as e:
         logger.error(f"Failed to handle subscription.deleted: {e}")
 
@@ -204,10 +298,15 @@ def _activate_subscription(user_id: str, tier: str, stripe_customer_id: str | No
 
 def check_tier_limit(tier: str, feature: str) -> bool:
     """Check if a feature is available for a given tier."""
-    limits = TIER_LIMITS.get(tier, TIER_LIMITS["starter"])
+    limits = TIER_LIMITS.get(tier, TIER_LIMITS["none"])
     return bool(limits.get(feature, False))
+
+
+def get_tier_limit(tier: str, key: str, default: any = None) -> any:
+    """Get a specific limit value for a tier."""
+    return TIER_LIMITS.get(tier, TIER_LIMITS["none"]).get(key, default)
 
 
 def get_max_exchanges(tier: str) -> int:
     """How many exchanges can this tier connect?"""
-    return TIER_LIMITS.get(tier, TIER_LIMITS["starter"])["max_exchanges"]
+    return get_tier_limit(tier, "max_exchanges", 1)

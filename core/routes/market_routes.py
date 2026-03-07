@@ -4,9 +4,10 @@ import socket
 import time
 
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
+from core.auth import AuthenticatedUser, get_active_user
 from core.config import (
     API_PROXY_TIMEOUT,
     COINBASE_REST_TICKER,
@@ -68,7 +69,7 @@ def _fetch_exchange_tickers_sync(limit: int):
 
 
 @router.get("/api/coinbase/ticker")
-async def proxy_coinbase_ticker():
+async def proxy_coinbase_ticker(user: AuthenticatedUser = Depends(get_active_user)):
     """BTC ticker for demo. Serves from bot state when fresh; falls back to Coinbase REST."""
     btc = bot.coins.get("BTC")
     max_age = min(PRICE_MAX_AGE_SEC, 90)
@@ -85,7 +86,7 @@ async def proxy_coinbase_ticker():
 
 
 @router.get("/api/coinbase/tickers")
-async def proxy_coinbase_tickers(symbols: str = "BTC,ETH,SOL,DOGE,LINK,AVAX,UNI,AAVE"):
+async def proxy_coinbase_tickers(symbols: str = "BTC,ETH,SOL,DOGE,LINK,AVAX,UNI,AAVE", user: AuthenticatedUser = Depends(get_active_user)):
     """Multi-coin ticker. Coinbase primary (matches TradingView chart). CoinGecko fallback for robustness.
     Serves from bot state when fresh; else Coinbase REST; missing symbols from CoinGecko."""
     sym_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
@@ -161,7 +162,7 @@ async def proxy_coinbase_tickers(symbols: str = "BTC,ETH,SOL,DOGE,LINK,AVAX,UNI,
 
 
 @router.get("/api/exchange/tickers")
-async def exchange_tickers(limit: int = 500):
+async def exchange_tickers(limit: int = 500, user: AuthenticatedUser = Depends(get_active_user)):
     """All exchange symbols by 24h volume (up to 500). Binance first, Kraken fallback when Binance blocked."""
     limit = min(max(limit, 1), 500)
     now = time.time()
@@ -197,7 +198,7 @@ async def exchange_tickers(limit: int = 500):
 
 
 @router.get("/api/prices/multi")
-async def multi_exchange_prices(symbols: str = "BTC,ETH,SOL,XRP,DOGE,ADA"):
+async def multi_exchange_prices(symbols: str = "BTC,ETH,SOL,XRP,DOGE,ADA", user: AuthenticatedUser = Depends(get_active_user)):
     """Fetch prices from Binance, Coinbase, and Kraken for arbitrage view. Symbols comma-separated."""
     sym_list = [s.strip().upper() for s in symbols.split(",") if s.strip()][:20]
     if not sym_list:
@@ -288,7 +289,7 @@ async def multi_exchange_prices(symbols: str = "BTC,ETH,SOL,XRP,DOGE,ADA"):
 
 
 @router.get("/api/alternative/{path:path}")
-async def proxy_alternative(path: str, request: Request):
+async def proxy_alternative(path: str, request: Request, user: AuthenticatedUser = Depends(get_active_user)):
     """Proxy Alternative.me API (Fear & Greed, CORS bypass). Hardened."""
     if request.method != "GET":
         return JSONResponse({"error": "method not allowed"}, status_code=405)

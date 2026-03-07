@@ -262,27 +262,55 @@ def _apply_celery_decision(data: dict):
     )
 
 
+async def hub_scan_cycle(tier: str):
+    """Point 1: Managed Intelligence — a single AI loop for all users in a tier."""
+    from billing.stripe_handler import TIER_LIMITS
+    
+    limits = TIER_LIMITS.get(tier, TIER_LIMITS["starter"])
+    model = limits["ai_model"]
+    interval = limits["min_interval"]
+    coin_limit = limits.get("max_coins", 10)
+    
+    bot.add_log(f"🛰️ {tier.upper()} Hub started ({model} @ {interval}s)", "info")
+    
+    while True:
+        try:
+            # Only scan if there are active users in this tier
+            active_users = sum(1 for i in bot_manager._instances.values() 
+                             if i.running and i.config.subscription_tier == tier)
+            
+            if active_users > 0:
+                # Master Scan for this tier
+                # We skip_scout for Elite to ensure they get Opus every time
+                skip_scout = (tier == "elite")
+                
+                # Perform analysis using the shared 'bot' state (prices/feeds)
+                # But we'll override the model for this specific call
+                bot.claude_model = model
+                
+                # This call will populate bot.claude_decision
+                await call_claude(bot, broadcast_price, skip_scout=skip_scout, coin_limit=coin_limit)
+                
+                # Point 1 & 2: Broadcast to all eligible users
+                if bot.claude_decision:
+                    await bot_manager.broadcast_managed_signal(
+                        bot.claude_decision, 
+                        tier=tier
+                    )
+                
+                await asyncio.sleep(interval)
+            else:
+                await asyncio.sleep(10) # Wait for users to join
+                
+        except Exception as e:
+            bot.add_log(f"{tier.upper()} Hub error: {str(e)[:80]}", "error")
+            await asyncio.sleep(interval or 60)
+
 async def bot_cycle():
+    """Service-level maintenance (replaces the old individual bot_cycle)."""
     while True:
         try:
             await asyncio.sleep(1)
-            if bot.bot_running:
-                bot.countdown = max(0, bot.countdown - 1)
-                bot.daily_reset_check()
-                bot.hourly_snapshot_check()
-
-                if bot._trade_just_closed_flag:
-                    bot._trade_just_closed_flag = False
-                    bot.countdown = min(bot.countdown, 2)
-                    bot.add_log("⚡ Instant re-analysis — hunting next setup NOW", "info")
-
-                if bot.countdown == 0:
-                    bot.countdown = _adaptive_interval()
-                    asyncio.create_task(_safe_claude_call())
-
-                bot._tick_count = (bot._tick_count + 1) % 5
-                if bot._tick_count == 0:
-                    await broadcast({"type": "countdown", "countdown": bot.countdown})
         except Exception as e:
             bot.add_log(f"Bot cycle error (recovering): {str(e)[:80]}", "error")
             await asyncio.sleep(2)
@@ -533,6 +561,12 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(coinbase_ws_loop(bot, broadcast, broadcast_price))
     asyncio.create_task(stats_refresh_cycle(bot, broadcast_price))
+    
+    # Tiered Hub Cycles
+    asyncio.create_task(hub_scan_cycle("starter"))
+    asyncio.create_task(hub_scan_cycle("pro"))
+    asyncio.create_task(hub_scan_cycle("elite"))
+    
     asyncio.create_task(bot_cycle())
 
     if is_redis_available():
@@ -584,10 +618,15 @@ async def lifespan(app: FastAPI):
 
 
 # ─── FastAPI app ─────────────────────────────────────────────────────────────
-app = FastAPI(title="ClaudeBot Backend", lifespan=lifespan)
+app = FastAPI(
+    title="ClaudeBot Backend",
+    lifespan=lifespan,
+    docs_url=None, # Disable Swagger UI for security
+    redoc_url=None, # Disable Redoc for security
+)
 
-_DEFAULT_CORS = "https://doyou.trade,https://www.doyou.trade"
-ALLOWED_ORIGINS = os.getenv("CORS_ORIGINS", _DEFAULT_CORS).split(",")
+_DEFAULT_CORS = "https://doyou.trade,https://www.doyou.trade,http://localhost:5173,http://127.0.0.1:5173"
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", _DEFAULT_CORS).split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -678,8 +717,11 @@ class IPRateLimitMiddleware(BaseHTTPMiddleware):
             or "unknown"
         )
 
-        # Localhost is fully exempt — no rate limiting for the dashboard/dev machine
-        if client_ip in self.LOCALHOST_IPS:
+        # Localhost check - only trust if it's the actual loopback interface
+        # and NOT a spoofed header. Note: In production behind a proxy,
+        # we should only trust headers from known proxy IPs.
+        is_local = client_ip in ("127.0.0.1", "::1")
+        if is_local and not request.headers.get("x-forwarded-for"):
             return await call_next(request)
 
         # Remote IPs: 300 req/min (up from 120 — supports multi-tab usage without false 429s)
@@ -713,6 +755,12 @@ async def ws_endpoint(ws: WebSocket):
             user_info = get_user_from_token(token)
             if user_info:
                 user_id, user_email = user_info
+                # CRITICAL: Fix Signal Theft - verify active subscription
+                from core.user_config import load_user_config
+                config = load_user_config(user_id)
+                if config.subscription_status != "active" and user_id != "admin":
+                    await ws.close(code=4002, reason="active_subscription_required")
+                    return
         else:
             await ws.close(code=4001, reason="unauthorized")
             return

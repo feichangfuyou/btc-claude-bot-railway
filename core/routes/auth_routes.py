@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request
 
 from api.exchange_validate import validate_exchange_keys
 from billing.stripe_handler import get_max_exchanges
-from core.auth import AuthenticatedUser, get_current_user
+from core.auth import AuthenticatedUser, get_active_user, get_current_user
 from core.redis_client import is_redis_available, rate_limit_check
 from core.shared import _exchange_validate_lock, _exchange_validate_ratelimit
 from core.user_config import (
@@ -27,14 +27,27 @@ def _check_exchange_validate_ratelimit(user_id: str) -> bool:
     max_per_window = 10
     with _exchange_validate_lock:
         if user_id not in _exchange_validate_ratelimit:
+            # Prevent memory leak by capping the number of tracked users
+            if len(_exchange_validate_ratelimit) > 5000:
+                # Simple cleanup: remove the first 1000 keys (approximate LRU)
+                keys = list(_exchange_validate_ratelimit.keys())[:1000]
+                for k in keys:
+                    if k != "_global":
+                        _exchange_validate_ratelimit.pop(k, None)
             _exchange_validate_ratelimit[user_id] = []
         times = _exchange_validate_ratelimit[user_id]
         times[:] = [t for t in times if now - t < window]
         if len(times) >= max_per_window:
             return False
-        if not times:
-            del _exchange_validate_ratelimit[user_id]
-        _exchange_validate_ratelimit.setdefault(user_id, []).append(now)
+        _exchange_validate_ratelimit[user_id].append(now)
+        
+        # Global limit check (max 50 validations per minute across all users to protect server IP)
+        global_times = _exchange_validate_ratelimit.setdefault("_global", [])
+        global_times[:] = [t for t in global_times if now - t < 60]
+        if len(global_times) >= 50:
+            return False
+        global_times.append(now)
+        
         return True
 
 
@@ -131,13 +144,14 @@ async def connect_exchange(
         return {
             "error": f"Your {config.subscription_tier} plan allows up to {max_exchanges} exchange(s). Upgrade at /billing to add more.",
         }, 403
+    # Ensure we use the encrypted parameters only if they exist
     save_user_exchange(
         user.id,
         exchange,
         connection_type,
-        api_key_enc=body.get("api_key"),
-        api_secret_enc=body.get("api_secret"),
-        oauth_access_token_enc=body.get("oauth_token"),
+        api_key_enc=body.get("api_key") or body.get("api_key_enc"),
+        api_secret_enc=body.get("api_secret") or body.get("api_secret_enc"),
+        oauth_access_token_enc=body.get("oauth_token") or body.get("oauth_access_token_enc"),
         wallet_address=body.get("wallet_address"),
     )
     return {"ok": True, "exchange": exchange}

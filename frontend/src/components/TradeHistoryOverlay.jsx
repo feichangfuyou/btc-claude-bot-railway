@@ -1,5 +1,6 @@
 import AnimatedNumber from "../AnimatedNumber.jsx";
 import Skeleton from "../Skeleton.jsx";
+import { Download, X, RefreshCcw, ArrowUp, ArrowDown, Camera, ChevronLeft, ChevronRight } from "lucide-react";
 
 export function TradeHistoryOverlay({
   showHistory, setShowHistory,
@@ -15,14 +16,14 @@ export function TradeHistoryOverlay({
       <div style={{ padding:"20px 24px 0", flexShrink:0 }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"16px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-            <span style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:"20px", color:"#D4AF37", letterSpacing:"4px" }}>THE RECORD</span>
+            <span style={{ fontFamily:"'Montserrat', sans-serif", fontSize:"20px", color:"#D4AF37", letterSpacing:"4px" }}>THE RECORD</span>
             <span style={{ fontSize:"10px", color:"#5C5C5C" }}>{historyTotal} total trades in database</span>
           </div>
           <div style={{ display:"flex", gap:"8px" }}>
             {historyTrades.length > 0 && (
-              <button className="btn btn-d" onClick={() => exportTrades(historyTrades)} style={{ fontSize:"9px" }}>{"\u21E9"} EXPORT CSV</button>
+              <button className="btn btn-d" onClick={() => exportTrades(historyTrades)} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "9px" }}><Download size={14} /> EXPORT CSV</button>
             )}
-            <button className="btn btn-d" onClick={() => setShowHistory(false)} style={{ fontSize:"12px", color:"#FF1744", borderColor:"#FF174433", padding:"6px 14px" }}>{"\u2715"} CLOSE</button>
+            <button className="btn btn-d" onClick={() => setShowHistory(false)} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#FF1744", borderColor: "#FF174433", padding: "6px 14px" }}><X size={14} /> CLOSE</button>
           </div>
         </div>
 
@@ -77,7 +78,7 @@ export function TradeHistoryOverlay({
           {(historyFilters.date_from || historyFilters.date_to || historyFilters.symbol || historyFilters.side || historyFilters.result || historyFilters.product_type) && (
             <button className="btn btn-d" onClick={clearHistoryFilters} style={{ fontSize:"9px", color:"#ff9900", borderColor:"#ff990033", padding:"6px 12px", alignSelf:"flex-end" }}>CLEAR FILTERS</button>
           )}
-          <button className="btn btn-d" onClick={() => fetchHistory(historyPage)} style={{ fontSize:"9px", color:"#D4AF37", borderColor:"#D4AF3733", padding:"6px 12px", alignSelf:"flex-end" }}>{"\u21BB"} REFRESH</button>
+          <button className="btn btn-d" onClick={() => fetchHistory(historyPage)} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "9px", color: "#D4AF37", borderColor: "#D4AF3733", padding: "6px 12px", alignSelf: "flex-end" }}><RefreshCcw size={12} /> REFRESH</button>
         </div>
 
         {/* Summary stats */}
@@ -91,7 +92,7 @@ export function TradeHistoryOverlay({
           ].map(s => (
             <div key={s.label} style={{ background:"#111111", border:"1px solid #1e1e1e", borderRadius:"5px", padding:"8px 14px" }}>
               <div style={{ fontSize:"8px", color:"#3a3a3a", letterSpacing:"1px" }}>{s.label}</div>
-              <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:"14px", fontWeight:"700", color:s.color }}>{s.val}</div>
+              <div style={{ fontFamily:"'Montserrat', sans-serif", fontSize:"14px", fontWeight:"700", color:s.color }}>{s.val}</div>
             </div>
           ))}
         </div>
@@ -127,8 +128,8 @@ export function TradeHistoryOverlay({
                 </span>
                 <span style={{ color:"#D4AF37", fontWeight:"700" }}>{tr.symbol || "BTC"}</span>
                 <span>
-                  <span className="tag" style={{ background:tr.side==="buy"?"#00E67618":"#FF174418", color:tr.side==="buy"?"#00E676":"#FF1744", padding:"2px 6px" }}>
-                    {tr.side==="buy"?"\u25B2":"\u25BC"} {tr.side?.toUpperCase()}
+                  <span className="tag" style={{ display: "flex", alignItems: "center", gap: "4px", background: tr.side === "buy" ? "#00E67618" : "#FF174418", color: tr.side === "buy" ? "#00E676" : "#FF1744", padding: "2px 6px" }}>
+                    {tr.side === "buy" ? <ArrowUp size={10} /> : <ArrowDown size={10} />} {tr.side?.toUpperCase()}
                   </span>
                 </span>
                 <span>{tradeTypeBadge(tr)}</span>
@@ -142,7 +143,7 @@ export function TradeHistoryOverlay({
                 </span>
                 <span style={{ color:"#3a3a3a", fontSize:"10px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:"4px" }}>
                   {tr.reason}
-                  <span style={{ color:"#D4AF3766", fontSize:"9px", flexShrink:0 }}>📸</span>
+                  <Camera size={10} style={{ color: "#D4AF3766", flexShrink: 0 }} />
                 </span>
               </div>
             ))
@@ -154,12 +155,12 @@ export function TradeHistoryOverlay({
       {historyTotal > historyLimit && (
         <div style={{ padding:"12px 24px", flexShrink:0, display:"flex", justifyContent:"center", alignItems:"center", gap:"12px" }}>
           <button className="btn btn-d" disabled={historyPage === 0} onClick={() => fetchHistory(historyPage - 1)}
-            style={{ padding:"6px 14px", fontSize:"10px" }}>{"\u25C0"} PREV</button>
+            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", fontSize: "10px" }}><ChevronLeft size={14} /> PREV</button>
           <span style={{ fontSize:"10px", color:"#5C5C5C" }}>
             Page {historyPage + 1} of {Math.ceil(historyTotal / historyLimit)}
           </span>
           <button className="btn btn-d" disabled={(historyPage + 1) * historyLimit >= historyTotal} onClick={() => fetchHistory(historyPage + 1)}
-            style={{ padding:"6px 14px", fontSize:"10px" }}>NEXT {"\u25B6"}</button>
+            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", fontSize: "10px" }}>NEXT <ChevronRight size={14} /></button>
         </div>
       )}
     </div>

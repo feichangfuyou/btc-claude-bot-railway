@@ -1,4 +1,4 @@
-import { memo, useMemo, useCallback, useRef } from "react";
+import { memo, useMemo, useCallback, useRef, useEffect } from "react";
 import TickerItem from "../TickerItem.jsx";
 
 export const FALLBACK_SYMBOL_TO_COINGECKO = {
@@ -60,18 +60,76 @@ export function getTickerLogoPlaceholder(sym) {
 
 export const TICKER_TAPE_LIMIT = 50;
 
+// ─── Smooth rAF-driven ticker ────────────────────────────────────────────────
+// Pixels per second — tune this one number to change overall speed.
+const SCROLL_SPEED_PX_PER_SEC = 55;
+
 export const TickerTape = memo(function TickerTape({ marketTickers, activeCoins, coins, price, selectedCoin, positions, onSelectCoin }) {
-  const items = useMemo(() => {
-    const base = marketTickers.length > 0
+  // Build base set (no duplication yet — we duplicate in the DOM for the loop)
+  const baseItems = useMemo(() => {
+    return marketTickers.length > 0
       ? marketTickers.slice(0, TICKER_TAPE_LIMIT)
       : activeCoins.map(sym => ({ sym, price: 0, chg24h: null, image: null }));
-    return [...base, ...base];
   }, [marketTickers, activeCoins]);
+
+  // Render the set twice so the loop is seamless
+  const items = useMemo(() => [...baseItems, ...baseItems], [baseItems]);
 
   const positionSyms = useMemo(
     () => new Set(positions.map(p => p.symbol)),
     [positions],
   );
+
+  // ── rAF loop drives scroll — never touches React state ──────────────────────
+  const trackRef = useRef(null);
+  const rafRef = useRef(null);
+  const offsetRef = useRef(0);       // current X offset in pixels
+  const lastTsRef = useRef(null);    // last rAF timestamp
+  const pausedRef = useRef(false);   // paused by hover
+  const halfWidthRef = useRef(0);    // half the track scrollWidth — reset point
+
+  // Kick off the rAF loop — runs once on mount, stays alive forever
+  useEffect(() => {
+    function tick(ts) {
+      rafRef.current = requestAnimationFrame(tick);
+
+      const track = trackRef.current;
+      if (!track) { lastTsRef.current = ts; return; }
+
+      // Measure half-width lazily (needed for seamless loop reset)
+      if (!halfWidthRef.current) {
+        const tw = track.scrollWidth;
+        if (tw > 0) halfWidthRef.current = tw / 2;
+      }
+
+      const dt = lastTsRef.current != null ? ts - lastTsRef.current : 0;
+      lastTsRef.current = ts;
+
+      if (!pausedRef.current && halfWidthRef.current > 0 && dt > 0) {
+        // Cap delta (avoid huge jumps after tab becomes active again)
+        const safeDt = Math.min(dt, 100);
+        offsetRef.current += (SCROLL_SPEED_PX_PER_SEC / 1000) * safeDt;
+
+        // Seamless loop: once we've scrolled one full copy, reset
+        if (offsetRef.current >= halfWidthRef.current) {
+          offsetRef.current -= halfWidthRef.current;
+        }
+      }
+
+      // Direct DOM write — bypasses React entirely, no layout thrash
+      track.style.transform = `translate3d(${-offsetRef.current}px, 0, 0)`;
+    }
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []); // empty deps — loop is permanent, never restarts
+
+  // When items change, re-measure half-width on next tick
+  useEffect(() => {
+    halfWidthRef.current = 0;
+  }, [baseItems.length]);
 
   const handleImgError = useCallback((e) => {
     const img = e.target;
@@ -94,11 +152,27 @@ export const TickerTape = memo(function TickerTape({ marketTickers, activeCoins,
     return clickHandlers.current[sym];
   }, [onSelectCoin]);
 
+  const handleMouseEnter = useCallback(() => { pausedRef.current = true; }, []);
+  const handleMouseLeave = useCallback(() => { pausedRef.current = false; }, []);
+
   return (
-    <div className="ticker-tape" style={{ marginBottom: "14px" }}>
+    <div
+      className="ticker-tape"
+      style={{ marginBottom: "14px" }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <div
+        ref={trackRef}
         className="ticker-track"
-        style={{ display: "flex", gap: "24px", alignItems: "center" }}
+        style={{
+          display: "flex",
+          gap: "24px",
+          alignItems: "center",
+          willChange: "transform",
+          // NO animation property — rAF drives transform directly
+          transform: "translate3d(0,0,0)",
+        }}
       >
         {items.map((item, i) => {
           const sym = item.sym || item;

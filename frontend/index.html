@@ -1,42 +1,196 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="DoYou Trade" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="theme-color" content="#0A0A0A" />
-    <meta name="color-scheme" content="dark" />
-    <meta name="description" content="DoYou.trade — AI-powered trading terminal with Claude. Trade crypto smarter." />
-    <meta name="format-detection" content="telephone=no" />
-    <meta name="msapplication-TileColor" content="#0A0A0A" />
-    <meta name="msapplication-tap-highlight" content="no" />
-    <meta name="screen-orientation" content="portrait" />
-    <link rel="icon" href="/Bravo.svg" type="image/svg+xml" />
-    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
-    <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
-    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
-    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
-    <link rel="apple-touch-startup-image" href="/icon-512.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://api.exchange.coinbase.com" />
-    <link rel="preconnect" href="https://api.binance.com" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" />
-    <title>DoYou.trade — Trading Terminal</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-    <script>
-      if ('serviceWorker' in navigator && !window.Capacitor) {
-        window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/sw.js').catch(function() {});
-        });
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="DoYou Trade" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0A0A0A" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="DoYou.trade — The world's most advanced AI-powered trading terminal. Automate your crypto strategy with the Brain. Professional-grade algorithmic trading for everyone." />
+  <meta name="keywords" content="crypto trading, ai trading bot, automated trading, bitcoin, ethereum, trading terminal, algorithmic trading, crypto signals, day trading, quantitative trading, the brain ai" />
+  <meta name="author" content="DoYou.trade" />
+  <meta name="format-detection" content="telephone=no" />
+  <meta name="msapplication-TileColor" content="#0A0A0A" />
+  <meta name="msapplication-tap-highlight" content="no" />
+  <meta name="screen-orientation" content="portrait" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <link rel="icon" href="/Bravo.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+  <link rel="apple-touch-startup-image" href="/icon-512.png" />
+  <link rel="canonical" href="https://doyou.trade/" />
+  
+  <!-- Structured Data: BreadcrumbList -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://doyou.trade/"
+      },{
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Trading Terminal",
+        "item": "https://doyou.trade/login"
+      },{
+        "@type": "ListItem",
+        "position": 3,
+        "name": "Sign Up",
+        "item": "https://doyou.trade/signup"
+      }]
+    }
+  </script>
+  
+  <!-- Preload Critical Assets for LCP -->
+  <link rel="preload" href="/Bravo.svg" as="image" type="image/svg+xml" />
+  <link rel="preload" href="https://fonts.gstatic.com/s/montserrat/v26/JTUSjIg1_i6t8kCHKm459Wlhyw.woff2" as="font" type="font/woff2" crossorigin />
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://doyou.trade/" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:site_name" content="DoYou.trade" />
+  <meta property="og:title" content="DoYou.trade — Advanced AI Trading Terminal" />
+  <meta property="og:description" content="Automate your crypto strategy with the Brain. The world's most advanced AI-powered trading terminal." />
+  <meta property="og:image" content="/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="DoYou.trade - Advanced AI Trading Dashboard Preview" />
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://doyou.trade/" />
+  <meta property="twitter:site" content="@doyoutrade" />
+  <meta property="twitter:creator" content="@doyoutrade" />
+  <meta property="twitter:title" content="DoYou.trade — Advanced AI Trading Terminal" />
+  <meta property="twitter:description" content="Automate your crypto strategy with the Brain. The world's most advanced AI-powered trading terminal." />
+  <meta property="twitter:image" content="/og-image.png" />
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://api.exchange.coinbase.com" />
+  <link rel="preconnect" href="https://api.binance.com" />
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@600;700;800;900&family=Space+Mono:wght@400;700&display=swap" />
+  <title>DoYou.trade — Advanced AI Trading Terminal | Crypto Intelligence</title>
+  
+  <!-- Structured Data: Organization -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "DoYou.trade",
+      "url": "https://doyou.trade",
+      "logo": "https://doyou.trade/Bravo.svg",
+      "sameAs": [
+        "https://twitter.com/doyoutrade",
+        "https://github.com/doyoutrade"
+      ],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "email": "support@doyou.trade",
+        "contactType": "customer support"
       }
-    </script>
-  </body>
+    }
+  </script>
+
+  <!-- Structured Data: WebSite -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "url": "https://doyou.trade",
+      "name": "DoYou.trade",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://doyou.trade/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+  </script>
+
+  <!-- Structured Data: SoftwareApplication -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "DoYou.trade",
+      "operatingSystem": "Web",
+      "applicationCategory": "FinancingApplication",
+      "description": "Professional AI-powered crypto trading terminal with advanced algorithmic strategies and real-time market insights.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0.00",
+        "priceCurrency": "USD"
+      }
+    }
+  </script>
+  
+  <!-- Structured Data: FAQPage -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is DoYou.trade a custodial platform?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. DoYou.trade is 100% non-custodial. Your funds always remain in your own exchange account (Coinbase, Binance, or Kraken). We only execute trades on your behalf using API keys with withdrawal permissions strictly disabled."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does the AI 'Brain' make trading decisions?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The Brain utilizes advanced neural networks to process millions of data points every second, including price action, technical indicators, global news sentiment, and on-chain liquidity flows. It identifies high-probability setups and executes with millisecond precision."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need prior trading experience?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Not at all. While professional traders use our advanced tools, beginners can leverage our 100+ expert trading presets. Simply connect your exchange, pick a strategy that matches your risk profile, and let the Brain handle the technical execution."
+          }
+        }
+      ]
+    }
+  </script>
+</head>
+
+<body>
+  <noscript>
+    <div style="padding: 20px; text-align: center; background: #0A0A0A; color: white; font-family: sans-serif;">
+      <h1>DoYou.trade — Advanced AI Trading Terminal</h1>
+      <p>Automate your crypto strategy with the world's most advanced non-custodial neural engine.</p>
+      <p>Please enable JavaScript to access the trading terminal.</p>
+      <nav>
+        <a href="/">Home</a> | <a href="/signup">Sign Up</a> | <a href="/login">Login</a>
+      </nav>
+    </div>
+  </noscript>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+  <script>
+    if ('serviceWorker' in navigator && !window.Capacitor) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function () { });
+      });
+    }
+  </script>
+</body>
+
 </html>

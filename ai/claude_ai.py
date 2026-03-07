@@ -709,7 +709,7 @@ def _build_scout_snapshot(bot, coins_snapshot: dict) -> str:
     )
 
 
-async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False):
+async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_limit: int = 0):
     """Run AI analysis. skip_scout=True bypasses scout and goes straight to trade model (manual Ask Claude)."""
     global _claude_lock
     if _claude_lock is None:
@@ -750,6 +750,12 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False):
         for sym, cs in bot.coins.items():
             if cs.price > 0:
                 coins_snapshot[sym] = _build_enhanced_coin_snapshot(cs, sym)
+        
+        # Enforce tier-based coin limit if provided
+        if coin_limit > 0 and len(coins_snapshot) > coin_limit:
+            # Keep top N based on volume or just first N (usually BTC/ETH/SOL)
+            sorted_syms = sorted(coins_snapshot.keys(), key=lambda x: (x != "BTC", x != "ETH", x))
+            coins_snapshot = {s: coins_snapshot[s] for s in sorted_syms[:coin_limit]}
 
         # ── STAGE 1: Scout scan (cheap Haiku) — skipped when skip_scout=True ──
         scout_raw = ""

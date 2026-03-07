@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 const EFFECTIVE_DATE = "March 5, 2026";
@@ -6,6 +7,13 @@ const CONTACT_EMAIL = "support@doyou.trade";
 
 export default function Terms() {
     const navigate = useNavigate();
+
+    useEffect(() => {
+        document.title = "Terms of Service — DoYou.trade";
+        const meta = document.querySelector('meta[name="description"]');
+        if (meta) meta.setAttribute("content", "Read the Terms of Service for DoYou.trade. Professional-grade non-custodial AI trading terminal services and user agreement.");
+    }, []);
+
     return (
         <div style={s.page}>
             <div style={s.content}>
@@ -133,7 +141,7 @@ const s = {
         display: "block",
     },
     h1: {
-        fontFamily: "'Bebas Neue', sans-serif",
+        fontFamily: "'Montserrat', sans-serif",
         fontSize: 40,
         letterSpacing: 4,
         color: "#D4AF37",
@@ -151,7 +159,7 @@ const s = {
         borderBottom: "1px solid rgba(255,255,255,0.04)",
     },
     h2: {
-        fontFamily: "'Oswald', sans-serif",
+        fontFamily: "'Montserrat', sans-serif",
         fontSize: 14,
         letterSpacing: 2,
         color: "#888",

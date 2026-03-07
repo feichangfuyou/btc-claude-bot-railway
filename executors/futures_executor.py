@@ -10,8 +10,10 @@ from datetime import datetime
 from core.config import (
     AI_COST_PER_TRADE,
     ENABLE_FUTURES,
+    EST_8H_FUNDING_RATE,
     FUTURES_LIVE,
     MAX_FUTURES_POSITIONS,
+    PAPER_SLIPPAGE_PCT,
     PERP_PRODUCT_IDS,
 )
 from core.database import db_save_state, db_save_trade, file_log
@@ -138,7 +140,21 @@ def close_futures_position(bot, pos: dict, exit_price: float, reason: str):
         pnl = (pos["entry"] - exit_price) * coin_size
 
     fee = margin * FUTURES_ROUND_TRIP_FEE
-    total_cost = fee + AI_COST_PER_TRADE
+    
+    # realism penalty for paper traders (slippage + funding carry cost)
+    paper_slippage = (margin * PAPER_SLIPPAGE_PCT * 2) if not FUTURES_LIVE else 0
+    
+    # Simulate funding bleed for held positions (approx 0.01% per 8h)
+    funding_cost = 0
+    if not FUTURES_LIVE and pos.get("open_ts"):
+        try:
+            opened = datetime.strptime(pos["open_ts"], "%Y-%m-%d %H:%M:%S")
+            hours_held = (datetime.now() - opened).total_seconds() / 3600
+            funding_cost = margin * (hours_held / 8) * EST_8H_FUNDING_RATE
+        except Exception:
+            pass
+
+    total_cost = fee + AI_COST_PER_TRADE + paper_slippage + funding_cost
     net = round(pnl - total_cost, 2)
 
     bot.account["balance"] = round(bot.account["balance"] + margin + net, 2)

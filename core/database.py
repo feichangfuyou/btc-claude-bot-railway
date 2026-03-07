@@ -13,6 +13,8 @@ from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
 DB_PATH = os.getenv("DB_PATH", "bot.db")
+if os.path.dirname(DB_PATH):
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 LOG_DIR = os.getenv("LOG_DIR", "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 BACKUP_DIR = os.getenv("BACKUP_DIR", "backups")

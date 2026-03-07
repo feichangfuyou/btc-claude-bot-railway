@@ -53,8 +53,8 @@ export const spacing = {
 
 export const typography = {
   fontMono: "'Space Mono', monospace",
-  fontDisplay: "'Bebas Neue', sans-serif",
-  fontButton: "'Oswald', sans-serif",
+  fontDisplay: "'Montserrat', sans-serif",
+  fontButton: "'Montserrat', sans-serif",
   sizeXs: 9,
   sizeSm: 10,
   sizeMd: 11,

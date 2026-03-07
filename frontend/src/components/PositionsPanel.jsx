@@ -1,4 +1,5 @@
 import AnimatedNumber from "../AnimatedNumber.jsx";
+import { Circle, Link, X, ArrowUp, ArrowDown } from "lucide-react";
 
 export function PositionsPanel({
   positions, coins, price, enableFutures, maxPositions, maxFuturesPositions,
@@ -6,8 +7,8 @@ export function PositionsPanel({
 }) {
   if (positions.length === 0) {
     return (
-      <div className="card" style={{ textAlign: "center", padding: "16px", color: "#3a3a3a", fontSize: "11px", letterSpacing: "1.5px", position: "relative", zIndex: 2 }}>
-        {"\u25CB"} NO OPEN POSITIONS — {botOn ? `Scanning (0/${enableFutures ? maxPositions + maxFuturesPositions : maxPositions} slots)...` : "Start bot to begin"}
+      <div className="card" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", textAlign: "center", padding: "16px", color: "#3a3a3a", fontSize: "11px", letterSpacing: "1.5px", position: "relative", zIndex: 2 }}>
+        <Circle size={10} /> NO OPEN POSITIONS — {botOn ? `Scanning (0/${enableFutures ? maxPositions + maxFuturesPositions : maxPositions} slots)...` : "Start bot to begin"}
       </div>
     );
   }
@@ -47,8 +48,10 @@ export function PositionsPanel({
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <span className="dot pulse" style={{ background: pos.side === "buy" ? "#00E676" : "#FF1744" }} />
-                  <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "11px", color: pos.side === "buy" ? "#00E676" : "#FF1744", fontWeight: "700", letterSpacing: "2px" }}>
-                    {pos.onchain ? "\u26D3 " : ""}{pos.side?.toUpperCase()} {pos.symbol || "BTC"}
+                  <span style={{ display: "flex", alignItems: "center", gap: "6px", fontFamily: "'Montserrat', sans-serif", fontSize: "11px", color: pos.side === "buy" ? "#00E676" : "#FF1744", fontWeight: "700", letterSpacing: "2px" }}>
+                    {pos.onchain && <Link size={12} />}
+                    {pos.side === "buy" ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+                    {pos.side?.toUpperCase()} {pos.symbol || "BTC"}
                   </span>
                   {pos.onchain && <span className="tag" style={{ background: "#D4AF3718", color: "#D4AF37", fontSize: "9px" }}>ON-CHAIN</span>}
                   {pos.product_type === "futures" && <span className="tag" style={{ background: "#D4AF3718", color: "#D4AF37", fontSize: "9px" }}>FUTURES{pos.leverage ? ` ${pos.leverage}x` : ""}</span>}
@@ -57,7 +60,7 @@ export function PositionsPanel({
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <span style={{ fontSize: "9px", color: "#3a3a3a" }}>since {pos.open_ts}</span>
-                  <button className="btn btn-d" onClick={() => handleClose(pos)} style={{ padding: "4px 8px", fontSize: "9px", color: "#ff9900", borderColor: "#ff990033" }}>{"\u2715"}</button>
+                  <button className="btn btn-d" onClick={() => handleClose(pos)} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "4px 8px", fontSize: "9px", color: "#ff9900", borderColor: "#ff990033" }}><X size={10} /></button>
                 </div>
               </div>
               <div className="pos-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "8px" }}>

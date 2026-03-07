@@ -182,7 +182,7 @@ const styles = {
     transition: "border-color 0.3s ease, box-shadow 0.3s ease",
   },
   statLabel: { fontSize: 10, color: colors.muted, letterSpacing: 1, marginBottom: 4 },
-  statValue: { fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 2 },
+  statValue: { fontFamily: "'Montserrat', sans-serif", fontSize: 24, letterSpacing: 2 },
   filterRow: { display: "flex", gap: 8, marginBottom: 16 },
   filterSelect: {
     fontFamily: "'Space Mono', monospace",

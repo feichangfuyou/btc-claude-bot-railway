@@ -34,6 +34,7 @@ from core.config import (
     MIN_PROFIT_AFTER_COSTS,
     MIN_TRADE_USD,
     ONCHAIN_SLIPPAGE,
+    PAPER_SLIPPAGE_PCT,
     PAPER_TRADING,
     PENDING_TRADE_TIMEOUT_SEC,
     PROFIT_TO_TARGET,
@@ -233,15 +234,21 @@ class BotState:
         ages = [cs.price_age() for cs in self.coins.values() if cs.price > 0]
         return min(ages) if ages else 999999.0
 
-    def add_log(self, msg: str, log_type: str = "info"):
+    def add_log(self, msg: str, log_type: str = "info", admin_only: bool = False):
+        if not admin_only:
+            tech_keyphrases = ["memory", "learning", "circuit breaker", "semantic", "solver", "admin action", "admin [", "pending trade", "kill switch"]
+            if log_type == "dim" or any(k in msg.lower() for k in tech_keyphrases):
+                admin_only = True
+
         entry = {
             "msg": msg,
             "type": log_type,
             "ts": datetime.now().strftime("%H:%M:%S"),
+            "admin_only": admin_only
         }
-        self.logs = [entry] + self.logs[:59]
+        self.logs = [entry] + self.logs[:199]
         db_save_log(msg, log_type)
-        if self._broadcast_fn:
+        if self._broadcast_fn and not admin_only:
             try:
                 asyncio.ensure_future(self._broadcast_fn({"type": "log", "entry": entry}))
             except RuntimeError:
@@ -426,7 +433,11 @@ class BotState:
     def _finalize_close(self, pos, pos_symbol, coin_size, pnl, reason):
         trading_fee = pos["usd_size"] * ROUND_TRIP_FEE
         onchain_cost = (pos["usd_size"] * ONCHAIN_SLIPPAGE + GAS_COST_USD * 2) if pos.get("onchain") else 0
-        total_cost = trading_fee + onchain_cost + AI_COST_PER_TRADE
+        
+        # Simulated slippage helps bridge the paper-to-live performance gap
+        paper_slippage = (pos["usd_size"] * PAPER_SLIPPAGE_PCT * 2) if (PAPER_TRADING and not pos.get("onchain")) else 0
+        total_cost = trading_fee + onchain_cost + AI_COST_PER_TRADE + paper_slippage
+        
         net = round(pnl - total_cost, 2)
         self.account["balance"] = round(self.account["balance"] + pos["usd_size"] + net, 2)
         self.account["daily_pnl"] = round(self.account["daily_pnl"] + net, 2)
@@ -528,7 +539,8 @@ class BotState:
             pnl = (pos["entry"] - current_price) * coin_size
 
         trading_fee = pos["usd_size"] * ROUND_TRIP_FEE
-        total_cost = trading_fee + AI_COST_PER_TRADE
+        paper_slippage = (pos["usd_size"] * PAPER_SLIPPAGE_PCT * 2) if PAPER_TRADING else 0
+        total_cost = trading_fee + AI_COST_PER_TRADE + paper_slippage
         net = round(pnl - total_cost, 2)
 
         self.account["balance"] = round(self.account["balance"] + pos["usd_size"] + net, 2)
@@ -1030,7 +1042,11 @@ class BotState:
             pnl = (pos["entry"] - current_price) * coin_size
         trading_fee = pos["usd_size"] * ROUND_TRIP_FEE
         onchain_cost = (pos["usd_size"] * ONCHAIN_SLIPPAGE + GAS_COST_USD * 2) if pos.get("onchain") else 0
-        total_cost = trading_fee + onchain_cost + AI_COST_PER_TRADE
+        
+        # Simulated slippage helps bridge the paper-to-live performance gap
+        paper_slippage = (pos["usd_size"] * PAPER_SLIPPAGE_PCT * 2) if (PAPER_TRADING and not pos.get("onchain")) else 0
+        total_cost = trading_fee + onchain_cost + AI_COST_PER_TRADE + paper_slippage
+        
         net = round(pnl - total_cost, 2)
         self.account["balance"] = round(self.account["balance"] + pos["usd_size"] + net, 2)
         self.account["daily_pnl"] = round(self.account["daily_pnl"] + net, 2)
@@ -1148,7 +1164,8 @@ class BotState:
         """Calculate all costs for a round-trip trade: fees + slippage + gas + AI."""
         trading_fee = usd_sz * ROUND_TRIP_FEE
         onchain_cost = (usd_sz * ONCHAIN_SLIPPAGE + GAS_COST_USD * 2) if is_onchain else 0
-        return trading_fee + onchain_cost + AI_COST_PER_TRADE
+        paper_slippage = (usd_sz * PAPER_SLIPPAGE_PCT * 2) if (PAPER_TRADING and not is_onchain) else 0
+        return trading_fee + onchain_cost + AI_COST_PER_TRADE + paper_slippage
 
     def _handle_open_trade(self, action: str, decision: dict):
         order = decision.get("order", {})
@@ -1628,7 +1645,7 @@ class BotState:
             "open_positions": self.open_positions,
             "max_positions": MAX_CONCURRENT_POSITIONS,
             "trades": self.trades,
-            "logs": self.logs,
+            "logs": [l for l in self.logs if not l.get("admin_only", False)],
             "claude_decision": self.claude_decision,
             "bot_running": self.bot_running,
             "claude_thinking": self.claude_thinking,

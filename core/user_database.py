@@ -43,6 +43,8 @@ def udb_save_trade(user_id: str, trade: dict) -> Optional[int]:
 
 def udb_load_trades(user_id: str, limit: int = 50) -> list[dict]:
     """Load recent trades for a user."""
+    if user_id == "admin":
+        return []
     sb = get_supabase()
     result = sb.table("user_trades").select("*").eq("user_id", user_id).order("id", desc=True).limit(limit).execute()
     trades = []
@@ -114,6 +116,8 @@ def udb_save_state(user_id: str, key: str, value):
 
 def udb_load_state(user_id: str, key: str, default=None):
     """Load a bot state value for a user."""
+    if user_id == "admin":
+        return default
     sb = get_supabase()
     result = sb.table("user_bot_state").select("value").eq("user_id", user_id).eq("key", key).single().execute()
     if result.data:

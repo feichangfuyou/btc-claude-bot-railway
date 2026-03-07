@@ -17,12 +17,8 @@ def test_metrics_prometheus_format():
     client = TestClient(app)
     r = client.get("/metrics")
     text = r.text
-    assert "claudebot_balance" in text
-    assert "claudebot_total_pnl" in text
-    assert "claudebot_daily_pnl" in text
-    assert "claudebot_open_positions" in text
-    assert "claudebot_trades_total" in text
     assert "claudebot_bot_running" in text
+    assert "claudebot_bot_manager_instances" in text
     assert "# TYPE" in text
     assert "# HELP" in text
 
@@ -32,5 +28,5 @@ def test_metrics_returns_text():
     client = TestClient(app)
     r = client.get("/metrics")
     assert r.text
-    # PlainTextResponse: real newlines. JSON-wrapped would have \\n.
-    assert "claudebot_balance" in r.text and "gauge" in r.text
+    # PlainTextResponse: real newlines. JSON-wrapped would have \n.
+    assert "claudebot_bot_manager_instances" in r.text and "gauge" in r.text

@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 import App from "./App.jsx";
 import Login from "./pages/Login.jsx";
@@ -12,6 +12,8 @@ import Billing from "./pages/Billing.jsx";
 import AuthCallback from "./pages/AuthCallback.jsx";
 import Terms from "./pages/Terms.jsx";
 import Privacy from "./pages/Privacy.jsx";
+import Admin from "./pages/Admin.jsx";
+
 import "./suppress-warnings.js";
 import "./capacitor-init.js";
 import "./global.css";
@@ -19,6 +21,7 @@ import "./styles/auth.css";
 
 function ProtectedRoute({ children }) {
   const { user, profile, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -31,6 +34,15 @@ function ProtectedRoute({ children }) {
 
   if (!user) return <Navigate to="/login" replace />;
   if (profile && !profile.onboarding_complete) return <Navigate to="/onboarding" replace />;
+
+  const isActive = profile?.subscription_status === "active";
+  const isBilling = location.pathname === "/billing";
+  const isAdmin = user?.email === "feichangfuyou@gmail.com" || profile?.role === "admin";
+
+  if (!isActive && !isBilling && !isAdmin) {
+    return <Navigate to="/billing" replace />;
+  }
+
   return children;
 }
 
@@ -50,6 +62,16 @@ function OnboardingRoute() {
   return <Onboarding />;
 }
 
+function AdminRoute({ children }) {
+  const { user, profile, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.email !== "feichangfuyou@gmail.com" && profile?.role !== "admin") {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+}
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
@@ -63,10 +85,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
           <Route path="/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
+          <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Login />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

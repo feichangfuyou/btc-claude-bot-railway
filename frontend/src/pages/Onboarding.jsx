@@ -4,12 +4,33 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
 import { supabase } from "../supabaseClient.js";
 import { colors, radii, typography } from "../theme.js";
+import { Check, AlertTriangle, ArrowRight, ArrowLeft, Lightbulb, Info, X } from "lucide-react";
 
 const EXCHANGES = [
-  { id: "coinbase", name: "Coinbase", type: "oauth", desc: "OAuth — secure, no API key needed" },
-  { id: "kraken", name: "Kraken", type: "api_key", desc: "API Key — create a restricted key" },
-  { id: "binance", name: "Binance", type: "api_key", desc: "API Key — create a restricted key" },
-  { id: "onchain", name: "On-Chain (Base)", type: "wallet", desc: "Wallet Connect — trustless" },
+  { id: "coinbase", name: "Coinbase", type: "coinbase_oauth", desc: "Linked via server — no API key needed" },
+  {
+    id: "kraken",
+    name: "Kraken",
+    type: "api_key",
+    desc: "API Key — create a restricted key",
+    keyPlaceholder: "API Key (e.g. XXXX-XXXX-XXXX-XXXX)",
+    secretPlaceholder: "Private Key / API Secret",
+    keyHint: "Kraken API keys are alphanumeric strings (usually 56 characters). Enable Spot trading, Futures trading, and margin permissions. The only permission to leave OFF is Withdraw Funds.",
+    keyPattern: /^[A-Za-z0-9+/=]{40,90}$/,
+    keyPatternHint: "Must be 40–90 alphanumeric characters (no spaces).",
+  },
+  {
+    id: "binance",
+    name: "Binance",
+    type: "api_key",
+    desc: "API Key — create a restricted key",
+    keyPlaceholder: "API Key (64 characters)",
+    secretPlaceholder: "Secret Key (64 characters)",
+    keyHint: "Binance API keys are exactly 64 hexadecimal characters. Enable Spot trading AND Futures trading. The only permission to leave OFF is Enable Withdrawals.",
+    keyPattern: /^[A-Za-z0-9]{60,70}$/,
+    keyPatternHint: "Must be exactly 64 alphanumeric characters (no spaces or dashes).",
+  },
+  { id: "onchain", name: "On-Chain (Base)", type: "wallet", desc: "Direct Wallet — enterprise-grade" },
 ];
 
 const PRESETS_FALLBACK = [
@@ -125,8 +146,10 @@ export default function Onboarding() {
   const [keyModal, setKeyModal] = useState(null);
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
   const [keyError, setKeyError] = useState("");
   const [keySaving, setKeySaving] = useState(false);
+  const [skipWarning, setSkipWarning] = useState(false);
 
   const [preset, setPreset] = useState("turtle");
   const [presets, setPresets] = useState(PRESETS_FALLBACK);
@@ -143,21 +166,83 @@ export default function Onboarding() {
     const url = base ? `${base}/api/presets` : "/api/presets";
     fetch(url, { headers: getAuthHeaders() }).then(r => r.ok && r.json()).then(d => {
       if (d?.presets?.length) setPresets(d.presets);
-    }).catch(() => {});
+    }).catch(() => { });
   }, [getAuthHeaders]);
 
   function toggleCoin(c) {
     setCoins(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
   }
 
-  async function handleConnectOAuth(exchange) {
-    // Coinbase OAuth would redirect — for now mark as connected (placeholder)
-    setConnected(prev => ({ ...prev, [exchange]: true }));
+  async function handleConnectCoinbase() {
+    if (!accessToken) {
+      setKeyError("Please sign in to connect Coinbase");
+      return;
+    }
+    setKeySaving(true);
+    setKeyError("");
+    try {
+      const base = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || "";
+      const connectUrl = base ? `${base}/auth/exchanges/connect` : "/auth/exchanges/connect";
+      const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` };
+      const connectRes = await fetch(connectUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ exchange: "coinbase", connection_type: "coinbase_oauth" }),
+      });
+      if (!connectRes.ok) throw new Error("Failed to connect Coinbase");
+      setConnected(prev => ({ ...prev, coinbase: true }));
+      setKeyModal(null);
+    } catch (err) {
+      setKeyError(err.message || "Failed to connect. Is the backend running?");
+    } finally {
+      setKeySaving(false);
+    }
+  }
+
+  async function handleConnectOnchain() {
+    if (!walletAddress?.trim()) {
+      setKeyError("Wallet address is required.");
+      return;
+    }
+    if (!accessToken) {
+      setKeyError("Please sign in to connect.");
+      return;
+    }
+    setKeySaving(true);
+    setKeyError("");
+    try {
+      const base = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || "";
+      const connectUrl = base ? `${base}/auth/exchanges/connect` : "/auth/exchanges/connect";
+      const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` };
+      const connectRes = await fetch(connectUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          exchange: "onchain",
+          connection_type: "wallet",
+          wallet_address: walletAddress.trim(),
+        }),
+      });
+      if (!connectRes.ok) throw new Error("Failed to save wallet");
+      setConnected(prev => ({ ...prev, onchain: true }));
+      setKeyModal(null);
+      setWalletAddress("");
+    } catch (err) {
+      setKeyError(err.message || "Failed to save. Is the backend running?");
+    } finally {
+      setKeySaving(false);
+    }
   }
 
   async function handleSaveKey() {
     if (!apiKey?.trim() || !apiSecret?.trim()) {
-      setKeyError("Both API key and secret are required");
+      setKeyError("Both API key and secret are required.");
+      return;
+    }
+    // Client-side format check per exchange
+    const exDef = EXCHANGES.find(e => e.id === keyModal);
+    if (exDef?.keyPattern && !exDef.keyPattern.test(apiKey.trim())) {
+      setKeyError(`Invalid ${exDef.name} API key format. ${exDef.keyPatternHint}`);
       return;
     }
     setKeySaving(true);
@@ -240,235 +325,337 @@ export default function Onboarding() {
 
   return (
     <>
-    <style>{responsiveCss}</style>
-    <div style={styles.container}>
-      <div style={styles.card} className="onboarding-card">
-        {/* Progress bar */}
-        <div style={styles.progressBar}>
-          <div style={{ ...styles.progressFill, width: `${progress}%` }} />
-        </div>
-        <div style={styles.stepLabel}>Step {step} of 4</div>
+      <style>{responsiveCss}</style>
+      <div style={styles.container}>
+        <div style={styles.card} className="onboarding-card">
+          {/* Progress bar */}
+          <div style={styles.progressBar}>
+            <div style={{ ...styles.progressFill, width: `${progress}%` }} />
+          </div>
+          <div style={styles.stepLabel}>Step {step} of 4</div>
 
-        {/* Step 1: Connect Exchanges */}
-        {step === 1 && (
-          <div>
-            <h2 style={styles.heading}>Connect Your Exchanges</h2>
-            <p style={styles.desc}>Connect at least one exchange to start trading. Your API keys are encrypted and never stored in plaintext.</p>
+          {/* Step 1: Connect Exchanges */}
+          {step === 1 && (
+            <div>
+              <h2 style={styles.heading}>Connect Your Exchanges</h2>
+              <p style={styles.desc}>Connect at least one exchange to start trading. Your API keys are encrypted and never stored in plaintext.</p>
 
-            <div style={styles.exchangeList}>
-              {EXCHANGES.map(ex => (
-                <div key={ex.id} style={styles.exchangeRow}>
-                  <div style={{ flex: 1 }}>
-                    <div style={styles.exchangeName}>
-                      {connected[ex.id] && <span style={{ color: colors.success, marginRight: 6 }}>&#10003;</span>}
-                      {ex.name}
+              <div style={styles.exchangeList}>
+                {EXCHANGES.map(ex => (
+                  <div key={ex.id} style={styles.exchangeRow}>
+                    <div style={{ flex: 1 }}>
+                      <div style={styles.exchangeName}>
+                        {connected[ex.id] && <Check size={12} style={{ color: colors.success, marginRight: 6 }} />}
+                        {ex.name}
+                      </div>
+                      <div style={styles.exchangeDesc}>{ex.desc}</div>
                     </div>
-                    <div style={styles.exchangeDesc}>{ex.desc}</div>
+                    {connected[ex.id] ? (
+                      <span style={{ color: colors.success, fontSize: 11, fontFamily: typography.fontMono }}>Connected</span>
+                    ) : (
+                      <button
+                        style={styles.connectBtn}
+                        onClick={() => {
+                          setKeyModal(ex.id);
+                          setKeyError("");
+                          setApiKey("");
+                          setApiSecret("");
+                          setWalletAddress("");
+                        }}
+                      >
+                        {ex.id === "coinbase" ? "Connect" : ex.id === "onchain" ? "Add Wallet" : "Add Key"}
+                      </button>
+                    )}
                   </div>
-                  {connected[ex.id] ? (
-                    <span style={{ color: colors.success, fontSize: 11, fontFamily: typography.fontMono }}>Connected</span>
-                  ) : (
-                    <button
-                      style={styles.connectBtn}
-                      onClick={() => {
-                        if (ex.type === "oauth") handleConnectOAuth(ex.id);
-                        else if (ex.type === "api_key") setKeyModal(ex.id);
-                        else handleConnectOAuth(ex.id);
-                      }}
-                    >
-                      {ex.type === "oauth" ? "Connect" : ex.type === "api_key" ? "Add Key" : "Connect Wallet"}
-                    </button>
-                  )}
+                ))}
+              </div>
+
+              {skipWarning && (
+                <div style={styles.skipWarningBox}>
+                  <div style={styles.skipWarningTitle}><AlertTriangle size={14} style={{ marginRight: 6 }} /> No exchange connected</div>
+                  <div style={styles.skipWarningText}>
+                    You can skip and add your API keys later in <strong>Settings</strong>. However, the bot will not be able to execute any trades until valid keys are saved. You'll see a warning when you try to start the bot.
+                  </div>
+                  <button style={styles.skipConfirmBtn} onClick={() => { setSkipWarning(false); setStep(2); }}>
+                    Got it — Skip for now
+                  </button>
                 </div>
-              ))}
+              )}
+
+              {!skipWarning && (
+                <div style={styles.btnRow}>
+                  <button style={styles.skipBtn} onClick={() => setSkipWarning(true)}>Skip for now</button>
+                  <button style={styles.nextBtn} onClick={() => setStep(2)} disabled={connectedCount === 0}>
+                    Next <ArrowRight size={14} />
+                  </button>
+                </div>
+              )}
             </div>
+          )}
 
-            <div style={styles.btnRow}>
-              <button style={styles.skipBtn} onClick={() => setStep(2)}>Skip for now</button>
-              <button style={styles.nextBtn} onClick={() => setStep(2)} disabled={connectedCount === 0}>
-                Next &rarr;
-              </button>
-            </div>
-          </div>
-        )}
+          {/* Step 2: Trading Preferences */}
+          {step === 2 && (
+            <div>
+              <h2 style={styles.heading}>Trading Preferences</h2>
+              <p style={styles.desc}>Choose your strategy and risk level. You can change these anytime in Settings.</p>
 
-        {/* Step 2: Trading Preferences */}
-        {step === 2 && (
-          <div>
-            <h2 style={styles.heading}>Trading Preferences</h2>
-            <p style={styles.desc}>Choose your strategy and risk level. You can change these anytime in Settings.</p>
-
-            <label style={styles.label}>Strategy Preset</label>
-            <div style={styles.presetCarousel}>
-              {presets.map(p => (
-                <button
-                  key={p.id}
-                  style={{ ...styles.presetCard, ...(preset === p.id ? styles.presetActive : {}) }}
-                  onClick={() => setPreset(p.id)}
-                >
-                  <div style={styles.presetName}>{p.name}</div>
-                  <div style={styles.presetDesc}>{p.description || p.desc}</div>
-                </button>
-              ))}
-            </div>
-
-            <label style={styles.label}>Risk Level</label>
-            <div style={styles.riskRow}>
-              {["conservative", "moderate", "aggressive"].map(r => (
-                <button
-                  key={r}
-                  style={{ ...styles.riskBtn, ...(risk === r ? styles.riskActive : {}) }}
-                  onClick={() => setRisk(r)}
-                >
-                  {r.charAt(0).toUpperCase() + r.slice(1)}
-                </button>
-              ))}
-            </div>
-
-            <label style={styles.label}>Starting Balance ($)</label>
-            <input
-              type="number"
-              value={startBalance}
-              onChange={e => setStartBalance(e.target.value)}
-              style={styles.input}
-              min="100"
-            />
-
-            <div style={styles.btnRow}>
-              <button style={styles.skipBtn} onClick={() => setStep(1)}>&larr; Back</button>
-              <button style={styles.nextBtn} onClick={() => setStep(3)}>Next &rarr;</button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Coins & Paper Mode */}
-        {step === 3 && (
-          <div>
-            <h2 style={styles.heading}>Coins & Mode</h2>
-            <p style={styles.desc}>Select which coins to trade and whether to start in paper trading mode.</p>
-
-            <label style={styles.label}>Coins to Trade</label>
-            <div style={styles.coinGrid}>
-              {allCoins.map(c => (
-                <button
-                  key={c}
-                  style={{ ...styles.coinBtn, ...(coins.includes(c) ? styles.coinActive : {}) }}
-                  onClick={() => toggleCoin(c)}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-
-            <label style={styles.label}>Paper Trading (Practice Mode)</label>
-            <div style={styles.toggleRow}>
-              <button
-                style={{ ...styles.toggleBtn, ...(paperMode ? styles.toggleActive : {}) }}
-                onClick={() => setPaperMode(true)}
-              >
-                ON — Practice with virtual money
-              </button>
-              <button
-                style={{ ...styles.toggleBtn, ...(!paperMode ? styles.toggleDanger : {}) }}
-                onClick={() => setPaperMode(false)}
-              >
-                OFF — Real money
-              </button>
-            </div>
-
-            <div style={styles.btnRow}>
-              <button style={styles.skipBtn} onClick={() => setStep(2)}>&larr; Back</button>
-              <button style={styles.nextBtn} onClick={() => setStep(4)}>Next &rarr;</button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Confirmation */}
-        {step === 4 && (
-          <div>
-            <h2 style={styles.heading}>You&apos;re Ready</h2>
-            <p style={styles.desc}>Review your setup. You can change everything later in Settings.</p>
-
-            <div style={styles.summaryBox}>
-              <div style={styles.summaryRow}>
-                <span style={styles.summaryLabel}>Exchanges</span>
-                <span>{connectedCount > 0 ? Object.keys(connected).filter(k => connected[k]).join(", ") : "None (paper only)"}</span>
+              <label style={styles.label}>Strategy Preset</label>
+              <div style={styles.presetCarousel}>
+                {presets.map(p => (
+                  <button
+                    key={p.id}
+                    style={{ ...styles.presetCard, ...(preset === p.id ? styles.presetActive : {}) }}
+                    onClick={() => setPreset(p.id)}
+                  >
+                    <div style={styles.presetName}>{p.name}</div>
+                    <div style={styles.presetDesc}>{p.description || p.desc}</div>
+                  </button>
+                ))}
               </div>
-              <div style={styles.summaryRow}>
-                <span style={styles.summaryLabel}>Strategy</span>
-                <span>{presets.find(p => p.id === preset)?.name || preset}</span>
-              </div>
-              <div style={styles.summaryRow}>
-                <span style={styles.summaryLabel}>Risk</span>
-                <span>{risk.charAt(0).toUpperCase() + risk.slice(1)}</span>
-              </div>
-              <div style={styles.summaryRow}>
-                <span style={styles.summaryLabel}>Balance</span>
-                <span>${parseFloat(startBalance).toLocaleString()}</span>
-              </div>
-              <div style={styles.summaryRow}>
-                <span style={styles.summaryLabel}>Coins</span>
-                <span>{coins.join(", ")}</span>
-              </div>
-              <div style={styles.summaryRow}>
-                <span style={styles.summaryLabel}>Mode</span>
-                <span style={{ color: paperMode ? colors.success : colors.error }}>
-                  {paperMode ? "Paper Trading" : "LIVE Trading"}
-                </span>
-              </div>
-            </div>
 
-            <div style={styles.btnRow}>
-              <button style={styles.skipBtn} onClick={() => setStep(3)}>&larr; Back</button>
-              <button style={styles.launchBtn} onClick={handleFinish} disabled={saving}>
-                {saving ? "Setting up..." : "Launch Bot \u2192"}
-              </button>
-            </div>
-          </div>
-        )}
+              <label style={styles.label}>Risk Level</label>
+              <div style={styles.riskRow}>
+                {["conservative", "moderate", "aggressive"].map(r => (
+                  <button
+                    key={r}
+                    style={{ ...styles.riskBtn, ...(risk === r ? styles.riskActive : {}) }}
+                    onClick={() => setRisk(r)}
+                  >
+                    {r.charAt(0).toUpperCase() + r.slice(1)}
+                  </button>
+                ))}
+              </div>
 
-        {/* API Key Modal */}
-        {keyModal && (
-          <div style={styles.modalOverlay} onClick={() => setKeyModal(null)}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <h3 style={styles.modalTitle}>Add {keyModal.charAt(0).toUpperCase() + keyModal.slice(1)} API Key</h3>
-
-              {keyError && <div style={styles.error}>{keyError}</div>}
-
+              <label style={styles.label}>Starting Balance ($)</label>
               <input
-                type="text"
-                placeholder="API Key"
-                value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
+                type="number"
+                value={startBalance}
+                onChange={e => setStartBalance(e.target.value)}
                 style={styles.input}
-              />
-              <input
-                type="password"
-                placeholder="API Secret"
-                value={apiSecret}
-                onChange={e => setApiSecret(e.target.value)}
-                style={{ ...styles.input, marginTop: 8 }}
+                min="100"
               />
 
-              <div style={styles.keyInfo}>
-                <div style={styles.keyInfoTitle}>Make sure your key has:</div>
-                <div style={styles.keyPerm}><span style={{ color: colors.success }}>&#10003;</span> Query Funds</div>
-                <div style={styles.keyPerm}><span style={{ color: colors.success }}>&#10003;</span> Query Orders & Trades</div>
-                <div style={styles.keyPerm}><span style={{ color: colors.success }}>&#10003;</span> Create & Modify Orders</div>
-                <div style={styles.keyPerm}><span style={{ color: colors.error }}>&#10007;</span> Withdraw Funds (leave OFF)</div>
+              <div style={styles.btnRow}>
+                <button style={styles.skipBtn} onClick={() => setStep(1)}><ArrowLeft size={14} /> Back</button>
+                <button style={styles.nextBtn} onClick={() => setStep(3)}>Next <ArrowRight size={14} /></button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Coins & Paper Mode */}
+          {step === 3 && (
+            <div>
+              <h2 style={styles.heading}>Coins & Mode</h2>
+              <p style={styles.desc}>Select which coins to trade and whether to start in paper trading mode.</p>
+
+              <label style={styles.label}>Coins to Trade</label>
+              <div style={styles.coinGrid}>
+                {allCoins.map(c => (
+                  <button
+                    key={c}
+                    style={{ ...styles.coinBtn, ...(coins.includes(c) ? styles.coinActive : {}) }}
+                    onClick={() => toggleCoin(c)}
+                  >
+                    {c}
+                  </button>
+                ))}
               </div>
 
-              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                <button style={styles.skipBtn} onClick={() => { setKeyModal(null); setApiKey(""); setApiSecret(""); setKeyError(""); }}>Cancel</button>
-                <button style={styles.nextBtn} onClick={handleSaveKey} disabled={keySaving}>
-                  {keySaving ? "Saving..." : "Save Key"}
+              <label style={styles.label}>Paper Trading (Practice Mode)</label>
+              <div style={styles.toggleRow}>
+                <button
+                  style={{ ...styles.toggleBtn, ...(paperMode ? styles.toggleActive : {}) }}
+                  onClick={() => setPaperMode(true)}
+                >
+                  ON — Practice with virtual money
+                </button>
+                <button
+                  style={{ ...styles.toggleBtn, ...(!paperMode ? styles.toggleDanger : {}) }}
+                  onClick={() => setPaperMode(false)}
+                >
+                  OFF — Real money
+                </button>
+              </div>
+
+              <div style={styles.btnRow}>
+                <button style={styles.skipBtn} onClick={() => setStep(2)}><ArrowLeft size={14} /> Back</button>
+                <button style={styles.nextBtn} onClick={() => setStep(4)}>Next <ArrowRight size={14} /></button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Confirmation */}
+          {step === 4 && (
+            <div>
+              <h2 style={styles.heading}>You&apos;re Ready</h2>
+              <p style={styles.desc}>Review your setup. You can change everything later in Settings.</p>
+
+              {/* No-exchange warning */}
+              {connectedCount === 0 && (
+                <div style={styles.noKeyWarning}>
+                  <div style={styles.noKeyWarningTitle}><AlertTriangle size={14} style={{ marginRight: 6 }} /> No exchange connected</div>
+                  <div style={styles.noKeyWarningText}>
+                    The bot will launch in <strong>paper trading mode only</strong>. To execute real trades, go to <strong>Settings → Exchange Keys</strong> and add your API keys. The bot will not activate live trading until valid keys are saved and verified.
+                  </div>
+                </div>
+              )}
+
+              <div style={styles.summaryBox}>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>Exchanges</span>
+                  <span>{connectedCount > 0 ? Object.keys(connected).filter(k => connected[k]).join(", ") : "None (paper only)"}</span>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>Strategy</span>
+                  <span>{presets.find(p => p.id === preset)?.name || preset}</span>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>Risk</span>
+                  <span>{risk.charAt(0).toUpperCase() + risk.slice(1)}</span>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>Balance</span>
+                  <span>${parseFloat(startBalance).toLocaleString()}</span>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>Coins</span>
+                  <span>{coins.join(", ")}</span>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>Mode</span>
+                  <span style={{ color: paperMode ? colors.success : colors.error }}>
+                    {paperMode ? "Paper Trading" : "LIVE Trading"}
+                  </span>
+                </div>
+              </div>
+
+              <div style={styles.btnRow}>
+                <button style={styles.skipBtn} onClick={() => setStep(3)}><ArrowLeft size={14} /> Back</button>
+                <button style={styles.launchBtn} onClick={handleFinish} disabled={saving}>
+                  {saving ? "Setting up..." : <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>Launch Bot <ArrowRight size={16} /></span>}
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Exchange Modals */}
+          {keyModal && (() => {
+            const exDef = EXCHANGES.find(e => e.id === keyModal);
+            const closeModal = () => { setKeyModal(null); setApiKey(""); setApiSecret(""); setWalletAddress(""); setKeyError(""); };
+
+            /* ── COINBASE: direct connect ── */
+            if (keyModal === "coinbase") {
+              return (
+                <div style={styles.modalOverlay} onClick={closeModal}>
+                  <div style={styles.modal} onClick={e => e.stopPropagation()}>
+                    <h3 style={styles.modalTitle}>Connect Coinbase</h3>
+                    <div style={styles.keyHintBanner}>
+                      <Info size={14} style={{ color: colors.gold, marginRight: 6 }} />
+                      Coinbase is connected via your account credentials. Click Connect below to link your Coinbase account to your profile.
+                    </div>
+                    {keyError && <div style={styles.error}>{keyError}</div>}
+                    <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                      <button style={styles.skipBtn} onClick={closeModal}>Cancel</button>
+                      <button style={styles.nextBtn} onClick={handleConnectCoinbase} disabled={keySaving}>
+                        {keySaving ? "Connecting..." : "Connect"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            /* ── ONCHAIN: wallet address ── */
+            if (keyModal === "onchain") {
+              return (
+                <div style={styles.modalOverlay} onClick={closeModal}>
+                  <div style={styles.modal} onClick={e => e.stopPropagation()}>
+                    <h3 style={styles.modalTitle}>Add On-Chain Wallet</h3>
+                    <div style={styles.keyHintBanner}>
+                      <Info size={14} style={{ color: colors.gold, marginRight: 6 }} />
+                      Enter your public wallet address. The bot uses Coinbase AgentKit to execute on-chain trades — no private key is stored.
+                    </div>
+                    {keyError && <div style={styles.error}>{keyError}</div>}
+                    <input
+                      id="onboarding-wallet-address"
+                      type="text"
+                      placeholder="0x... wallet address"
+                      value={walletAddress}
+                      onChange={e => { setWalletAddress(e.target.value); setKeyError(""); }}
+                      style={styles.input}
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                      <button style={styles.skipBtn} onClick={closeModal}>Cancel</button>
+                      <button style={styles.nextBtn} onClick={handleConnectOnchain} disabled={keySaving || !walletAddress.trim()}>
+                        {keySaving ? "Saving..." : "Save Wallet"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            /* ── KRAKEN / BINANCE: API Keys ── */
+            return (
+              <div style={styles.modalOverlay} onClick={closeModal}>
+                <div style={styles.modal} onClick={e => e.stopPropagation()}>
+                  <h3 style={styles.modalTitle}>Add {exDef?.name || keyModal} API Key</h3>
+
+                  {exDef?.keyHint && (
+                    <div style={styles.keyHintBanner}>
+                      <Info size={14} style={{ color: colors.gold, marginRight: 6 }} />
+                      {exDef.keyHint}
+                    </div>
+                  )}
+
+                  {keyError && <div style={styles.error}>{keyError}</div>}
+
+                  <input
+                    id={`api-key-input-${keyModal}`}
+                    type="text"
+                    placeholder={exDef?.keyPlaceholder || "API Key"}
+                    value={apiKey}
+                    onChange={e => { setApiKey(e.target.value); setKeyError(""); }}
+                    style={styles.input}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  {exDef?.keyPatternHint && (
+                    <div style={styles.fieldHint}>{exDef.keyPatternHint}</div>
+                  )}
+                  <input
+                    id={`api-secret-input-${keyModal}`}
+                    type="password"
+                    placeholder={exDef?.secretPlaceholder || "API Secret"}
+                    value={apiSecret}
+                    onChange={e => { setApiSecret(e.target.value); setKeyError(""); }}
+                    style={{ ...styles.input, marginTop: 10 }}
+                    autoComplete="new-password"
+                  />
+
+                  <div style={styles.keyInfo}>
+                    <div style={styles.keyInfoTitle}>Enable these permissions on your key:</div>
+                    <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> View / Query Funds &amp; Balances</div>
+                    <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> Query Orders &amp; Trade History</div>
+                    <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> Spot Trading (Create &amp; Modify Orders)</div>
+                    <div style={styles.keyPerm}><Check size={12} style={{ color: colors.success }} /> Futures / Derivatives Trading</div>
+                    <div style={styles.keyPerm}><X size={12} style={{ color: colors.error }} /> Withdraw Funds — leave <strong>OFF</strong></div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                    <button style={styles.skipBtn} onClick={closeModal}>Cancel</button>
+                    <button style={styles.nextBtn} onClick={handleSaveKey} disabled={keySaving || !apiKey.trim() || !apiSecret.trim()}>
+                      {keySaving ? "Validating..." : "Save Key"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
       </div>
-    </div>
     </>
   );
 }
@@ -657,6 +844,71 @@ const styles = {
     justifyContent: "space-between",
     marginTop: 24,
     gap: 12,
+  },
+  skipWarningBox: {
+    background: "rgba(212,175,55,0.06)",
+    border: "1px solid rgba(212,175,55,0.3)",
+    borderRadius: 12,
+    padding: "16px 14px",
+    marginTop: 16,
+  },
+  skipWarningTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: colors.gold,
+    marginBottom: 8,
+  },
+  skipWarningText: {
+    fontSize: 11,
+    color: "#bbb",
+    lineHeight: 1.7,
+    marginBottom: 12,
+  },
+  skipConfirmBtn: {
+    fontFamily: typography.fontMono,
+    fontSize: 11,
+    padding: "8px 16px",
+    background: "rgba(212,175,55,0.1)",
+    border: "1px solid rgba(212,175,55,0.4)",
+    borderRadius: 8,
+    color: colors.gold,
+    cursor: "pointer",
+    width: "100%",
+  },
+  noKeyWarning: {
+    background: "rgba(212,175,55,0.05)",
+    border: "1px solid rgba(212,175,55,0.25)",
+    borderRadius: 12,
+    padding: "14px 14px",
+    marginBottom: 16,
+  },
+  noKeyWarningTitle: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: colors.gold,
+    marginBottom: 6,
+  },
+  noKeyWarningText: {
+    fontSize: 11,
+    color: "#aaa",
+    lineHeight: 1.7,
+  },
+  keyHintBanner: {
+    fontSize: 11,
+    color: "#aaa",
+    lineHeight: 1.6,
+    background: "rgba(212,175,55,0.05)",
+    border: "1px solid rgba(212,175,55,0.15)",
+    borderRadius: 8,
+    padding: "10px 12px",
+    marginBottom: 12,
+  },
+  fieldHint: {
+    fontSize: 10,
+    color: "#666",
+    marginTop: 4,
+    marginBottom: 4,
+    paddingLeft: 2,
   },
   skipBtn: {
     fontFamily: typography.fontMono,

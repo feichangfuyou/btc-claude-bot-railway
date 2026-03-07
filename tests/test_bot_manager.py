@@ -36,9 +36,9 @@ def mock_dependencies():
         mock_config.email = "test@example.com"
         mock_config.connected_exchanges = ["coinbase"]
         mock_config.max_concurrent_positions = 8
+        mock_config.subscription_status = "active"
         mock_load_config.return_value = mock_config
         yield mock_load_config
-
 
 # ── BotManager create / get ──────────────────────────────────────────────────
 

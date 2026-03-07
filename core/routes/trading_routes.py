@@ -7,7 +7,7 @@ from fastapi import APIRouter, Body, Depends, Request
 from ai.claude_ai import call_claude, get_cost_tracker
 from api.agentkit_provider import agentkit
 from core.ai_state_builder import build_ai_state
-from core.auth import AuthenticatedUser, get_optional_user
+from core.auth import AuthenticatedUser, get_active_user, get_optional_user
 from core.bot_manager import bot_manager
 from core.config import (
     API_SECRET,
@@ -46,7 +46,7 @@ router = APIRouter(tags=["trading"])
 async def ask_claude_rest(
     request: Request,
     direct: bool = True,
-    user: Optional[AuthenticatedUser] = Depends(get_optional_user),
+    user: AuthenticatedUser = Depends(get_active_user),
 ):
     """Manual Ask Claude — always skips scout for full trade analysis."""
     from core.shared import bot as _bot
@@ -115,12 +115,9 @@ async def ask_claude_rest(
 
 
 @router.get("/trades")
-async def get_trades(user: Optional[AuthenticatedUser] = Depends(get_optional_user)):
-    if user:
-        instance = await bot_manager.get_or_create(user.id)
-        trades = instance.trades
-    else:
-        trades = bot.trades
+async def get_trades(user: AuthenticatedUser = Depends(get_active_user)):
+    instance = await bot_manager.get_or_create(user.id)
+    trades = instance.trades
     wins = sum(1 for t in trades if t.get("win"))
     total = len(trades)
     return {
@@ -134,7 +131,7 @@ async def get_trades(user: Optional[AuthenticatedUser] = Depends(get_optional_us
 
 @router.get("/trades/history")
 async def get_trade_history(
-    user: Optional[AuthenticatedUser] = Depends(get_optional_user),
+    user: AuthenticatedUser = Depends(get_active_user),
     date_from: str | None = None,
     date_to: str | None = None,
     symbol: str | None = None,
@@ -153,29 +150,17 @@ async def get_trade_history(
     elif result == "loss":
         win_only = False
 
-    if user:
-        trades, total = udb_load_all_trades(
-            user.id,
-            date_from=date_from,
-            date_to=date_to,
-            symbol=symbol or None,
-            side=side or None,
-            win_only=win_only,
-            product_type=product_type or None,
-            limit=min(limit, 500),
-            offset=offset,
-        )
-    else:
-        trades, total = db_load_all_trades(
-            date_from=date_from,
-            date_to=date_to,
-            symbol=symbol or None,
-            side=side or None,
-            win_only=win_only,
-            product_type=product_type or None,
-            limit=min(limit, 500),
-            offset=offset,
-        )
+    trades, total = udb_load_all_trades(
+        user.id,
+        date_from=date_from,
+        date_to=date_to,
+        symbol=symbol or None,
+        side=side or None,
+        win_only=win_only,
+        product_type=product_type or None,
+        limit=min(limit, 500),
+        offset=offset,
+    )
 
     pnls = [t["pnl"] for t in trades]
     wins = sum(1 for p in pnls if p > 0)
@@ -196,19 +181,12 @@ async def get_trade_history(
 
 
 @router.get("/account")
-async def get_account(user: Optional[AuthenticatedUser] = Depends(get_optional_user)):
-    if user:
-        instance = await bot_manager.get_or_create(user.id)
-        snap = instance.account_snapshot()
-        return {
-            **snap,
-            "trading_preset": instance.config.trading_preset,
-        }
+async def get_account(user: AuthenticatedUser = Depends(get_active_user)):
+    instance = await bot_manager.get_or_create(user.id)
+    snap = instance.account_snapshot()
     return {
-        **bot.account,
-        "start_balance": START_BALANCE,
-        "target_balance": TARGET_BALANCE,
-        "trading_preset": getattr(bot, "trading_preset", "turtle"),
+        **snap,
+        "trading_preset": instance.config.trading_preset,
     }
 
 
@@ -234,25 +212,29 @@ def get_current_preset():
 
 
 @router.post("/api/preset")
-def set_preset(body: dict = Body(default={})):
-    """Set active trading preset. Body: {"preset": "soros"}"""
+async def set_preset(body: dict = Body(default={}), user: AuthenticatedUser = Depends(get_active_user)):
+    """Set active trading preset for the authenticated user's instance."""
     pid = (body.get("preset") or "").strip().lower()
     if pid not in PRESETS:
         return {"ok": False, "error": f"Unknown preset: {pid}"}
-    bot.trading_preset = pid
-    db_save_state("trading_preset", pid)
+    
+    # Update the user's bot instance
+    instance = await bot_manager.get_or_create(user.id)
+    instance.config.trading_preset = pid
+    instance.persist_state()
+    
+    # Also save to user_preferences for persistence
+    from core.user_config import save_user_preferences
+    save_user_preferences(user.id, {"trading_preset": pid})
+    
     return {"ok": True, "preset": pid}
 
 
 @router.get("/stats")
-async def get_stats(user: Optional[AuthenticatedUser] = Depends(get_optional_user)):
-    if user:
-        instance = await bot_manager.get_or_create(user.id)
-        trades = instance.trades
-        account = instance.account_snapshot()
-    else:
-        trades = bot.trades
-        account = bot.account
+async def get_stats(user: AuthenticatedUser = Depends(get_active_user)):
+    instance = await bot_manager.get_or_create(user.id)
+    trades = instance.trades
+    account = instance.account_snapshot()
     pnls = [t["pnl"] for t in trades]
     wins = [p for p in pnls if p > 0]
     losses = [p for p in pnls if p < 0]
@@ -270,12 +252,12 @@ async def get_stats(user: Optional[AuthenticatedUser] = Depends(get_optional_use
 
 
 @router.get("/costs")
-def get_costs():
+def get_costs(user: AuthenticatedUser = Depends(get_active_user)):
     return get_cost_tracker()
 
 
 @router.get("/wallet")
-async def get_wallet():
+async def get_wallet(user: AuthenticatedUser = Depends(get_active_user)):
     status = agentkit.status_snapshot()
     if agentkit.ready:
         loop = asyncio.get_running_loop()
@@ -291,13 +273,9 @@ async def get_wallet():
 
 
 @router.get("/equity")
-async def get_equity(user: Optional[AuthenticatedUser] = Depends(get_optional_user)):
-    if user:
-        curve = udb_get_equity_curve(user.id, limit=500)
-        sessions = []
-    else:
-        curve = db_get_equity_curve(limit=500)
-        sessions = db_get_session_history(limit=30)
+async def get_equity(user: AuthenticatedUser = Depends(get_active_user)):
+    curve = udb_get_equity_curve(user.id, limit=500)
+    sessions = []
     return {
         "curve": curve,
         "sessions": sessions,
@@ -305,22 +283,42 @@ async def get_equity(user: Optional[AuthenticatedUser] = Depends(get_optional_us
 
 
 @router.post("/emergency/stop")
-async def emergency_stop(request: Request):
-    if not API_SECRET:
+async def emergency_stop(request: Request, user: AuthenticatedUser = Depends(get_active_user)):
+    # Admin only or localhost check
+    if user.role != "admin":
         host = request.client.host if request.client else ""
         if host not in ("127.0.0.1", "::1", "localhost"):
-            from fastapi.responses import JSONResponse
+            raise HTTPException(status_code=403, detail="Emergency stop restricted to admins")
 
-            return JSONResponse(
-                {"error": "emergency/stop requires BOT_API_SECRET or localhost"},
-                status_code=403,
-            )
+    from core.bot_manager import bot_manager
+    import asyncio
+    
+    # Broadcast CLOSE signals to all running bots
+    targets = []
+    for instance in bot_manager._instances.values():
+        if instance.running:
+            targets.append(bot_manager._safely_process_signal(instance, {
+                "action": "close",
+                "symbol": "ALL",
+                "reason": "ADMIN EMERGENCY STOP",
+            }))
+    
+    if targets:
+        # Await their closures
+        await asyncio.gather(*targets, return_exceptions=True)
+        # Turn them all off and persist to DB
+        for instance in list(bot_manager._instances.values()):
+            if instance.running:
+                instance.running = False
+                instance.persist_state()
+
+    # Legacy bot fallback
     await bot.emergency_stop()
-    return {"status": "emergency_stop_executed", "balance": bot.account["balance"]}
+    return {"status": "emergency_stop_executed", "balance": bot.account.get("balance", 0)}
 
 
 @router.get("/snapshots")
-def get_snapshots(limit: int = 168):
+def get_snapshots(user: AuthenticatedUser = Depends(get_active_user), limit: int = 168):
     """Return account balance snapshots for equity curve."""
     from core.database import get_conn
 
@@ -337,6 +335,7 @@ def get_snapshots(limit: int = 168):
 
 @router.post("/backtest")
 async def run_backtest_endpoint(
+    user: AuthenticatedUser = Depends(get_active_user),
     symbol: str = "BTC",
     days: int = 30,
     position_size_pct: float = 0.20,

@@ -18,6 +18,16 @@ function httpProxy() {
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          utils: ['canvas-confetti']
+        }
+      }
+    }
+  },
   envDir: "..",  // load .env from project root (where BOT_API_SECRET / VITE_BOT_API_SECRET live)
   server: {
     port: 5173,
@@ -40,32 +50,35 @@ export default defineConfig({
         configure: (proxy) => {
           proxy.on("error", silentErrorHandler);
           proxy.on("proxyReqWs", (_proxyReq, _req, socket) => {
-            socket.on("error", () => {});
+            socket.on("error", () => { });
             socket.setTimeout(0);
           });
           proxy.on("open", (proxySocket) => {
-            proxySocket.on("error", () => {});
+            proxySocket.on("error", () => { });
             proxySocket.setTimeout(0);
           });
         },
       },
-      "/health":     httpProxy(),
-      "/readiness":  httpProxy(),
-      "/metrics":    httpProxy(),
-      "/trades":     httpProxy(),
-      "/account":    httpProxy(),
-      "/stats":      httpProxy(),
-      "/wallet":     httpProxy(),
+      "/health": httpProxy(),
+      "/readiness": httpProxy(),
+      "/metrics": httpProxy(),
+      "/trades": httpProxy(),
+      "/account": httpProxy(),
+      "/stats": httpProxy(),
+      "/wallet": httpProxy(),
       "/ask_claude": httpProxy(),
-      "/memory":     httpProxy(),
-      "/costs":      httpProxy(),
-      "/emergency":  httpProxy(),
-      "/equity":     httpProxy(),
-      "/snapshots":  httpProxy(),
-      "/backtest":   httpProxy(),
+      "/memory": httpProxy(),
+      "/costs": httpProxy(),
+      "/emergency": httpProxy(),
+      "/equity": httpProxy(),
+      "/snapshots": httpProxy(),
+      "/backtest": httpProxy(),
       "/api/preset": httpProxy(),
       "/api/presets": httpProxy(),
-      "/auth":       httpProxy(),
+      "/api/config": httpProxy(),
+      "/api/admin": httpProxy(),
+      "/api/trade": httpProxy(),
+      "/auth": httpProxy(),
     },
   },
 });

@@ -1,6 +1,7 @@
 import { useEffect, useRef, memo } from "react";
 import { animate } from "animejs";
 import { colors } from "./theme.js";
+import { CheckCircle2 } from "lucide-react";
 
 function formatPrice(p) {
   if (!p || p <= 0) return "\u2014";
@@ -127,9 +128,9 @@ function TickerItem({
       />
       {hasPosition && (
         <span
-          style={{ fontSize: "9px", color: colors.gold, marginLeft: "2px" }}
+          style={{ fontSize: "9px", color: colors.gold, marginLeft: "2px", display: "flex", alignItems: "center", gap: "2px" }}
         >
-          🥊 OPEN
+          <CheckCircle2 size={10} /> OPEN
         </span>
       )}
     </button>

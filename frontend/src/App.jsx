@@ -1,9 +1,11 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, Component } from "react";
+import { useNavigate } from "react-router-dom";
 import confetti from "canvas-confetti";
 import { useAuth } from "./contexts/AuthContext.jsx";
 import AnimatedNumber from "./AnimatedNumber.jsx";
 import FetchingPrice from "./FetchingPrice.jsx";
-import { staggerIn } from "./animations.js";
+import TradingViewChart from "./TradingViewChart.jsx";
+import { staggerIn, slideUp, popIn } from "./animations.js";
 import { useAuthHeaders, useAuthQueryParam } from "./hooks/useAuthHeaders.js";
 import { colors } from "./theme.js";
 import { TradeQuote } from "./components/TradeQuote.jsx";
@@ -14,7 +16,8 @@ import { TradeDetailModal } from "./components/TradeDetailModal.jsx";
 import { PositionsPanel } from "./components/PositionsPanel.jsx";
 import { ControlPanel } from "./components/ControlPanel.jsx";
 import { ChartSection } from "./components/ChartSection.jsx";
-import { ClaudeBrainPanel, MarketRegimePanel, AgentKitPanel, IndicatorsPanel, RiskMonitorPanel, RecentTradesPanel, ActivityLogPanel } from "./components/BottomPanels.jsx";
+import { TerminalBrainPanel, MarketRegimePanel, AgentKitPanel, IndicatorsPanel, RiskMonitorPanel, RecentTradesPanel, ActivityLogPanel } from "./components/BottomPanels.jsx";
+import { AlertTriangle, Brain } from "lucide-react";
 
 // ─── Error Boundary ────────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -29,16 +32,16 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <div style={{ fontFamily: "'Space Mono',monospace", background: "#0A0A0A", color: "#D4D4D4", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "16px", padding: "20px", textAlign: "center" }}>
-          <div style={{ fontSize: "48px" }}>🥊</div>
-          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "28px", fontWeight: "400", color: colors.error, letterSpacing: "4px" }}>DOWN FOR THE COUNT</div>
+          <div style={{ fontSize: "48px" }}><AlertTriangle size={48} color={colors.error} /></div>
+          <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "28px", fontWeight: "700", color: colors.error, letterSpacing: "4px" }}>SYSTEM ERROR</div>
           <div style={{ fontSize: "12px", color: colors.muted, maxWidth: "500px", lineHeight: "1.8" }}>
             {this.state.error?.message || "An unexpected error occurred."}
           </div>
           <button
             onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
-            style={{ fontFamily: "'Oswald',sans-serif", fontSize: "12px", fontWeight: "600", letterSpacing: "2px", padding: "10px 24px", border: "none", borderRadius: "3px", cursor: "pointer", background: `linear-gradient(180deg,${colors.gold},${colors.goldDark})`, color: colors.dark }}
+            style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "12px", fontWeight: "800", letterSpacing: "2px", padding: "10px 24px", border: "none", borderRadius: "3px", cursor: "pointer", background: `linear-gradient(180deg,${colors.gold},${colors.goldDark})`, color: colors.dark }}
           >
-            GET BACK UP
+            RELOAD TERMINAL
           </button>
         </div>
       );
@@ -193,18 +196,24 @@ function Dashboard() {
   const { user, profile, signOut, accessToken } = useAuth();
   const getAuthHeaders = useAuthHeaders();
   const getAuthQueryParam = useAuthQueryParam();
+  const navigate = useNavigate();
 
   // ── Connection ──────────────────────────────────────────────────────────────
   const [connected, setConnected] = useState(false);
   const [cbLive, setCbLive] = useState(false);
   const [krakenEnabled, setKrakenEnabled] = useState(false);
   const [binanceEnabled, setBinanceEnabled] = useState(false);
-  const [hasClaude, setHasClaude] = useState(false);
+  const [hasBrain, setHasBrain] = useState(false);
   const [paperMode, setPaperMode] = useState(true);
   const [agentKit, setAgentKit] = useState({ agentkit_ready: false, wallet_address: null, network: null, error: null });
   const [wsRetrying, setWsRetrying] = useState(false);
 
-  // ── Multi-coin ──────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    document.title = "Terminal — DoYou.trade AI Trading Brain";
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute("content", "Access your institutional-grade AI trading terminal. Professional crypto automation and strategy management for the Brain.");
+  }, []);
   const [coins, setCoins] = useState({});
   const [activeCoins, setActiveCoins] = useState(DEFAULT_COINS);
   const [selectedCoin, setSelectedCoin] = useState("BTC");
@@ -259,6 +268,32 @@ function Dashboard() {
 
   // ── Toast (loss notification) ──────────────────────────────────────────────
   const [lossToast, setLossToast] = useState(null);
+
+  // ── Navigation ────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState("trade"); // "trade", "bot", "logs", "analytics"
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    if (mobileNavOpen) {
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      document.documentElement.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+      document.documentElement.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+      document.documentElement.style.overflow = "";
+    };
+  }, [mobileNavOpen]);
+
+  useLayoutEffect(() => {
+    const panels = document.querySelectorAll(`.tab-${activeTab}`);
+    if (panels.length > 0) slideUp(panels, 400);
+  }, [activeTab]);
 
   // ── Trading preset (top 100 trader strategies) ────────────────────────────
   const [tradingPreset, setTradingPreset] = useState("turtle");
@@ -341,7 +376,8 @@ function Dashboard() {
 
   // ── Backend WebSocket ────────────────────────────────────────────────────────
   useEffect(() => {
-    let ws, retryTimer, pingTimer, connectTimeout, disposed = false;
+    let ws, retryTimer, pingTimer, watchdogTimer, connectTimeout, disposed = false;
+    let lastMessageAt = Date.now();
     let retryDelay = 2000;
     const MAX_RETRY = 30000;
     let hadConnection = false;
@@ -372,9 +408,19 @@ function Dashboard() {
             try { ws.send(JSON.stringify({ cmd: "ping" })); } catch { }
           }
         }, 25000);
+
+        if (watchdogTimer) clearInterval(watchdogTimer);
+        lastMessageAt = Date.now();
+        watchdogTimer = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN && Date.now() - lastMessageAt > 45000) {
+            console.warn("Backend WS watchdog timeout - reconnecting");
+            ws.close();
+          }
+        }, 10000);
       };
 
       ws.onmessage = (e) => {
+        lastMessageAt = Date.now();
         try {
           const m = JSON.parse(e.data);
           if (m.type === "pong") return;
@@ -480,7 +526,7 @@ function Dashboard() {
           if (m.claude_thinking != null) setThinking(m.claude_thinking);
           if (m.last_claude_call) setLastCall(m.last_claude_call);
           if (m.countdown != null) setCountdown(m.countdown);
-          if (m.has_claude_key != null) setHasClaude(m.has_claude_key);
+          if (m.has_claude_key != null) setHasBrain(m.has_claude_key);
           if (m.paper_trading != null) setPaperMode(m.paper_trading);
           if (m.coinbase_connected != null) setCbLive(m.coinbase_connected);
           if (m.kraken_enabled != null) setKrakenEnabled(m.kraken_enabled);
@@ -502,6 +548,7 @@ function Dashboard() {
       ws.onclose = (ev) => {
         if (disposed) return;
         if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+        if (watchdogTimer) { clearInterval(watchdogTimer); watchdogTimer = null; }
         if (priceAgeRef.current) { clearInterval(priceAgeRef.current); priceAgeRef.current = null; }
         setConnected(false);
         setCbLive(false);
@@ -528,6 +575,7 @@ function Dashboard() {
       if (connectTimeout) clearTimeout(connectTimeout);
       clearTimeout(retryTimer);
       if (pingTimer) clearInterval(pingTimer);
+      if (watchdogTimer) clearInterval(watchdogTimer);
       if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
         try { ws.close(); } catch { }
       }
@@ -645,7 +693,8 @@ function Dashboard() {
 
   // ── Coinbase WebSocket — real-time price stream matching TradingView ─────────
   useEffect(() => {
-    let ws, disposed = false, reconnectTimer;
+    let ws, disposed = false, reconnectTimer, watchdogTimer;
+    let lastMessageAt = Date.now();
     const CB_WS = "wss://ws-feed.exchange.coinbase.com";
     const productId = `${selectedCoinRef.current}-USD`;
 
@@ -660,9 +709,19 @@ function Dashboard() {
           product_ids: [productId],
           channels: ["ticker"],
         }));
+
+        if (watchdogTimer) clearInterval(watchdogTimer);
+        lastMessageAt = Date.now();
+        watchdogTimer = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN && Date.now() - lastMessageAt > 20000) {
+            console.warn("Coinbase WS watchdog timeout - reconnecting");
+            ws.close();
+          }
+        }, 5000);
       };
 
       ws.onmessage = (evt) => {
+        lastMessageAt = Date.now();
         try {
           const m = JSON.parse(evt.data);
           if (m.type !== "ticker" || m.product_id !== `${selectedCoinRef.current}-USD`) return;
@@ -678,7 +737,10 @@ function Dashboard() {
         } catch { }
       };
 
-      ws.onclose = () => { if (!disposed) scheduleReconnect(); };
+      ws.onclose = () => {
+        if (watchdogTimer) { clearInterval(watchdogTimer); watchdogTimer = null; }
+        if (!disposed) scheduleReconnect();
+      };
       ws.onerror = () => { try { ws.close(); } catch { } };
     }
 
@@ -696,6 +758,7 @@ function Dashboard() {
     return () => {
       disposed = true;
       clearTimeout(reconnectTimer);
+      if (watchdogTimer) clearInterval(watchdogTimer);
       if (ws) {
         // Unbind listeners before closing to avoid errors/reconnects during cleanup
         ws.onopen = null;
@@ -793,11 +856,11 @@ function Dashboard() {
     return () => clearInterval(t);
   }, [log]);
 
-  const callClaude = useCallback(async () => {
+  const callBrain = useCallback(async () => {
     if (thinkingRef.current) return;
     setThinking(true);
     setLastCall(new Date().toLocaleTimeString());
-    log("Claude analyzing live market data...", "claude");
+    log("Brain analyzing live market data...", "claude");
 
     try {
       const backendBase = BACKEND_BASE || `${window.location.protocol}//${window.location.hostname}:8000`;
@@ -810,13 +873,13 @@ function Dashboard() {
 
       const dec = await res.json();
       setDecision(dec);
-      log(`Claude: ${dec.action?.toUpperCase()} — ${dec.reasoning?.slice(0, 80) || ""}`, dec.action === "wait" ? "dim" : "claude");
+      log(`Brain: ${dec.action?.toUpperCase()} — ${dec.reasoning?.slice(0, 80) || ""}`, dec.action === "wait" ? "dim" : "claude");
     } catch (e) {
       if (e.message?.toLowerCase().includes("failed to fetch") || e.message?.toLowerCase().includes("networkerror")) {
-        log("Backend offline — cannot reach Claude. Start python backend.py", "warning");
+        log("Backend offline — cannot reach the Brain. Start python backend.py", "warning");
         setDecision({ reasoning: "Backend offline. Start backend.py for AI trading.", action: "wait", confidence: 0, market_condition: regimeRef.current });
       } else {
-        log(`Claude error: ${e.message}`, "error");
+        log(`Brain error: ${e.message}`, "error");
       }
     } finally {
       setThinking(false);
@@ -834,7 +897,7 @@ function Dashboard() {
   };
   const handleAsk = () => {
     if (connected) send("ask_claude", { direct: true });
-    else callClaude();  // callClaude will show "Backend offline" if unreachable
+    else callBrain();  // callBrain will show "Backend offline" if unreachable
   };
   const handleModelChange = (model) => {
     setClaudeModel(model);
@@ -1083,6 +1146,20 @@ function Dashboard() {
   const unrealized = useMemo(() => +totalUnrealized.toFixed(2), [totalUnrealized]);
   const isLiveMode = !paperMode;
 
+  // ── Bot Fast Scan Effect ──────────────────────────────────────────────────
+  const [fastScanIdx, setFastScanIdx] = useState(0);
+  useEffect(() => {
+    if (positions.length > 0 || !botOn) return;
+    const interval = setInterval(() => {
+      setFastScanIdx(i => i + 1);
+    }, 400); // Slowed down from 150ms to 400ms for a more methodical scan
+    return () => clearInterval(interval);
+  }, [positions.length, botOn]);
+
+  const fastScanCoin = activeCoins.length > 0 ? activeCoins[fastScanIdx % activeCoins.length] : selectedCoin;
+  // Chart updates every ~2400ms (every 6th tick) to allow TV to render, while text updates faster
+  const chartScanCoin = activeCoins.length > 0 ? activeCoins[Math.floor(fastScanIdx / 6) % activeCoins.length] : selectedCoin;
+
   const priceFormat = useCallback((v) => {
     if (v < 10) return v.toFixed(4);
     if (v < 1000) return v.toFixed(2);
@@ -1090,20 +1167,17 @@ function Dashboard() {
   }, []);
 
   return (
-    <div className="app-root" style={{ fontFamily: "'Space Mono',monospace", background: "#0A0A0A", color: "#D4D4D4", padding: "20px 24px 80px", fontSize: "12px" }}>
+    <div className="app-root" data-tab={activeTab} style={{ fontFamily: "'Space Mono',monospace", background: "#0A0A0A", color: "#D4D4D4", padding: "20px 24px 80px", fontSize: "12px" }}>
       <style>{`
-        *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-        ::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(212,175,55,0.2);border-radius:2px}
-        *{scrollbar-width:thin;scrollbar-color:rgba(212,175,55,0.2) transparent}
+        .grid{display:grid;grid-template-columns:260px 1fr 260px;gap:14px}
+        .grid-bottom{display:grid;grid-template-columns:300px 1fr 300px;gap:16px;margin-top:16px}
+        .col{display:flex;flex-direction:column;gap:14px}
         .card{background:rgba(17,17,17,0.55);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border:1px solid rgba(212,175,55,0.1);border-radius:16px;padding:16px;position:relative;box-shadow:0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.04);transition:border-color 0.3s ease,box-shadow 0.3s ease}
         .card:hover{border-color:rgba(212,175,55,0.2);box-shadow:0 12px 40px rgba(0,0,0,0.45),0 0 24px rgba(212,175,55,0.06),inset 0 1px 0 rgba(255,255,255,0.06)}
         .card::before,.card::after{content:'';position:absolute;width:16px;height:16px;pointer-events:none;opacity:0.6;transition:opacity 0.3s ease}
         .card:hover::before,.card:hover::after{opacity:1}
         .card::before{top:-1px;left:-1px;border-top:2px solid rgba(212,175,55,0.5);border-left:2px solid rgba(212,175,55,0.5);border-radius:16px 0 0 0}
         .card::after{bottom:-1px;right:-1px;border-bottom:2px solid rgba(212,175,55,0.5);border-right:2px solid rgba(212,175,55,0.5);border-radius:0 0 16px 0}
-        .grid{display:grid;grid-template-columns:260px 1fr 260px;gap:14px}
-        .grid-bottom{display:grid;grid-template-columns:300px 1fr 300px;gap:16px;margin-top:16px}
-        .col{display:flex;flex-direction:column;gap:14px}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
         @keyframes fadein{from{opacity:0;transform:translateY(-6px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}
         @keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -1127,10 +1201,12 @@ function Dashboard() {
         .confirm-box{background:rgba(17,17,17,0.72);backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);border:1px solid rgba(212,175,55,0.15);border-radius:20px;padding:28px 32px;width:calc(100% - 32px);max-width:400px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.04),inset 0 1px 0 rgba(255,255,255,0.06);box-sizing:border-box}
         select option,select optgroup{background:#111111;color:#D4D4D4;font-family:'Space Mono',monospace;font-size:10px}
         select optgroup{color:#5C5C5C;font-weight:700}
-        .live-banner{background:linear-gradient(90deg,rgba(192,57,43,0.1),rgba(255,153,0,0.1));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(192,57,43,0.2);border-radius:12px;padding:8px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:10px}
+        .chasing-container { position: relative; overflow: hidden; border: none !important; padding: 0 !important; box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 24px rgba(212,175,55,0.15) !important; background: rgba(212,175,55,0.15) !important; }
+        .chasing-container::before, .chasing-container::after { display: none !important; }
+        .chasing-light { position: absolute; top: 50%; left: 50%; width: 250%; height: 250%; background: conic-gradient(from 0deg, transparent 75%, rgba(212,175,55,0.6) 90%, rgba(212,175,55,1) 100%); transform: translate(-50%, -50%); animation: spinAround 5s linear infinite; z-index: 0; }
+        .chasing-content { position: absolute; inset: 1.5px; background: #111111; border-radius: 14.5px; z-index: 1; padding: 12px; display: flex; flex-direction: column; }
+        .scan-border{animation:scanGlow 1.5s infinite ease-in-out;}
         .app-root{min-height:100vh;min-height:100dvh}
-        /* ─── Section spacing: every major section gets breathing room ─── */
-        .section-gap{margin-bottom:20px}
         .brand-ticker-row{display:flex;align-items:center;margin-bottom:20px;position:relative;overflow:hidden;background:rgba(17,17,17,0.55);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border:1px solid rgba(212,175,55,0.1);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.04)}
         .brand-ticker-row::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#D4AF37,#C0392B,#D4AF37);z-index:20;opacity:0.7}
         .brand-ticker-row::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(212,175,55,0.15),transparent);z-index:20}
@@ -1139,21 +1215,46 @@ function Dashboard() {
         .ticker-wrapper{flex:1;min-width:0;overflow:hidden;position:relative;z-index:1;display:flex;align-items:center}
         .ticker-wrapper .ticker-tape{margin-bottom:0;border:none;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;padding:0;flex:1;min-width:0}
         .ticker-wrapper .ticker-tape::before{display:none}
-        .ticker-tape{margin-bottom:20px;overflow:hidden;position:relative;background:rgba(17,17,17,0.45);backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:10px 0;box-shadow:0 4px 24px rgba(0,0,0,0.4);z-index:1}
-        .ticker-tape::before,.ticker-tape::after{content:'';position:absolute;top:0;bottom:0;width:48px;z-index:2;pointer-events:none}
-        .ticker-tape::before{left:0;background:linear-gradient(90deg,rgba(17,17,17,0.6) 0%,transparent 100%)}
-        .ticker-tape::after{right:0;background:linear-gradient(270deg,rgba(17,17,17,0.6) 0%,transparent 100%)}
-        .ticker-tape:hover .ticker-track{animation-play-state:paused}
-        .ticker-track{display:flex;align-items:center;gap:32px;will-change:transform;animation:tickerScroll 90s linear infinite;width:max-content;backface-visibility:hidden;-webkit-backface-visibility:hidden}
-        @keyframes tickerScroll{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-50%,0,0)}}
+        /* ── Ticker tape — motion driven by rAF loop in TickerTape.jsx, NOT by CSS animation ── */
+        .ticker-tape{margin-bottom:20px;overflow:hidden;position:relative;background:rgba(10,10,10,0.85);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:10px 0;box-shadow:0 4px 24px rgba(0,0,0,0.5);z-index:1}
+        .ticker-tape::before,.ticker-tape::after{content:'';position:absolute;top:0;bottom:0;width:80px;z-index:3;pointer-events:none}
+        .ticker-tape::before{left:0;background:linear-gradient(90deg,rgba(10,10,10,0.9) 0%,transparent 100%)}
+        .ticker-tape::after{right:0;background:linear-gradient(270deg,rgba(10,10,10,0.9) 0%,transparent 100%)}
+        /* No animation here — rAF writes transform directly to this element */
+        .ticker-track{display:flex;align-items:center;gap:32px;will-change:transform;width:max-content;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+        .section-gap{margin-bottom:20px}
         @keyframes lossToastIn{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
         @keyframes slideDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+        /* ── Unified Nav Tabs for Desktop ── */
+        .desktop-nav { display: flex; gap: 32px; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 0 16px; font-family: 'Montserrat', sans-serif; letter-spacing: 2px; text-transform: uppercase; font-size: 14px; }
+        .desktop-nav-item { padding: 12px 16px; color: #5C5C5C; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; position: relative; }
+        .desktop-nav-item:hover { color: #D4D4D4; }
+        .desktop-nav-item.active { color: #D4AF37; font-weight: 600; }
+        .desktop-nav-item.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #D4AF37; box-shadow: 0 0 10px rgba(212,175,55,0.5); }
+        .app-root[data-tab="trade"] .tab-bot,
+        .app-root[data-tab="trade"] .tab-logs { display: none !important; }
+        .app-root[data-tab="bot"] .tab-trade,
+        .app-root[data-tab="bot"] .tab-logs { display: none !important; }
+        .app-root[data-tab="logs"] .tab-trade,
+        .app-root[data-tab="logs"] .tab-bot,
+        .app-root[data-tab="logs"] .hide-on-logs { display: none !important; }
+
+        @media(min-width: 1025px) {
+          .app-root[data-tab="trade"] .grid-bottom { grid-template-columns: 350px 1fr; }
+          .app-root[data-tab="bot"] .grid-bottom { grid-template-columns: 350px 1fr; }
+          .app-root[data-tab="logs"] .grid-bottom { grid-template-columns: 1fr; }
+          .app-root[data-tab="logs"] .col.tab-logs { flex-direction: row; flex-wrap: wrap; }
+          .app-root[data-tab="logs"] .col.tab-logs > * { flex: 1 1 45%; min-height: 400px; }
+        }
         /* ── Hamburger nav drawer ── */
-        .nav-drawer{position:fixed;bottom:48px;right:0;left:0;z-index:8999;background:rgba(10,10,10,0.97);backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);border-top:1px solid rgba(212,175,55,0.15);padding:16px;display:flex;flex-direction:column;gap:10px;animation:slideDown 0.2s cubic-bezier(0.4,0,0.2,1)}
-        .nav-drawer-btn{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;letter-spacing:2px;padding:14px 20px;border-radius:10px;border:1px solid rgba(212,175,55,0.15);background:rgba(212,175,55,0.05);color:#D4AF37;cursor:pointer;text-align:center;touch-action:manipulation}
+        .nav-drawer{position:fixed;top:76px;right:0;left:0;z-index:9000;background:rgba(10,10,10,0.97);backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);border-bottom:1px solid rgba(212,175,55,0.15);padding:16px;display:flex;flex-direction:column;gap:10px;animation:slideDown 0.2s cubic-bezier(0.4,0,0.2,1)}
+        .nav-drawer-btn{font-family:'Montserrat', sans-serif;font-size:13px;font-weight:600;letter-spacing:2px;padding:14px 20px;border-radius:10px;border:1px solid rgba(212,175,55,0.15);background:rgba(212,175,55,0.05);color:#D4AF37;cursor:pointer;text-align:center;touch-action:manipulation}
         .nav-drawer-btn:active{background:rgba(212,175,55,0.12)}
         .hamburger-btn{display:none;background:transparent;border:1px solid rgba(212,175,55,0.2);border-radius:8px;color:#D4AF37;cursor:pointer;padding:6px 10px;flex-direction:column;gap:4px;align-items:center;justify-content:center;min-width:36px;min-height:36px;flex-shrink:0}
         .hamburger-btn span{display:block;width:18px;height:2px;background:#D4AF37;border-radius:1px;transition:all 0.2s}
+        .mobile-bottom-nav{display:none}
+        .bot-charts-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 24px; }
+        @media(min-width: 1025px) { .bot-charts-grid { grid-template-columns: 1fr 1fr; } }
         /* TABLET 601–1024px */
         @media(max-width:1024px){
           .app-root{padding:16px 18px 80px}
@@ -1163,84 +1264,182 @@ function Dashboard() {
           .grid-bottom>.col:nth-child(2){grid-column:1/-1}
           .card{border-radius:12px;padding:18px}
           .btn{min-height:44px;padding:10px 18px}
-          .chart-card{height:60vh!important;min-height:400px!important;max-height:600px!important}
+          .chart-card{height:50vh!important;min-height:400px!important;max-height:600px!important}
           .control-panel{max-width:100%!important}
           .cp-row1{gap:3px!important;flex-wrap:wrap!important}
           .cp-row1 .btn{min-height:28px!important;padding:3px 10px!important}
         }
         /* PHONE ≤600px */
         @media(max-width:600px){
-          .app-root{padding:12px 12px 80px;margin:0;max-width:100%;border-radius:0}
-          .grid{grid-template-columns:1fr!important}
-          .grid>.col{order:unset!important;grid-column:unset!important}
-          .grid-bottom{grid-template-columns:1fr!important}
-          .grid-bottom>.col{grid-column:unset!important}
-          .header-main{grid-template-columns:1fr!important;grid-template-rows:auto!important;gap:14px!important}
+          .app-root{padding:8px 8px 120px !important;margin:0;max-width:100%;border-radius:0;font-size:10px}
+          .desktop-nav { display: none !important; }
+          
+          .mobile-bottom-nav{
+            display:flex; position:fixed; bottom:0; left:0; right:0;
+            background:rgba(10,10,10,0.95); backdrop-filter:blur(20px);
+            border-top:1px solid rgba(212,175,55,0.15); z-index:9000;
+            padding-bottom:env(safe-area-inset-bottom);
+          }
+          .mobile-nav-item{
+            flex:1; text-align:center; padding:12px 0;
+            color:#5C5C5C; font-size:10px; font-weight:700;
+            font-family:'Montserrat', sans-serif; letter-spacing:1px;
+            display:flex; flex-direction:column; align-items:center; gap:4px;
+            cursor:pointer; -webkit-tap-highlight-color:transparent;
+          }
+          .mobile-nav-item.active{color:#D4AF37;}
+          .mobile-nav-item svg{width:18px; height:18px; fill:currentColor;}
+          
+          .grid{grid-template-columns:1fr!important;gap:8px!important}
+          .grid>.col{order:unset!important;grid-column:unset!important;gap:8px!important}
+          .grid-bottom{grid-template-columns:1fr!important;gap:8px!important}
+          .grid-bottom>.col{grid-column:unset!important;gap:8px!important}
+          .header-main{grid-template-columns:1fr!important;grid-template-rows:auto!important;gap:10px!important}
           .header-main>*{grid-column:1!important;grid-row:auto!important;justify-self:stretch!important}
           .header-price{justify-self:center!important}
-          .control-panel{padding:8px 10px!important;max-width:100%!important}
-          .cp-row1{gap:3px!important;justify-content:center!important;flex-wrap:wrap!important}
-          .cp-row1 .btn{min-height:32px!important;padding:4px 10px!important;font-size:9px!important}
-          .cp-row2{justify-content:center!important;gap:3px!important;flex-wrap:wrap!important}
+          .header-price div[style*="font-size: 36px"]{font-size:28px!important}
+          .control-panel{padding:8px!important;max-width:100%!important}
+          .cp-row1{gap:4px!important;justify-content:center!important;flex-wrap:wrap!important}
+          .cp-row1 .btn{min-height:28px!important;padding:4px 8px!important;font-size:9px!important}
+          .cp-row2{justify-content:center!important;gap:4px!important;flex-wrap:wrap!important}
           .status-bar-badges{display:none!important}
-          .status-bar-user{flex:1;min-width:0}
+          .status-bar-user{flex:1;min-width:0;font-size:9px!important}
           .hamburger-btn{display:flex!important}
-          .pos-grid{grid-template-columns:repeat(2,1fr)!important}
-          .card{border-radius:14px;padding:14px}
-          .btn{min-height:44px;padding:12px 20px;font-size:11px;border-radius:10px}
-          .live-banner{border-radius:12px}
-          .brand-ticker-row{flex-direction:column;overflow:visible}
-          .ironmike-brand{padding:10px 14px 6px}
+          .pos-grid{grid-template-columns:repeat(2,1fr)!important;gap:6px!important}
+          .card{border-radius:10px;padding:10px}
+          .btn{min-height:36px;padding:8px 14px;font-size:10px;border-radius:8px}
+          .live-banner{border-radius:10px;padding:6px 10px;margin-bottom:10px;gap:6px}
+          .live-banner span[style*="font-size: 14px"]{font-size:11px!important}
+          .brand-ticker-row{flex-direction:column;overflow:visible;align-items:stretch;position:relative}
+          .ironmike-brand{padding:6px 60px 6px 10px;gap:10px;justify-content:flex-start}
           .ironmike-brand::after{display:none}
           .ticker-wrapper{width:100%}
-          .ticker-wrapper .ticker-tape{border-top:1px solid #1e1e1e}
-          .ironmike-brand img{width:44px!important;height:44px!important}
-          .coin-btn{min-height:44px;padding:12px 16px;-webkit-tap-highlight-color:transparent}
-          .chart-card{height:55vh!important;min-height:300px!important;max-height:500px!important}
-          .section-gap{margin-bottom:16px}
+          .ticker-wrapper .ticker-tape{border-top:1px solid rgba(255,255,255,0.05);padding:6px 0;margin-bottom:0}
+          .ironmike-brand img{width:36px!important;height:36px!important}
+          .ironmike-brand div div:first-child{font-size:20px!important}
+          .coin-btn{min-height:36px;padding:8px 12px;font-size:10px!important;-webkit-tap-highlight-color:transparent}
+          .chart-card{height:50vh!important;min-height:350px!important;max-height:500px!important}
+          .section-gap{margin-bottom:10px}
+          .row{padding:4px 0;font-size:10px!important}
+          .section-label{font-size:10px!important;padding-left:6px!important}
+          .trow{padding:4px 0;font-size:10px!important}
+          .logrow{padding:3px 0;font-size:9px!important}
         }
         /* NARROW ≤400px: Z Fold cover, Galaxy S etc */
         @media(max-width:400px){
-          .app-root{padding:8px 8px 80px}
-          .card{padding:12px 10px}
+          .app-root{padding:6px 6px 70px !important}
+          .card{padding:8px}
           .section-label{font-size:9px!important;letter-spacing:1px!important}
           .pos-grid{grid-template-columns:1fr!important}
           .cp-row1 .btn{font-size:8px!important;padding:3px 6px!important;letter-spacing:0.5px!important}
           .cp-row2 .btn{font-size:8px!important;padding:3px 6px!important}
           .status-bar{font-size:8px!important}
-          .ironmike-brand img{width:36px!important;height:36px!important}
-          .section-gap{margin-bottom:12px}
+          .ironmike-brand img{width:32px!important;height:32px!important}
+          .ironmike-brand div div:first-child{font-size:16px!important;letter-spacing:3px!important}
+          .section-gap{margin-bottom:8px}
+          .ticker-wrapper .ticker-tape{padding:4px 0}
+          .analytics-grid, .memory-grid { grid-template-columns: 1fr !important; }
         }
         /* ULTRA-NARROW ≤280px */
         @media(max-width:280px){
-          .app-root{padding:6px 6px 76px}
-          .card{padding:10px 8px;border-radius:10px}
+          .app-root{padding:6px 6px 76px !important; font-size: 9px !important;}
+          .card{padding:8px 6px;border-radius:10px}
           .section-label{font-size:8px!important;letter-spacing:0.5px!important}
-          .btn{font-size:8px!important;padding:8px 10px!important;letter-spacing:1px!important}
+          .btn{font-size:8px!important;padding:6px 8px!important;letter-spacing:0.5px!important; min-height: 32px !important;}
           .brand-ticker-row{border-radius:10px}
           .ironmike-brand img{width:28px!important;height:28px!important}
-          .ironmike-brand{gap:8px!important;padding:8px 8px 4px!important}
-          .section-gap{margin-bottom:10px}
-          .grid-bottom{gap:10px!important}
-          .col{gap:10px!important}
+          .ironmike-brand{gap:6px!important;padding:8px 44px 4px 6px!important}
+          .ironmike-brand div div:first-child{font-size:12px!important;letter-spacing:1px!important}
+          .section-gap{margin-bottom:8px}
+          .grid-bottom{gap:8px!important}
+          .col{gap:8px!important}
+          .tag{padding: 2px 5px !important; font-size: 7px !important;}
+          .analytics-grid, .memory-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
         }
       `}</style>
 
       {/* ══ LIVE MODE WARNING BANNER ══ */}
       {isLiveMode && (
-        <div className="live-banner" role="alert">
+        <div className="live-banner" role="alert" ref={pulseInfinite}>
           <span style={{ fontSize: "14px" }}>&#9888;</span>
           <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "14px", color: "#C0392B", letterSpacing: "3px" }}>LIVE TRADING MODE</span>
           <span style={{ fontSize: "10px", color: "#ff9900" }}>Real funds at risk — trades execute on-chain</span>
         </div>
       )}
 
+      {/* ══ MOBILE COMPACT HEADER NAV DRAWER ══ */}
+      {mobileNavOpen && (
+        <>
+          <div className="nav-drawer-overlay" onClick={() => setMobileNavOpen(false)} style={{ position: "fixed", inset: 0, top: "76px", zIndex: 8999, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", touchAction: "none" }} />
+          <div className="nav-drawer" role="dialog" aria-label="Navigation" style={{ maxHeight: "85vh", overflowY: "auto", overscrollBehavior: "none" }}>
+            <div style={{ padding: "8px 20px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: "8px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
+                <span style={{ fontSize: "10px", color: "#5C5C5C", letterSpacing: "1px" }}>ACCOUNT</span>
+                {(user?.email === "feichangfuyou@gmail.com" || profile?.role === "admin") ? (
+                  <span style={{ fontSize: "9px", color: colors.success, background: "rgba(0,230,118,0.1)", padding: "2px 6px", borderRadius: "4px", letterSpacing: "1px" }}>DEV · ELITE</span>
+                ) : (
+                  <span style={{ fontSize: "9px", color: colors.gold, background: "rgba(212,175,55,0.1)", padding: "2px 6px", borderRadius: "4px" }}>{(profile?.subscription_status === "active" ? (profile?.subscription_tier || "NONE") : "NONE").toUpperCase()}</span>
+                )}
+              </div>
+              <div style={{ fontSize: "13px", color: "#D4D4D4", marginBottom: "4px", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.email}</div>
+            </div>
+
+            <div style={{ padding: "0 20px 20px" }}>
+              <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", padding: "12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "10px", color: "#5C5C5C" }}>Daily PnL</span>
+                  <span style={{ fontSize: "11px", fontWeight: "700", color: account.daily_pnl >= 0 ? "#00E676" : "#FF1744" }}>
+                    {account.daily_pnl >= 0 ? "+" : ""}${Math.abs(account.daily_pnl).toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "10px", color: "#5C5C5C" }}>Total PnL</span>
+                  <span style={{ fontSize: "11px", fontWeight: "700", color: account.total_pnl >= 0 ? "#00E676" : "#FF1744" }}>
+                    {account.total_pnl >= 0 ? "+" : ""}${Math.abs(account.total_pnl).toFixed(2)}
+                  </span>
+                </div>
+                {directionBias !== "both" && (
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: "10px", color: "#5C5C5C" }}>Bias</span>
+                    <span style={{ fontSize: "10px", fontWeight: "700", color: directionBias === "long" ? "#00E676" : "#FF1744" }}>
+                      {directionBias === "long" ? "▲ LONG" : "▼ SHORT"}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {(price > 0 || (wsRetrying && !connected)) && (
+                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", marginTop: "12px", padding: "4px" }}>
+                  {price > 0 && <span style={{ fontSize: "9px", color: priceAge > 60 ? "#ff9900" : "#5C5C5C" }}>price <AnimatedNumber value={priceAge} format={(v) => `${Math.round(v)}s`} duration={100} /> ago</span>}
+                  {wsRetrying && !connected && <span style={{ fontSize: "9px", color: "#ff9900" }}>Reconnecting…</span>}
+                </div>
+              )}
+            </div>
+
+            <button className="nav-drawer-btn" onClick={() => { navigate("/history"); setMobileNavOpen(false); }}>HISTORY</button>
+            <button className="nav-drawer-btn" onClick={() => { navigate("/billing"); setMobileNavOpen(false); }}>BILLING</button>
+            <button className="nav-drawer-btn" onClick={() => { navigate("/settings"); setMobileNavOpen(false); }}>SETTINGS</button>
+            <button className="nav-drawer-btn" style={{ color: "#5C5C5C", borderColor: "rgba(255,255,255,0.08)" }} onClick={() => { signOut(); setMobileNavOpen(false); }}>SIGN OUT</button>
+          </div>
+        </>
+      )}
+
       {/* ══ BRAND + TICKER — horizontal row, ticker fades behind brand ══ */}
       <div className="brand-ticker-row">
-        <div className="ironmike-brand">
+        <button
+          className="hamburger-btn"
+          style={{ position: "absolute", top: "12px", right: "12px", zIndex: 100, background: "rgba(10,10,10,0.85)", backdropFilter: "blur(8px)" }}
+          onClick={() => setMobileNavOpen(o => !o)}
+          aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileNavOpen}
+        >
+          <span style={{ transform: mobileNavOpen ? "rotate(45deg) translateY(6px)" : "none" }} />
+          <span style={{ opacity: mobileNavOpen ? 0 : 1 }} />
+          <span style={{ transform: mobileNavOpen ? "rotate(-45deg) translateY(-6px)" : "none" }} />
+        </button>
+        <div className="ironmike-brand" style={{ minWidth: 0 }}>
           <img src="/Bravo.svg" alt="DoYou.trade" style={{ width: "80px", height: "80px", flexShrink: 0 }} />
-          <div>
-            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "36px", color: "transparent", letterSpacing: "6px", lineHeight: "1", background: "linear-gradient(180deg,#D4AF37,#B8860B)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>DOYOU.TRADE</div>
+          <div style={{ minWidth: 0, overflow: "hidden" }}>
+            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "36px", color: "transparent", letterSpacing: "6px", lineHeight: "1", background: "linear-gradient(180deg,#D4AF37,#B8860B)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>DOYOU.TRADE</div>
             <div style={{ width: "100%", height: "1px", background: "linear-gradient(90deg,#D4AF37,#C0392B,transparent)", margin: "4px 0" }} />
             <TradeQuote />
           </div>
@@ -1258,90 +1457,159 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* ══ HEADER ══ */}
-      <div className="header-main section-gap" style={{ display: "grid", gridTemplateColumns: "1fr", gridTemplateRows: "auto auto", alignItems: "center", gap: "12px 16px" }}>
-        {/* Price — always centered */}
-        <div className="header-price" style={{ gridColumn: "1", gridRow: "1", justifySelf: "center", textAlign: "center", contain: "layout paint", minWidth: 0 }}>
-          {price > 0 ? (
-            <>
-              <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: "11px", color: "#D4AF37", letterSpacing: "3px", fontWeight: "600", marginBottom: "2px" }}>{selectedCoin}</div>
-              <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "36px", letterSpacing: "2px", color: priceUp ? "#00E676" : "#FF1744" }}>
-                $<AnimatedNumber value={price} format={(v) => priceFormat(v)} duration={50} />
-              </div>
-              <div style={{ fontSize: "10px", color: change24h >= 0 ? "#00E676" : "#FF1744", marginTop: "2px" }}>
-                {change24h >= 0 ? "\u25B2" : "\u25BC"} <AnimatedNumber value={Math.abs(change24h)} format={(v) => `${v.toFixed(2)}%`} duration={200} /> 24h
-              </div>
-              <div style={{ fontSize: "8px", color: "#5C5C5C", marginTop: "2px", letterSpacing: "1px" }}>{priceSource === "coinbase" ? "COINBASE · real-time" : "COINGECKO · may differ from chart"}</div>
-            </>
-          ) : (
-            <FetchingPrice />
-          )}
-        </div>
-
-        <ControlPanel
-          account={account} winRate={winRate} startBal={startBal} targetBal={targetBal}
-          thinking={thinking} botOn={botOn} connected={connected}
-          claudeModel={claudeModel} handleModelChange={handleModelChange}
-          tradingPreset={tradingPreset} presets={presets} presetCategories={presetCategories} handlePresetChange={handlePresetChange}
-          profitGoal={profitGoal} setProfitGoal={setProfitGoal}
-          handleStart={handleStart} handleStop={handleStop} handleAsk={handleAsk} handleReset={handleReset}
-        />
+      {/* ══ DESKTOP NAV TABS ══ */}
+      <div className="desktop-nav">
+        <div className={`desktop-nav-item ${activeTab === 'trade' ? 'active' : ''}`} onClick={() => setActiveTab('trade')}>MARKET</div>
+        <div className={`desktop-nav-item ${activeTab === 'bot' ? 'active' : ''}`} onClick={() => setActiveTab('bot')}>AGENT AI & BOTS</div>
+        <div className={`desktop-nav-item ${activeTab === 'logs' ? 'active' : ''}`} onClick={() => setActiveTab('logs')}>ACTIVITY LOGS</div>
       </div>
+
+      {/* ══ HEADER ══ */}
+      {activeTab !== "logs" && (
+        <div className="header-main section-gap hide-on-logs" style={{ display: "grid", gridTemplateColumns: "1fr", gridTemplateRows: "auto auto", alignItems: "center", gap: "12px 16px" }}>
+          {/* Price — always centered */}
+          <div className="header-price" style={{ gridColumn: "1", gridRow: "1", justifySelf: "center", textAlign: "center", contain: "layout paint", minWidth: 0 }}>
+            {price > 0 ? (
+              <>
+                <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: "11px", color: "#D4AF37", letterSpacing: "3px", fontWeight: "600", marginBottom: "2px" }}>{selectedCoin}</div>
+                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "36px", letterSpacing: "2px", color: priceUp ? "#00E676" : "#FF1744" }}>
+                  $<AnimatedNumber value={price} format={(v) => priceFormat(v)} duration={50} />
+                </div>
+                <div style={{ fontSize: "10px", color: change24h >= 0 ? "#00E676" : "#FF1744", marginTop: "2px" }}>
+                  {change24h >= 0 ? "\u25B2" : "\u25BC"} <AnimatedNumber value={Math.abs(change24h)} format={(v) => `${v.toFixed(2)}%`} duration={200} /> 24h
+                </div>
+                <div style={{ fontSize: "8px", color: "#5C5C5C", marginTop: "2px", letterSpacing: "1px" }}>{priceSource === "coinbase" ? "COINBASE · real-time" : "COINGECKO · may differ from chart"}</div>
+              </>
+            ) : (
+              <FetchingPrice />
+            )}
+          </div>
+
+          <ControlPanel
+            account={account} winRate={winRate} startBal={startBal} targetBal={targetBal}
+            thinking={thinking} botOn={botOn} connected={connected}
+            claudeModel={claudeModel} handleModelChange={handleModelChange}
+            tradingPreset={tradingPreset} presets={presets} presetCategories={presetCategories} handlePresetChange={handlePresetChange}
+            profitGoal={profitGoal} setProfitGoal={setProfitGoal}
+            handleStart={handleStart} handleStop={handleStop} handleAsk={handleAsk} handleReset={handleReset}
+          />
+        </div>
+      )}
 
       {/* ══ FULL-WIDTH CHART ══ */}
-      <div className="section-gap">
-        <ChartSection
-          chartSymbol={chartSymbol} setChartSymbol={setChartSymbol}
-          selectedCoin={selectedCoin} positions={positions} price={price}
-          marketTickers={marketTickers}
-          multiExchangePrices={multiExchangePrices} setMultiExchangePrices={setMultiExchangePrices}
-        />
-      </div>
+      {activeTab === "trade" && (
+        <div className="section-gap tab-trade">
+          <ChartSection
+            chartSymbol={chartSymbol} setChartSymbol={setChartSymbol}
+            selectedCoin={selectedCoin} positions={positions} price={price}
+            marketTickers={marketTickers}
+            multiExchangePrices={multiExchangePrices} setMultiExchangePrices={setMultiExchangePrices}
+          />
+        </div>
+      )}
+
+      {/* ══ BOT CHARTS ══ */}
+      {activeTab === "bot" && (
+        <div className="section-gap tab-bot">
+          <div style={{ marginBottom: "16px", paddingLeft: "8px" }}>
+            <span className="section-label">BOT CHARTS & POSITIONS</span>
+          </div>
+          <div className="bot-charts-grid">
+            {positions.length > 0 ? positions.map(pos => (
+              <div key={pos.id} className="card chart-card" style={{ height: "400px", display: "flex", flexDirection: "column", padding: "12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                  <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "14px", color: "#D4AF37", letterSpacing: "2px" }}>
+                    {pos.symbol} - {pos.side.toUpperCase()}
+                  </span>
+                  <span className="tag" style={{ background: pos.side === "buy" ? "#00E67618" : "#FF174418", color: pos.side === "buy" ? "#00E676" : "#FF1744" }}>
+                    {pos.side.toUpperCase()} @ {pos.entry}
+                  </span>
+                </div>
+                <div style={{ flex: 1, minHeight: 0 }}>
+                  <TradingViewChart symbol={`BINANCE:${pos.symbol}USDT`} />
+                </div>
+              </div>
+            )) : (
+              <div className="card chart-card chasing-container" style={{ height: "400px" }}>
+                <div className="chasing-light"></div>
+                <div className="chasing-content">
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "14px", color: "#D4AF37", letterSpacing: "2px" }}>
+                      BOT SCAN: {fastScanCoin}
+                    </span>
+                    <span className="tag" style={{ background: "#D4AF3733", color: "#D4AF37", animation: "pulse 1.5s infinite" }}>SEARCHING</span>
+                  </div>
+                  <div style={{ flex: 1, minHeight: 0 }}>
+                    <TradingViewChart symbol={`BINANCE:${chartScanCoin}USDT`} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ══ OPEN POSITIONS (full width) ══ */}
-      <div className="section-gap">
-        <PositionsPanel
-          positions={positions} coins={coins} price={price}
-          enableFutures={enableFutures} maxPositions={maxPositions} maxFuturesPositions={maxFuturesPositions}
-          unrealized={unrealized} botOn={botOn} handleClose={handleClose}
-        />
-      </div>
+      {activeTab === "bot" && (
+        <div className="section-gap tab-bot">
+          <PositionsPanel
+            positions={positions} coins={coins} price={price}
+            enableFutures={enableFutures} maxPositions={maxPositions} maxFuturesPositions={maxFuturesPositions}
+            unrealized={unrealized} botOn={botOn} handleClose={handleClose}
+          />
+        </div>
+      )}
 
       {/* ══ 3-COL GRID (panels below chart) ══ */}
       <div className="grid-bottom section-gap">
-        {/* ═══ LEFT ═══ */}
-        <div className="col">
-          <ClaudeBrainPanel
-            thinking={thinking} botOn={botOn} countdown={countdown}
-            decision={decision} lastCall={lastCall} lastAiBlockReason={lastAiBlockReason}
-            pendingDecision={pendingDecision} pendingExpiresAt={pendingExpiresAt} pendingCountdown={pendingCountdown}
-            handleApprovePending={handleApprovePending} handleRejectPending={handleRejectPending}
-          />
-          <MarketRegimePanel regime={regime} fearGreed={fearGreed} />
-          <AgentKitPanel agentKit={agentKit} isLiveMode={isLiveMode} />
-        </div>
+        {/* ═══ MARKET TAB PANELS ═══ */}
+        {activeTab === "trade" && (
+          <>
+            <div className="col tab-trade">
+              <MarketRegimePanel regime={regime} fearGreed={fearGreed} />
+            </div>
+            <div className="col tab-trade">
+              <IndicatorsPanel indic={indic} history={history} />
+            </div>
+          </>
+        )}
 
-        {/* ═══ CENTER ═══ */}
-        <div className="col">
-          <IndicatorsPanel indic={indic} history={history} />
-          <RiskMonitorPanel account={account} startBal={startBal} trades={trades} winRate={winRate} />
-        </div>
+        {/* ═══ LEFT / CENTER (BOT TAB) ═══ */}
+        {activeTab === "bot" && (
+          <>
+            <div className="col tab-bot">
+              <TerminalBrainPanel
+                thinking={thinking} botOn={botOn} countdown={countdown}
+                decision={decision} lastCall={lastCall} lastAiBlockReason={lastAiBlockReason}
+                pendingDecision={pendingDecision} pendingExpiresAt={pendingExpiresAt} pendingCountdown={pendingCountdown}
+                handleApprovePending={handleApprovePending} handleRejectPending={handleRejectPending}
+              />
+              <AgentKitPanel agentKit={agentKit} isLiveMode={isLiveMode} />
+            </div>
 
-        {/* ═══ RIGHT ═══ */}
-        <div className="col">
-          <RecentTradesPanel
-            trades={trades} connected={connected} exportTrades={exportTrades}
-            tradeTypeBadge={tradeTypeBadge} openTradeDetail={openTradeDetail}
-            setShowHistory={setShowHistory} fetchHistory={fetchHistory}
-            tradesContainerRef={tradesContainerRef}
-          />
-          <ActivityLogPanel logs={logs} botOn={botOn} connected={connected} logsContainerRef={logsContainerRef} />
-        </div>
+            <div className="col tab-bot">
+              <RiskMonitorPanel account={account} startBal={startBal} trades={trades} winRate={winRate} />
+            </div>
+          </>
+        )}
+
+        {/* ═══ RIGHT (LOGS TAB) ═══ */}
+        {activeTab === "logs" && (
+          <div className="col tab-logs">
+            <RecentTradesPanel
+              trades={trades} connected={connected} exportTrades={exportTrades}
+              tradeTypeBadge={tradeTypeBadge} openTradeDetail={openTradeDetail}
+              setShowHistory={setShowHistory} fetchHistory={fetchHistory}
+              tradesContainerRef={tradesContainerRef}
+            />
+            <ActivityLogPanel logs={logs} botOn={botOn} connected={connected} logsContainerRef={logsContainerRef} />
+          </div>
+        )}
       </div>
 
       {/* ══ ANALYTICS ROW (equity + analytics + memory) ══ */}
       <AnalyticsSection connected={connected} log={log} lossToast={lossToast}
-        cbLive={cbLive} krakenEnabled={krakenEnabled} binanceEnabled={binanceEnabled} hasClaude={hasClaude}
+        cbLive={cbLive} krakenEnabled={krakenEnabled} binanceEnabled={binanceEnabled} hasBrain={hasBrain}
         isLiveMode={isLiveMode} agentKit={agentKit} paperMode={paperMode}
         directionBias={directionBias} requireTradeApproval={requireTradeApproval}
         price={price} priceAge={priceAge} wsRetrying={wsRetrying} />
@@ -1366,12 +1634,57 @@ function Dashboard() {
       {/* ══ CONFIRM DIALOG ══ */}
       {confirmAction && (
         <div className="confirm-overlay" onClick={() => setConfirmAction(null)} role="dialog" aria-modal="true" aria-label="Confirmation">
-          <div className="confirm-box" onClick={e => e.stopPropagation()}>
-            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "18px", color: "#D4AF37", letterSpacing: "3px", marginBottom: "16px" }}>CONFIRM ACTION</div>
+          <div className="confirm-box" ref={popIn} onClick={e => e.stopPropagation()}>
+            <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "18px", color: "#D4AF37", letterSpacing: "3px", marginBottom: "16px" }}>CONFIRM ACTION</div>
             <div style={{ fontSize: "11px", color: "#D4D4D4", lineHeight: "1.9", marginBottom: "22px" }}>{confirmAction.label}</div>
             <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
               <button className="btn btn-r" onClick={confirmYes} style={{ minWidth: "90px" }}>YES</button>
               <button className="btn btn-d" onClick={() => setConfirmAction(null)} style={{ minWidth: "90px", color: "#D4D4D4" }}>CANCEL</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MOBILE BOTTOM NAV ══ */}
+      <div className="mobile-bottom-nav" role="navigation">
+        <div className={`mobile-nav-item ${activeTab === "trade" ? "active" : ""}`} onClick={() => setActiveTab("trade")}>
+          <svg viewBox="0 0 24 24"><path d="M3 3v18h18V3H3zm16 16H5V5h14v14zM7 10h2v7H7v-7zm4-3h2v10h-2V7zm4 5h2v5h-2v-5z" /></svg>
+          MARKET
+        </div>
+        <div className={`mobile-nav-item ${activeTab === "bot" ? "active" : ""}`} onClick={() => setActiveTab("bot")}>
+          <svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9c0-1.1.9-2 2-2h5V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2zM6 9v9h12V9H6zm4 2h4v2h-4v-2zm-1 4h6v2H9v-2z" /></svg>
+          AGENT AI
+        </div>
+        <div className={`mobile-nav-item ${activeTab === "logs" ? "active" : ""}`} onClick={() => setActiveTab("logs")}>
+          <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" /></svg>
+          ACTIVITY
+        </div>
+      </div>
+
+      {/* ══ SUBSCRIPTION GATE ══ */}
+      {profile && profile.subscription_status !== "active" && user?.email !== "feichangfuyou@gmail.com" && profile?.role !== "admin" && (
+        <div className="confirm-overlay" style={{ zIndex: 99999, position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(20px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="confirm-box" style={{ maxWidth: "420px", textAlign: "center", background: "rgba(17,17,17,0.72)", border: "1px solid rgba(212,175,55,0.15)", borderRadius: "24px", padding: "40px 32px", boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}>
+            <div style={{ fontSize: "48px", marginBottom: "20px" }}><Brain size={48} color={colors.gold} /></div>
+            <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "22px", color: colors.gold, letterSpacing: "4px", marginBottom: "16px", fontWeight: "700" }}>ACTIVE SUBSCRIPTION REQUIRED</h2>
+            <p style={{ fontSize: "12px", color: "#888", lineHeight: "1.9", marginBottom: "32px" }}>
+              Trading access, AI Hub scans, and automated execution are locked. 
+              To continue using the brain, please activate your subscription.
+            </p>
+            <button 
+              className="btn btn-r" 
+              onClick={() => navigate("/billing")}
+              style={{ width: "100%", padding: "16px", fontSize: "12px", fontWeight: "800", letterSpacing: "2px", background: `linear-gradient(180deg, ${colors.gold}, ${colors.goldDark})`, color: colors.dark, border: "none", borderRadius: "10px", cursor: "pointer" }}
+            >
+              UPGRADE & ACTIVATE &rarr;
+            </button>
+            <div style={{ marginTop: "24px" }}>
+              <button 
+                onClick={signOut}
+                style={{ background: "none", border: "none", color: "#444", fontSize: "10px", cursor: "pointer", letterSpacing: "1px", textDecoration: "underline" }}
+              >
+                SIGN OUT
+              </button>
             </div>
           </div>
         </div>

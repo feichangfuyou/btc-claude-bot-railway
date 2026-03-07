@@ -1,0 +1,11 @@
+/* TEAM */
+Chef: The Brain
+Website: doyou.trade
+Twitter: @doyoutrade
+
+/* SITE */
+Last update: 2026-03-06
+Language: English
+Standards: HTML5, CSS3, ESNext
+Components: React, Vite, FastAPI
+Software: AI Neural Engine v7.4 (Non-custodial)
