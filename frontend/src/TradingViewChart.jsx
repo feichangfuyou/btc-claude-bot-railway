@@ -127,7 +127,7 @@ function TradingViewChart({ symbol = "BTC" }) {
   return (
     <div
       ref={containerRef}
-      style={{ width: "100%", height: "100%", minHeight: 0 }}
+      style={{ width: "100%", height: "100%", position: "absolute", inset: 0 }}
     />
   );
 }
