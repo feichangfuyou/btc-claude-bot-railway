@@ -490,9 +490,9 @@ h1, h2, h3, h4, h5, h6, .card-title, .section-label, .btn {
 }
 
 .chart-card {
-  height: 65vh;
-  min-height: 500px;
-  max-height: 700px;
+  height: 50vh;
+  min-height: 400px;
+  max-height: 500px;
 }
 
 .card::before,
