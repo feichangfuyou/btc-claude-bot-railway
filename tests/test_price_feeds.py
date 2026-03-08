@@ -103,6 +103,11 @@ async def test_bootstrap_prices_all_fail(mock_bot):
             new_callable=AsyncMock,
             return_value=False,
         ),
+        patch(
+            "feeds.price_feeds._fetch_instrumented_coingecko",
+            new_callable=AsyncMock,
+            return_value=False,
+        ),
     ):
         result = await _bootstrap_prices(mock_bot, broadcast_price)
 
@@ -174,7 +179,6 @@ async def test_fetch_kraken_fallback_only_missing(mock_bot):
 
     with (
         patch.dict("sys.modules", {"api": MagicMock(), "api.kraken_api": MagicMock()}),
-        patch("feeds.price_feeds.ACTIVE_COINS", ["BTC", "ETH", "SOL"]),
         patch("api.kraken_api.get_ticker", mock_get_ticker),
     ):
         result = await _fetch_kraken_fallback_prices(mock_bot)

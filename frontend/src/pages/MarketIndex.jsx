@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import {
-  ArrowRight, ArrowUp, TrendingUp, TrendingDown, Shield, Zap, Brain,
-  BarChart2, Target, Bot, Diamond,
+  ArrowRight, ArrowUp, TrendingUp, TrendingDown, Shield, Zap, Cpu,
+  BarChart2, Target, Settings as Bot, Diamond,
   Flame, Activity, Shuffle, Globe,
   Rocket, Cloud, Layers, Waves,
   RefreshCcw, MessageCircle, Crosshair, LineChart,
@@ -16,9 +16,9 @@ const COIN_DATA = {
     name: "Bitcoin",
     slug: "bitcoin",
     label: "BTC/USD Intelligence",
-    tagline: "The Original. The Benchmark. The Brain's Primary Asset.",
+    tagline: "The Original. The Benchmark. Primary Market Asset.",
     description:
-      "Bitcoin is the world's first and most liquid cryptocurrency, representing over 50% of total crypto market cap. Our AI Brain monitors BTC 24/7, analyzing global macro signals, on-chain flows, institutional order books, and hundreds of technical indicators to execute high-precision entries and exits.",
+      "Bitcoin is the world's first and most liquid cryptocurrency, representing over 50% of total crypto market cap. Our systems monitor BTC 24/7, analyzing global macro signals, on-chain flows, institutional order books, and hundreds of technical indicators to execute high-precision entries and exits.",
     strategies: [
       { name: "Turtle Traders", desc: "Momentum breakout — ride the trend until it ends.", Icon: BarChart2 },
       { name: "Paul Tudor Jones", desc: "Macro-driven risk management with tight stops.", Icon: Target },
@@ -29,7 +29,7 @@ const COIN_DATA = {
       { label: "MARKET DOMINANCE", value: "~52%" },
       { label: "AVG DAILY VOLUME", value: "$30B+" },
       { label: "LIQUIDITY TIER", value: "TIER 1" },
-      { label: "AI SCANS / DAY", value: "480+" },
+      { label: "DAILY SCANS", value: "480+" },
     ],
     color: "#F7931A",
     gradient: "linear-gradient(135deg, rgba(247,147,26,0.15), rgba(247,147,26,0.02))",
@@ -41,9 +41,9 @@ const COIN_DATA = {
     name: "Ethereum",
     slug: "ethereum",
     label: "ETH/USD Strategy",
-    tagline: "Smart Contract Powerhouse — The Brain's DeFi Edge.",
+    tagline: "Smart Contract Powerhouse — Systematic DeFi Edge.",
     description:
-      "Ethereum is the backbone of decentralized finance and Web3. Its deep liquidity and rich on-chain data give the AI Brain unique alpha through gas fee analysis, DeFi protocol flows, NFT volume signals, and staking yield dynamics — layers of data unavailable to traditional traders.",
+      "Ethereum is the backbone of decentralized finance and Web3. Its deep liquidity and rich on-chain data give our systems unique alpha through gas fee analysis, DeFi protocol flows, NFT volume signals, and staking yield dynamics — layers of data unavailable to traditional traders.",
     strategies: [
       { name: "Arthur Hayes Degen", desc: "High-conviction crypto-native momentum plays.", Icon: Flame },
       { name: "Donchian Channel", desc: "Systematic breakout entries on confirmed trends.", Icon: Activity },
@@ -54,7 +54,7 @@ const COIN_DATA = {
       { label: "DEFI TVL TRACKED", value: "$50B+" },
       { label: "AVG DAILY VOLUME", value: "$15B+" },
       { label: "LIQUIDITY TIER", value: "TIER 1" },
-      { label: "AI SCANS / DAY", value: "480+" },
+      { label: "DAILY SCANS", value: "480+" },
     ],
     color: "#627EEA",
     gradient: "linear-gradient(135deg, rgba(98,126,234,0.15), rgba(98,126,234,0.02))",
@@ -66,9 +66,9 @@ const COIN_DATA = {
     name: "Solana",
     slug: "solana",
     label: "SOL/USD Execution",
-    tagline: "Speed-Native. The Brain's High-Velocity Asset.",
+    tagline: "Speed-Native. High-Velocity Asset.",
     description:
-      "Solana's sub-second finality and low fees make it the premier chain for high-frequency patterns. The AI Brain capitalizes on SOL's explosive momentum cycles, NFT ecosystem surges, and memecoin season correlations — capturing moves often too fast for human reaction.",
+      "Solana's sub-second finality and low fees make it the premier chain for high-frequency patterns. Our platform capitalizes on SOL's explosive momentum cycles, NFT ecosystem surges, and memecoin season correlations — capturing moves often too fast for human reaction.",
     strategies: [
       { name: "Momentum Scalp", desc: "Rapid-fire entries on confirmed volume spikes.", Icon: Rocket },
       { name: "Ichimoku Cloud", desc: "Multi-timeframe trend confirmation for SOL.", Icon: Cloud },
@@ -79,7 +79,7 @@ const COIN_DATA = {
       { label: "TPS (THROUGHPUT)", value: "65,000+" },
       { label: "AVG DAILY VOLUME", value: "$4B+" },
       { label: "LIQUIDITY TIER", value: "TIER 2+" },
-      { label: "AI SCANS / DAY", value: "480+" },
+      { label: "DAILY SCANS", value: "480+" },
     ],
     color: "#9945FF",
     gradient: "linear-gradient(135deg, rgba(153,69,255,0.15), rgba(153,69,255,0.02))",
@@ -90,12 +90,12 @@ const COIN_DATA = {
     symbol: "ALT",
     name: "Altcoin Universe",
     slug: "altcoins",
-    label: "Altcoin Neural Engine",
-    tagline: "Maximum Alpha. 500+ Coins. One Unified Brain.",
+    label: "Altcoin Execution Engine",
+    tagline: "Maximum Alpha. 500+ Coins. One Unified System.",
     description:
-      "The Altcoin Neural Engine covers LINK, AVAX, UNI, AAVE, DOGE, PEPE, and 490+ more tokens simultaneously. The Brain rotates capital into the highest-probability setups across the entire market, detecting sector rotations (DeFi, L2, AI, memecoins) before they go mainstream.",
+      "The Altcoin Execution Engine covers LINK, AVAX, UNI, AAVE, DOGE, PEPE, and 490+ more tokens simultaneously. The system rotates capital into the highest-probability setups across the entire market, detecting sector rotations (DeFi, L2, Gaming, memecoins) before they go mainstream.",
     strategies: [
-      { name: "Sector Rotation", desc: "Rotate into DeFi, L2, AI, gaming on signal.", Icon: RefreshCcw },
+      { name: "Sector Rotation", desc: "Rotate into DeFi, L2, gaming on signal.", Icon: RefreshCcw },
       { name: "Cobie CT Alpha", desc: "Crypto-Twitter sentiment-driven momentum.", Icon: MessageCircle },
       { name: "Ansem Degen Momentum", desc: "High-beta plays with defined risk gates.", Icon: Crosshair },
       { name: "Elliott Wave", desc: "Wave structure analysis on altcoin cycles.", Icon: LineChart },
@@ -104,7 +104,7 @@ const COIN_DATA = {
       { label: "COINS MONITORED", value: "500+" },
       { label: "SECTOR SIGNALS", value: "REAL-TIME" },
       { label: "AVG DAILY VOLUME", value: "$20B+" },
-      { label: "AI SCANS / DAY", value: "2,400+" },
+      { label: "DAILY SCANS", value: "2,400+" },
     ],
     color: "#D4AF37",
     gradient: "linear-gradient(135deg, rgba(212,175,55,0.15), rgba(212,175,55,0.02))",
@@ -324,9 +324,9 @@ export default function MarketIndex() {
 
   useEffect(() => {
     if (!data) { navigate("/", { replace: true }); return; }
-    document.title = `${data.label} — DoYou.trade AI Trading`;
+    document.title = `${data.label} — DoYou.trade Advanced Trading`;
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", `${data.tagline} Automate your ${data.name} trading with DoYou.trade's AI Brain.`);
+    if (meta) meta.setAttribute("content", `${data.tagline} Automate your ${data.name} trading with DoYou.trade.`);
   }, [data, navigate]);
 
   if (!data) return null;
@@ -395,7 +395,7 @@ export default function MarketIndex() {
               background: `${data.color}0D`,
             }}>
               <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: data.color, display: "inline-block", boxShadow: `0 0 8px ${data.color}` }} />
-              AI BRAIN ACTIVE · LIVE MONITORING
+              SYSTEMS ACTIVE · LIVE MONITORING
             </div>
             <h1 style={{
               fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(36px, 6vw, 64px)",
@@ -418,7 +418,7 @@ export default function MarketIndex() {
                 display: "inline-flex", alignItems: "center", gap: "8px",
                 transition: "transform 0.2s",
               }}>
-                TRADE {data.symbol} WITH AI <ArrowRight size={14} />
+                TRADE {data.symbol} WITH PRECISION <ArrowRight size={14} />
               </Link>
               <Link to="/login" style={{
                 fontFamily: "'Montserrat', sans-serif", fontWeight: "700", fontSize: "12px",
@@ -454,10 +454,10 @@ export default function MarketIndex() {
         <div style={{ marginBottom: "60px" }}>
           <div style={{ marginBottom: "24px" }}>
             <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "22px", fontWeight: "800", color: "#ccc", letterSpacing: "2px", marginBottom: "8px" }}>
-              AI STRATEGIES FOR {data.symbol}
+              STRATEGIES FOR {data.symbol}
             </h2>
             <p style={{ fontSize: "12px", color: "#555" }}>
-              The Brain selects from 100+ legendary trader presets — here are the top approaches for {data.name}.
+              The system selects from 100+ legendary trader presets — here are the top approaches for {data.name}.
             </p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
@@ -473,12 +473,12 @@ export default function MarketIndex() {
           borderRadius: "20px", padding: "40px", marginBottom: "60px",
         }}>
           <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "18px", fontWeight: "800", color: data.color, letterSpacing: "2px", marginBottom: "32px" }}>
-            HOW THE BRAIN TRADES {data.symbol}
+            HOW THE SYSTEM TRADES {data.symbol}
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "32px" }}>
             {[
               { icon: <Zap size={20} />, title: "SCAN", desc: `480+ data points per scan — price action, indicators, volume, macro sentiment.` },
-              { icon: <Brain size={20} />, title: "ANALYZE", desc: `Claude AI evaluates confidence score, risk/reward, and regime fit before every trade.` },
+              { icon: <Cpu size={20} />, title: "ANALYZE", desc: `The system evaluates confidence score, risk/reward, and regime fit before every trade.` },
               { icon: <Shield size={20} />, title: "EXECUTE", desc: `Trade signals fire in milliseconds with pre-defined stop-loss and take-profit levels.` },
             ].map((step) => (
               <div key={step.title} style={{ display: "flex", gap: "16px", alignItems: "flex-start" }}>
@@ -498,9 +498,9 @@ export default function MarketIndex() {
           background: `linear-gradient(135deg, ${data.color}08, rgba(0,0,0,0.4))`,
           border: `1px solid ${data.color}22`, borderRadius: "24px",
         }}>
-          <div style={{ fontSize: "10px", color: data.color, letterSpacing: "3px", marginBottom: "16px" }}>JOIN THE BRAIN</div>
+          <div style={{ fontSize: "10px", color: data.color, letterSpacing: "3px", marginBottom: "16px" }}>JOIN THE COMMUNITY</div>
           <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(28px, 4vw, 48px)", letterSpacing: "4px", color: "#fff", marginBottom: "16px" }}>
-            START TRADING {data.symbol} WITH AI
+            START TRADING {data.symbol}
           </h2>
           <p style={{ fontSize: "13px", color: "#666", maxWidth: "480px", margin: "0 auto 32px", lineHeight: "1.8" }}>
             Non-custodial. Your funds stay on your exchange. Set up takes under 5 minutes.

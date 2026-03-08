@@ -94,7 +94,7 @@ COINS_RAW = os.getenv("COINS", "BTC,ETH,SOL,LINK").strip()
 if COINS_RAW.lower() == "all":
     from strategy.symbol_registry import SYMBOL_TO_COINGECKO
 
-    # Exclude stablecoins and low-leverage symbols from auto-list if desired, 
+    # Exclude stablecoins and low-leverage symbols from auto-list if desired,
     # but for now we follow the registry.
     ACTIVE_COINS = [s for s in SYMBOL_TO_COINGECKO.keys() if s != "USDC"]
 else:

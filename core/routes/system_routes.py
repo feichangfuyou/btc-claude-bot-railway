@@ -1,9 +1,8 @@
 import os
-import time
 from collections import deque
 from datetime import datetime
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 
 from core.auth import AuthenticatedUser, get_active_user, get_current_user
@@ -58,7 +57,6 @@ def _readiness_scale_10k() -> dict:
 
 @router.get("/health")
 def health():
-    prices = {sym: cs.price for sym, cs in bot.coins.items() if cs.price > 0}
     return {
         "status": "ok",
         "bot_running": bot.bot_running,
@@ -296,11 +294,11 @@ def set_global_max_loss(
     """Dynamically adjust the platform's global max loss circuit breaker threshold."""
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin privileges required")
-    
+
     new_limit = float(body.get("limit", 1000000.0))
     if new_limit <= 0:
         raise HTTPException(status_code=400, detail="Limit must be positive")
-        
+
     bot_manager.global_max_loss_usd = new_limit
     bot.add_log(f"⚙️ ADMIN ACTION: Set Global Max Loss to ${new_limit:,.2f}", "warning")
     return {"status": "ok", "global_max_loss_usd": bot_manager.global_max_loss_usd}

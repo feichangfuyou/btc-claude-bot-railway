@@ -593,7 +593,7 @@ async def _api_call(model: str, system: str, user_msg: str, max_tokens: int = 80
                 error_msg = data["error"].get("message", "Anthropic API error")
                 if "credit balance is too low" in error_msg.lower():
                     error_msg = "❌ Anthropic API balance is zero. Please top up at console.anthropic.com"
-                
+
                 next_model = model_fallback.record_failure(effective_model, error_msg)
                 if next_model and next_model != effective_model:
                     return await _api_call(next_model, system, user_msg, max_tokens)
@@ -750,7 +750,7 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
         for sym, cs in bot.coins.items():
             if cs.price > 0:
                 coins_snapshot[sym] = _build_enhanced_coin_snapshot(cs, sym)
-        
+
         # Enforce tier-based coin limit if provided
         if coin_limit > 0 and len(coins_snapshot) > coin_limit:
             # Keep top N based on volume or just first N (usually BTC/ETH/SOL)

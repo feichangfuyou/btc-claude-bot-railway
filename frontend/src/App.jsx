@@ -213,9 +213,9 @@ function Dashboard() {
 
 
   useEffect(() => {
-    document.title = "Terminal — DoYou.trade AI Trading Brain";
+    document.title = "Terminal — DoYou.trade Advanced Trading";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Access your institutional-grade AI trading terminal. Professional crypto automation and strategy management for the Brain.");
+    if (meta) meta.setAttribute("content", "Access your institutional-grade trading terminal. Professional crypto automation and strategy management.");
   }, []);
   const [coins, setCoins] = useState({});
   const [activeCoins, setActiveCoins] = useState(DEFAULT_COINS);

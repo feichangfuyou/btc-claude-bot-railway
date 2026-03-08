@@ -149,10 +149,10 @@ def close_futures_position(bot, pos: dict, exit_price: float, reason: str):
         pnl = (pos["entry"] - exit_price) * coin_size
 
     fee = margin * FUTURES_ROUND_TRIP_FEE
-    
+
     # realism penalty for paper traders (slippage + funding carry cost)
     paper_slippage = (margin * PAPER_SLIPPAGE_PCT * 2) if not FUTURES_LIVE else 0
-    
+
     # Simulate funding bleed for held positions (approx 0.01% per 8h)
     funding_cost = 0
     if not FUTURES_LIVE and pos.get("open_ts"):

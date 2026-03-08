@@ -433,11 +433,11 @@ class BotState:
     def _finalize_close(self, pos, pos_symbol, coin_size, pnl, reason):
         trading_fee = pos["usd_size"] * ROUND_TRIP_FEE
         onchain_cost = (pos["usd_size"] * ONCHAIN_SLIPPAGE + GAS_COST_USD * 2) if pos.get("onchain") else 0
-        
+
         # Simulated slippage helps bridge the paper-to-live performance gap
         paper_slippage = (pos["usd_size"] * PAPER_SLIPPAGE_PCT * 2) if (PAPER_TRADING and not pos.get("onchain")) else 0
         total_cost = trading_fee + onchain_cost + AI_COST_PER_TRADE + paper_slippage
-        
+
         net = round(pnl - total_cost, 2)
         self.account["balance"] = round(self.account["balance"] + pos["usd_size"] + net, 2)
         self.account["daily_pnl"] = round(self.account["daily_pnl"] + net, 2)
@@ -626,6 +626,29 @@ class BotState:
             )
         )
         return net
+
+    def set_paper_position(self, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision):
+        """Standard helper for recording a paper position (or failover) in the state."""
+        self.account["balance"] = round(self.account["balance"] - usd_sz, 2)
+        new_pos = {
+            "id": int(time.time() * 1000),
+            "symbol": symbol,
+            "side": action,
+            "entry": entry,
+            "tp": tp,
+            "sl": sl,
+            "coin_size": coin_sz,
+            "btc_size": coin_sz,
+            "usd_size": usd_sz,
+            "open_ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "confidence": decision.get("confidence", 0),
+            "patterns": decision.get("patterns_detected", []),
+            "paper": True,
+        }
+        self.open_positions.append(new_pos)
+        self.persist_position()
+        self.persist_account()
+        return new_pos
 
     async def broadcast_trade_update(self):
         """Broadcast current trade state to all connected WebSocket clients."""
@@ -1042,11 +1065,11 @@ class BotState:
             pnl = (pos["entry"] - current_price) * coin_size
         trading_fee = pos["usd_size"] * ROUND_TRIP_FEE
         onchain_cost = (pos["usd_size"] * ONCHAIN_SLIPPAGE + GAS_COST_USD * 2) if pos.get("onchain") else 0
-        
+
         # Simulated slippage helps bridge the paper-to-live performance gap
         paper_slippage = (pos["usd_size"] * PAPER_SLIPPAGE_PCT * 2) if (PAPER_TRADING and not pos.get("onchain")) else 0
         total_cost = trading_fee + onchain_cost + AI_COST_PER_TRADE + paper_slippage
-        
+
         net = round(pnl - total_cost, 2)
         self.account["balance"] = round(self.account["balance"] + pos["usd_size"] + net, 2)
         self.account["daily_pnl"] = round(self.account["daily_pnl"] + net, 2)
@@ -1645,7 +1668,7 @@ class BotState:
             "open_positions": self.open_positions,
             "max_positions": MAX_CONCURRENT_POSITIONS,
             "trades": self.trades,
-            "logs": [l for l in self.logs if not l.get("admin_only", False)],
+            "logs": [entry for entry in self.logs if not entry.get("admin_only", False)],
             "claude_decision": self.claude_decision,
             "bot_running": self.bot_running,
             "claude_thinking": self.claude_thinking,

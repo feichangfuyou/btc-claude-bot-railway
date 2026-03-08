@@ -360,7 +360,7 @@ export default function Onboarding() {
                 <div style={styles.skipWarningBox}>
                   <div style={styles.skipWarningTitle}><AlertTriangle size={14} style={{ marginRight: 6 }} /> No exchange connected</div>
                   <div style={styles.skipWarningText}>
-                    You can skip and add your API keys later in <strong>Settings</strong>. However, the bot will not be able to execute any trades until valid keys are saved. You'll see a warning when you try to start the bot.
+                    You can skip and add your API keys later in <strong>Settings</strong>. However, the system will not be able to execute any trades until valid keys are saved. You'll see a warning when you try to start the terminal.
                   </div>
                   <button style={styles.skipConfirmBtn} onClick={() => { setSkipWarning(false); setStep(2); }}>
                     Got it — Skip for now
@@ -481,7 +481,7 @@ export default function Onboarding() {
                 <div style={styles.noKeyWarning}>
                   <div style={styles.noKeyWarningTitle}><AlertTriangle size={14} style={{ marginRight: 6 }} /> No exchange connected</div>
                   <div style={styles.noKeyWarningText}>
-                    The bot will launch in <strong>paper trading mode only</strong>. To execute real trades, go to <strong>Settings → Exchange Keys</strong> and add your API keys. The bot will not activate live trading until valid keys are saved and verified.
+                    The system will launch in <strong>paper trading mode only</strong>. To execute real trades, go to <strong>Settings → Exchange Keys</strong> and add your API keys. The terminal will not activate live trading until valid keys are saved and verified.
                   </div>
                 </div>
               )}
@@ -518,7 +518,7 @@ export default function Onboarding() {
               <div style={styles.btnRow}>
                 <button style={styles.skipBtn} onClick={() => setStep(3)}><ArrowLeft size={14} /> Back</button>
                 <button style={styles.launchBtn} onClick={handleFinish} disabled={saving}>
-                  {saving ? "Setting up..." : <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>Launch Bot <ArrowRight size={16} /></span>}
+                  {saving ? "Setting up..." : <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>Launch Terminal <ArrowRight size={16} /></span>}
                 </button>
               </div>
             </div>

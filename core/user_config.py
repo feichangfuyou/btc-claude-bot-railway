@@ -140,7 +140,7 @@ def _dict_to_config(d: dict) -> UserConfig:
 def load_user_config(user_id: str) -> UserConfig:
     """Load full user config from Supabase (profile + preferences + exchanges) in parallel."""
     now = time.time()
-    
+
     # Return mock config for admin/system bypass
     if user_id == "admin":
         return UserConfig(
@@ -150,7 +150,7 @@ def load_user_config(user_id: str) -> UserConfig:
             subscription_tier="elite",
             subscription_status="active"
         )
-        
+
     # Redis cache (distributed)
     if is_redis_available():
         cached = cache_get(f"user_config:{user_id}", ttl_sec=_USER_CONFIG_TTL)

@@ -1,18 +1,13 @@
-import hmac
 import hashlib
-import time
+import hmac
 import json
+import time
 import urllib.parse
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
-from core.config import (
-    ACTIVE_COINS, 
-    PRICE_FETCH_TIMEOUT,
-    BINANCE_API_KEY,
-    BINANCE_API_SECRET
-)
+from core.config import ACTIVE_COINS, BINANCE_API_KEY, BINANCE_API_SECRET, PRICE_FETCH_TIMEOUT
 
 BINANCE_REST_URL = "https://api.binance.com"
 # Alternative: data-api.binance.vision (EU/US-friendly)
@@ -266,8 +261,8 @@ async def get_balance_usd() -> float:
 
 
 async def add_market_order(
-    symbol: str, 
-    side: str, 
+    symbol: str,
+    side: str,
     quantity: float,
     api_key: str | None = None,
     api_secret: str | None = None,

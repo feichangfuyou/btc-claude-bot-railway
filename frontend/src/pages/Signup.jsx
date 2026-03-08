@@ -76,9 +76,9 @@ export default function Signup() {
   const [oauthLoading, setOauthLoading] = useState(null);
   
   useEffect(() => {
-    document.title = "Join DoYou.trade — Create Your AI Trading Account";
+    document.title = "Join DoYou.trade — Create Your Trading Account";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Start your non-custodial AI trading journey today. Create a secure account on DoYou.trade and automate your crypto portfolio.");
+    if (meta) meta.setAttribute("content", "Start your non-custodial trading journey today. Create a secure account on DoYou.trade and automate your crypto portfolio.");
   }, []);
 
   async function handleSubmit(e) {
@@ -151,8 +151,8 @@ export default function Signup() {
           </div>
           <h1>START YOUR TRADING JOURNEY.</h1>
           <p>
-            Create your account in seconds and unlock the power of automated AI trading. 
-            Connect your favorite exchanges and let the brain do the heavy lifting.
+            Create your account in seconds and unlock the power of automated trading. 
+            Connect your favorite exchanges and let our systems do the heavy lifting.
           </p>
           <div style={{ display: "flex", gap: "16px", marginBottom: "40px", justifyContent: "center", flexWrap: "wrap" }}>
             <button className="btn btn-r" onClick={() => document.getElementById('signup-card').scrollIntoView({ behavior: 'smooth' })} style={{ padding: "16px 32px", fontSize: "14px" }}>CREATE ACCOUNT &rarr;</button>
@@ -265,7 +265,7 @@ export default function Signup() {
           </div>
           <div className="stat-item">
             <h4>12k+</h4>
-            <p>ACTIVE BRAINS</p>
+            <p>ACTIVE USERS</p>
           </div>
           <div className="stat-item">
             <h4>99.9%</h4>

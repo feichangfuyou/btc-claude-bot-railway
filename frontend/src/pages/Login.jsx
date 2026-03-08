@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { colors } from "../theme.js";
-import { Brain, Shield, Zap, ArrowUp, ArrowRight } from "lucide-react";
+import { Cpu, Shield, Zap, ArrowUp, ArrowRight } from "lucide-react";
 
 // Minimal Ticker for Landing if the main one is too heavy
 function LandingTicker() {
@@ -77,9 +77,9 @@ export default function Login() {
   const [resetSent, setResetSent] = useState(false);
 
   useEffect(() => {
-    document.title = "DoYou.trade — Advanced AI Trading Terminal | Crypto Intelligence";
+    document.title = "DoYou.trade — Advanced Trading Terminal | Crypto Intelligence";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "DoYou.trade — The world's most advanced AI-powered trading terminal. Automate your crypto strategy with the Brain. Professional-grade algorithmic trading for everyone.");
+    if (meta) meta.setAttribute("content", "DoYou.trade — The world's most advanced trading terminal. Automate your crypto strategy with high-performance systems. Professional-grade algorithmic trading for everyone.");
     
     const err = searchParams.get("error");
     if (err) {
@@ -152,14 +152,14 @@ export default function Login() {
       <header className="landing-hero">
         <div className="hero-text">
           <div className="hero-badges">
-            <span className="hero-badge">AI POWERED</span>
-            <span className="hero-badge">PROPRIETARY NEURAL ENGINE</span>
+            <span className="hero-badge">PREMIUM EXECUTION</span>
+            <span className="hero-badge">PROPRIETARY STRATEGY ENGINE</span>
             <span className="hero-badge">24/7 AUTOMATED</span>
           </div>
-          <h1>ADVANCED AI CRYPTO TRADING TERMINAL.</h1>
+          <h1>ADVANCED CRYPTO TRADING TERMINAL.</h1>
           <p>
-            DoYou.trade is a premier non-custodial AI trading assistant that monitors global markets 24/7. 
-            Integrated with a sophisticated neural model to analyze sentiment, technical indicators, 
+            DoYou.trade is a premier non-custodial trading assistant that monitors global markets 24/7. 
+            Integrated with a sophisticated execution model to analyze sentiment, technical indicators, 
             and global macro trends to execute high-precision trades automatically.
           </p>
           <div style={{ display: "flex", gap: "16px", marginBottom: "40px", justifyContent: "center", flexWrap: "wrap" }}>
@@ -168,7 +168,7 @@ export default function Login() {
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", opacity: 0.45 }}>
             <div style={{ display: "flex", gap: "32px", justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
               {/* Coinbase */}
-              <svg aria-label="Trade Bitcoin on Coinbase with AI" width="100" height="24" viewBox="0 0 100 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg aria-label="Trade Bitcoin on Coinbase" width="100" height="24" viewBox="0 0 100 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="12" r="12" fill="#0052FF"/>
                 <path d="M12 6C8.69 6 6 8.69 6 12C6 15.31 8.69 18 12 18C14.97 18 17.44 15.97 17.9 13.2H15.33C14.93 14.56 13.58 15.56 12 15.56C10.03 15.56 8.44 13.97 8.44 12C8.44 10.03 10.03 8.44 12 8.44C13.58 8.44 14.93 9.44 15.33 10.8H17.9C17.44 8.03 14.97 6 12 6Z" fill="white"/>
                 <text x="28" y="17" fontFamily="'Space Mono', monospace" fontSize="12" fontWeight="700" fill="#aaa" letterSpacing="1">COINBASE</text>
@@ -183,7 +183,7 @@ export default function Login() {
                 <text x="28" y="17" fontFamily="'Space Mono', monospace" fontSize="12" fontWeight="700" fill="#aaa" letterSpacing="1">BINANCE</text>
               </svg>
               {/* Kraken */}
-              <svg aria-label="Kraken AI Trading Bot" width="80" height="24" viewBox="0 0 80 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg aria-label="Kraken Trading Systems" width="80" height="24" viewBox="0 0 80 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="12" r="12" fill="#5741D9"/>
                 <text x="6" y="16" fontFamily="Arial" fontSize="10" fontWeight="900" fill="white">K</text>
                 <text x="26" y="17" fontFamily="'Space Mono', monospace" fontSize="12" fontWeight="700" fill="#aaa" letterSpacing="1">KRAKEN</text>
@@ -311,7 +311,7 @@ export default function Login() {
           </div>
           <div className="stat-item">
             <h4>12k+</h4>
-            <p>ACTIVE BRAINS</p>
+            <p>ACTIVE USERS</p>
           </div>
           <div className="stat-item">
             <h4>99.9%</h4>
@@ -333,7 +333,7 @@ export default function Login() {
                 "End-to-End Encryption for all API keys",
                 "Non-custodial architecture (We never hold your funds)",
                 "Strict withdrawal-disabled API policy",
-                "24/7 internal auditing of neural engine decisions",
+                "24/7 internal auditing of execution engine decisions",
                 "Global DDOS protection and encrypted traffic"
               ].map((text, i) => (
                 <li key={i} style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", color: "#aaa" }}>
@@ -368,12 +368,12 @@ export default function Login() {
           <div className="feature-card" style={{ background: "rgba(255,255,255,0.03)", padding: "40px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.05)" }}>
             <div style={{ color: colors.gold, fontSize: "24px", fontWeight: "800", marginBottom: "20px" }}>02. CONFIGURE</div>
             <h3 style={{ fontSize: "18px", marginBottom: "12px" }}>SET YOUR STRATEGY</h3>
-            <p style={{ fontSize: "14px", lineHeight: "1.6", color: "#888" }}>Choose from 100+ professional trading presets or customize your risk parameters. Our AI Brain adapts to your preferences.</p>
+            <p style={{ fontSize: "14px", lineHeight: "1.6", color: "#888" }}>Choose from 100+ professional trading presets or customize your risk parameters. Our systems adapt to your preferences.</p>
           </div>
           <div className="feature-card" style={{ background: "rgba(255,255,255,0.03)", padding: "40px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.05)" }}>
             <div style={{ color: colors.gold, fontSize: "24px", fontWeight: "800", marginBottom: "20px" }}>03. AUTOMATE</div>
             <h3 style={{ fontSize: "18px", marginBottom: "12px" }}>EXECUTE 24/7</h3>
-            <p style={{ fontSize: "14px", lineHeight: "1.6", color: "#888" }}>Sit back while the AI monitors global markets, analyzes data streams, and executes trades with millisecond precision.</p>
+            <p style={{ fontSize: "14px", lineHeight: "1.6", color: "#888" }}>Sit back while our systems monitor global markets, analyze data streams, and execute trades with millisecond precision.</p>
           </div>
         </div>
       </section>
@@ -381,14 +381,14 @@ export default function Login() {
       <section className="landing-faq" style={{ padding: "80px 20px", maxWidth: "800px", margin: "0 auto", contentVisibility: "auto", containIntrinsicSize: "0 500px" }}>
         <div className="section-header" style={{ textAlign: "center", marginBottom: "40px" }}>
           <h2 style={{ fontSize: "32px", marginBottom: "16px" }}>FREQUENTLY ASKED QUESTIONS</h2>
-          <p style={{ color: "#888" }}>EVERYTHING YOU NEED TO KNOW ABOUT THE BRAIN</p>
+          <p style={{ color: "#888" }}>EVERYTHING YOU NEED TO KNOW ABOUT DOYOU.TRADE</p>
         </div>
         <div className="faq-list" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           {[
             { q: "Is DoYou.trade a custodial platform?", a: "No. DoYou.trade is 100% non-custodial. Your funds always remain in your own exchange account (Coinbase, Binance, or Kraken). We only execute trades on your behalf using API keys with withdrawal permissions strictly disabled." },
-            { q: "How does the AI 'Brain' make trading decisions?", a: "The Brain utilizes advanced neural networks to process millions of data points every second, including price action, technical indicators, global news sentiment, and on-chain liquidity flows. It identifies high-probability setups and executes with millisecond precision." },
-            { q: "Do I need prior trading experience?", a: "Not at all. While professional traders use our advanced tools, beginners can leverage our 100+ expert trading presets. Simply connect your exchange, pick a strategy that matches your risk profile, and let the Brain handle the technical execution." },
-            { q: "Which exchanges are supported?", a: "Currently, we offer full support for Coinbase, Binance, and Kraken. You can connect multiple exchanges simultaneously and manage your entire portfolio from a single, unified AI-powered dashboard." },
+            { q: "How does the System make trading decisions?", a: "The platform utilizes advanced execution models to process millions of data points every second, including price action, technical indicators, global market sentiment, and on-chain liquidity flows. It identifies high-probability setups and executes with millisecond precision." },
+            { q: "Do I need prior trading experience?", a: "Not at all. While professional traders use our advanced tools, beginners can leverage our 100+ expert trading presets. Simply connect your exchange, pick a strategy that matches your risk profile, and let the systems handle the technical execution." },
+            { q: "Which exchanges are supported?", a: "Currently, we offer full support for Coinbase, Binance, and Kraken. You can connect multiple exchanges simultaneously and manage your entire portfolio from a single, unified dashboard." },
             { q: "What are the fees for using the platform?", a: "We offer transparent, tier-based subscription models with no hidden performance fees. Visit our billing section after signing up to choose a plan that fits your trading volume and needs." }
           ].map((item, idx) => (
             <details key={idx} style={{ background: "rgba(255,255,255,0.03)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)", padding: "20px", cursor: "pointer" }}>
@@ -409,9 +409,9 @@ export default function Login() {
         </div>
         <div className="features-grid">
           <div className="feature-card">
-            <div style={{ marginBottom: "20px" }}><Brain size={32} color={colors.gold} /></div>
-            <h3>Advanced Neural Intelligence</h3>
-            <p>Leverage state-of-the-art AI for deep market analysis. Real-time inference on price action, global news sentiment, and on-chain liquidity.</p>
+            <div style={{ marginBottom: "20px" }}><Cpu size={32} color={colors.gold} /></div>
+            <h3>Advanced Systematic Intelligence</h3>
+            <p>Leverage state-of-the-art systems for deep market analysis. Real-time inference on price action, global news sentiment, and on-chain liquidity.</p>
           </div>
           <div className="feature-card">
             <div style={{ marginBottom: "20px" }}><Shield size={32} color={colors.gold} /></div>
@@ -431,17 +431,17 @@ export default function Login() {
           <div>
             <div className="auth-brand" style={{ fontSize: "20px", marginBottom: "15px" }}>DOYOU.TRADE</div>
             <p style={{ fontSize: "14px", color: "#666", lineHeight: "1.6" }}>
-              The world's most advanced non-custodial AI trading terminal. 
+              The world's most advanced non-custodial trading terminal. 
               Built for precision, speed, and security.
             </p>
           </div>
           <div>
             <h4 style={{ fontSize: "12px", color: "#888", letterSpacing: "2px", marginBottom: "15px" }}>MARKET INDEX</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px" }}>
-              <Link to="/market/btc" title="Trade Bitcoin with AI" aria-label="Trade Bitcoin with AI">BTC/USD Intelligence</Link>
+              <Link to="/market/btc" title="Trade Bitcoin" aria-label="Trade Bitcoin">BTC/USD Intelligence</Link>
               <Link to="/market/eth" title="Automate Ethereum Trading" aria-label="Automate Ethereum Trading">ETH/USD Strategy</Link>
-              <Link to="/market/sol" title="Solana AI Algorithms" aria-label="Solana AI Algorithms">SOL/USD Execution</Link>
-              <Link to="/market/altcoins" title="Algorithmic Altcoin Trading" aria-label="Algorithmic Altcoin Trading">Altcoin Neural Engine</Link>
+              <Link to="/market/sol" title="Solana Precision Execution" aria-label="Solana Precision Execution">SOL/USD Execution</Link>
+              <Link to="/market/altcoins" title="Algorithmic Altcoin Trading" aria-label="Algorithmic Altcoin Trading">Altcoin Execution Engine</Link>
             </div>
           </div>
           <div>
@@ -498,12 +498,12 @@ export default function Login() {
       >
         <div style={{ display: "none", alignItems: "center", gap: "10px" }} className="desktop-only-flex">
           <span className="dot" style={{ background: "#00E676", animation: "pulse 1.5s infinite" }} />
-          <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1px", color: colors.gold }}>THE BRAIN IS ANALYZING GLOBAL MARKETS</span>
+          <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1px", color: colors.gold }}>SYSTEMS MONITORING GLOBAL MARKETS</span>
         </div>
         <div style={{ flex: 1, maxWidth: "1200px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <span style={{ fontSize: "12px", fontWeight: "800", letterSpacing: "1px" }}>READY TO AUTOMATE?</span>
-            <span style={{ fontSize: "10px", color: "#666" }}>Join 12k+ traders using the neural engine.</span>
+            <span style={{ fontSize: "10px", color: "#666" }}>Join 12k+ traders using the execution engine.</span>
           </div>
           <div style={{ display: "flex", gap: "12px" }}>
             <Link to="/signup" className="btn btn-r" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 24px", fontSize: "11px", whiteSpace: "nowrap" }}>GET STARTED <ArrowRight size={14} /></Link>

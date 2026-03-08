@@ -11,7 +11,7 @@ export default function Terms() {
     useEffect(() => {
         document.title = "Terms of Service — DoYou.trade";
         const meta = document.querySelector('meta[name="description"]');
-        if (meta) meta.setAttribute("content", "Read the Terms of Service for DoYou.trade. Professional-grade non-custodial AI trading terminal services and user agreement.");
+        if (meta) meta.setAttribute("content", "Read the Terms of Service for DoYou.trade. Professional-grade non-custodial trading terminal services and user agreement.");
     }, []);
 
     return (
@@ -32,7 +32,7 @@ export default function Terms() {
                 <section style={s.section}>
                     <h2 style={s.h2}>2. Service Description</h2>
                     <p style={s.p}>
-                        {COMPANY} provides an AI-assisted crypto trading dashboard. The Service connects to
+                        {COMPANY} provides an advanced crypto trading dashboard. The Service connects to
                         exchanges on your behalf using API keys you provide. We do not custody funds, hold
                         private keys, or make financial decisions without your configuration.
                     </p>
@@ -86,7 +86,7 @@ export default function Terms() {
                     <h2 style={s.h2}>8. Disclaimer of Warranties</h2>
                     <p style={s.p}>
                         THE SERVICE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND. WE DO NOT GUARANTEE
-                        UPTIME, ACCURACY OF AI SIGNALS, OR PROFITABLE TRADING OUTCOMES.
+                        UPTIME, ACCURACY OF SYSTEM SIGNALS, OR PROFITABLE TRADING OUTCOMES.
                     </p>
                 </section>
 

@@ -11,7 +11,7 @@ const TIERS = [
     name: "Starter",
     price: "$49",
     period: "/mo",
-    features: ["1 exchange", "Claude Haiku AI", "Top 10 Coins", "Paper + live trading"],
+    features: ["1 exchange", "Standard Intelligence", "Top 10 Coins", "Paper + live trading"],
     color: colors.muted,
   },
   {
@@ -19,7 +19,7 @@ const TIERS = [
     name: "Pro",
     price: "$99",
     period: "/mo",
-    features: ["Up to 3 exchanges", "Claude Sonnet 3.5 AI", "50+ Coins", "Smart routing", "Priority support"],
+    features: ["Up to 3 exchanges", "Enhanced Strategy Engine", "50+ Coins", "Smart routing", "Priority support"],
     color: colors.gold,
     popular: true,
   },
@@ -28,7 +28,7 @@ const TIERS = [
     name: "Elite",
     price: "$199",
     period: "/mo",
-    features: ["Unlimited exchanges", "Claude Opus 4.6 AI", "All 100+ Coins", "Futures (10x leverage)", "On-chain + Vision"],
+    features: ["Unlimited exchanges", "Ultra-Scale Execution", "All 100+ Coins", "Futures (10x leverage)", "On-chain + Vision"],
     color: colors.success,
   },
 ];
@@ -184,15 +184,15 @@ export default function Billing() {
           <div style={styles.faq}>
             <div style={styles.faqItem}>
               <div style={styles.faqQ}>Can I cancel anytime?</div>
-              <div style={styles.faqA}>Yes. Cancel anytime from this page. Your bot will continue until the end of your billing period.</div>
+              <div style={styles.faqA}>Yes. Cancel anytime from this page. Your automated systems will continue until the end of your billing period.</div>
             </div>
             <div style={styles.faqItem}>
               <div style={styles.faqQ}>What happens if my payment fails?</div>
-              <div style={styles.faqA}>You get a 3-day grace period. After that, your bot pauses but your data is preserved.</div>
+              <div style={styles.faqA}>You get a 3-day grace period. After that, your platform pauses but your data is preserved.</div>
             </div>
             <div style={styles.faqItem}>
               <div style={styles.faqQ}>Do you touch my funds?</div>
-              <div style={styles.faqA}>Never. Your exchange API keys are encrypted with AES-256 and stored securely. We never see your private keys or enable withdrawals. The bot executes trades through your own exchange account using restricted API keys.</div>
+              <div style={styles.faqA}>Never. Your exchange API keys are encrypted with AES-256 and stored securely. We never see your private keys or enable withdrawals. Our systems execute trades through your own exchange account using restricted API keys.</div>
             </div>
 
             {/* Capital Requirements Callout */}
@@ -201,7 +201,7 @@ export default function Billing() {
                 <Lightbulb size={16} /> How much capital do I need to trade live?
               </div>
               <div style={styles.faqA}>
-                The bot enforces strict minimums to ensure every trade is actually profitable after fees and AI costs:
+                The system enforces strict minimums to ensure every trade is actually profitable after fees and execution costs:
               </div>
               <div style={styles.capitalCallout}>
                 <div style={styles.capitalCalloutGrid} className="capital-callout-grid">
@@ -223,7 +223,7 @@ export default function Billing() {
                   </div>
                 </div>
                 <div style={styles.calloutNote}>
-                  <Zap size={14} /> The bot will silently block any trade that can't clear $5 net profit at its take-profit price — protecting you from entering trades where fees eat all the gains.
+                  <Zap size={14} /> The system will silently block any trade that can't clear $5 net profit at its take-profit price — protecting you from entering trades where fees eat all the gains.
                 </div>
               </div>
             </div>

@@ -49,7 +49,7 @@ async def get_current_user(
     """Extract and verify the Supabase JWT from the Authorization header.
     Returns an AuthenticatedUser or raises 401."""
     from core.config import API_SECRET
-    
+
     secret_header = request.headers.get("x-bot-secret")
     secret_query = request.query_params.get("secret")
     if API_SECRET and (secret_header == API_SECRET or secret_query == API_SECRET):

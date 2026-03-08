@@ -86,7 +86,7 @@ async def execute_onchain(
             f"⚠ CDP swap failed [{symbol}]: {str(e)[:80]} — falling back to paper",
             "error",
         )
-        _set_paper_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision)
+        bot.set_paper_position(action, symbol, entry, tp, sl, coin_sz, usd_sz, decision)
         await bot._broadcast(
             {
                 "type": "trade_update",
@@ -236,21 +236,3 @@ def _set_onchain_position(
     )
 
 
-def _set_paper_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision):
-    bot.account["balance"] = round(bot.account["balance"] - usd_sz, 2)
-    new_pos = {
-        "id": int(time.time() * 1000),
-        "symbol": symbol,
-        "side": action,
-        "entry": entry,
-        "tp": tp,
-        "sl": sl,
-        "coin_size": coin_sz,
-        "btc_size": coin_sz,
-        "usd_size": usd_sz,
-        "open_ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "confidence": decision.get("confidence", 0),
-    }
-    bot.open_positions.append(new_pos)
-    bot.persist_position()
-    bot.persist_account()

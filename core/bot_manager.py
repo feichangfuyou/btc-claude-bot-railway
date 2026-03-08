@@ -15,6 +15,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+from billing.stripe_handler import get_tier_limit
 from core.redis_client import is_redis_available, publish
 from core.user_config import UserConfig, load_user_config
 from core.user_database import (
@@ -24,7 +25,6 @@ from core.user_database import (
     udb_save_state,
     udb_save_trade,
 )
-from billing.stripe_handler import get_tier_limit
 from executors.order_router import OrderRouter
 
 USER_STATE_CHANNEL = "user_state"
@@ -194,7 +194,7 @@ class UserBotInstance:
         # 4. Execution Logic (Simplified for now - Phase 1-2 bridge)
         # In a full hub, this calls self.router.place_order()
         logger.info(f"User {self.user_id[:8]} executing {action} {symbol} (Signal Hub)")
-        
+
         try:
             # Special case: Take profit only (close winning positions)
             if action == "take_profit":
@@ -208,25 +208,25 @@ class UserBotInstance:
 
             # For simplicity, calculate rough size
             size_pct = float(signal_data.get("size_pct", 0.05))
-            
+
             # Apply Defensive Risk-Off Mode
             if getattr(bot_manager, "global_risk_off", False):
                 size_pct = size_pct * 0.5  # Halve all new entries
 
             trade_amount_usd = self.balance * size_pct
-            
+
             # Simple bounds check
             if action not in ("close", "take_profit") and trade_amount_usd < self.config.min_trade_usd:
                 logger.debug(f"User {self.user_id[:8]} trade amount too small (${trade_amount_usd:.2f})")
                 return
-                
+
             # Place order on exchange
             result = await self.router.place_order(
                 symbol=symbol,
                 action=action,
                 amount_usd=trade_amount_usd
             )
-            
+
             if result and result.get("success"):
                 logger.info(f"User {self.user_id[:8]} executed {action} for {symbol} successfully via Signal Hub")
                 self.last_trade_time = datetime.now()
@@ -241,7 +241,7 @@ class UserBotInstance:
                 })
             else:
                 logger.warning(f"User {self.user_id[:8]} failed to execute {action} {symbol}")
-                
+
         except Exception as e:
             logger.error(f"Error executing managed signal for user {self.user_id[:8]}: {e}")
 
@@ -254,7 +254,7 @@ class BotManager:
         self.global_pause = False
         self.global_risk_off = False
         self.global_max_loss_usd = 1000000.0  # $1M platform limit
-        
+
         # Concurrency limit for broadcast signals to prevent rate limit bans (e.g. Coinbase 429 errors)
         self._broadcast_semaphore = asyncio.Semaphore(50)  # Max 50 concurrent outgoing orders
 
@@ -328,7 +328,7 @@ class BotManager:
                 continue
             if preset != "all" and instance.config.trading_preset != preset:
                 continue
-            
+
             # Use Semaphore wrapper to enforce rate limits
             targets.append(self._safely_process_signal(instance, signal_data))
 
@@ -336,12 +336,12 @@ class BotManager:
             logger.info(f"📡 Broadcasting to {len(targets)} users (Semaphore queued).")
             # This batch processes all users but only 50 at a time hit the exchange
             results = await asyncio.gather(*targets, return_exceptions=True)
-            
+
             # Simple error reporting
             err_count = sum(1 for r in results if isinstance(r, Exception))
             if err_count:
                 logger.error(f"Broadcast encountered {err_count} execution errors.")
-            
+
             logger.info(f"📡 Broadcast to {len(targets)} users completed.")
 
     async def _safely_process_signal(self, instance: UserBotInstance, signal_data: dict):

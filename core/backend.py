@@ -265,43 +265,43 @@ def _apply_celery_decision(data: dict):
 async def hub_scan_cycle(tier: str):
     """Point 1: Managed Intelligence — a single AI loop for all users in a tier."""
     from billing.stripe_handler import TIER_LIMITS
-    
+
     limits = TIER_LIMITS.get(tier, TIER_LIMITS["starter"])
     model = limits["ai_model"]
     interval = limits["min_interval"]
     coin_limit = limits.get("max_coins", 10)
-    
+
     bot.add_log(f"🛰️ {tier.upper()} Hub started ({model} @ {interval}s)", "info")
-    
+
     while True:
         try:
             # Only scan if there are active users in this tier
-            active_users = sum(1 for i in bot_manager._instances.values() 
+            active_users = sum(1 for i in bot_manager._instances.values()
                              if i.running and i.config.subscription_tier == tier)
-            
+
             if active_users > 0:
                 # Master Scan for this tier
                 # We skip_scout for Elite to ensure they get Opus every time
                 skip_scout = (tier == "elite")
-                
+
                 # Perform analysis using the shared 'bot' state (prices/feeds)
                 # But we'll override the model for this specific call
                 bot.claude_model = model
-                
+
                 # This call will populate bot.claude_decision
                 await call_claude(bot, broadcast_price, skip_scout=skip_scout, coin_limit=coin_limit)
-                
+
                 # Point 1 & 2: Broadcast to all eligible users
                 if bot.claude_decision:
                     await bot_manager.broadcast_managed_signal(
-                        bot.claude_decision, 
+                        bot.claude_decision,
                         tier=tier
                     )
-                
+
                 await asyncio.sleep(interval)
             else:
                 await asyncio.sleep(10) # Wait for users to join
-                
+
         except Exception as e:
             bot.add_log(f"{tier.upper()} Hub error: {str(e)[:80]}", "error")
             await asyncio.sleep(interval or 60)
@@ -561,12 +561,12 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(coinbase_ws_loop(bot, broadcast, broadcast_price))
     asyncio.create_task(stats_refresh_cycle(bot, broadcast_price))
-    
+
     # Tiered Hub Cycles
     asyncio.create_task(hub_scan_cycle("starter"))
     asyncio.create_task(hub_scan_cycle("pro"))
     asyncio.create_task(hub_scan_cycle("elite"))
-    
+
     asyncio.create_task(bot_cycle())
 
     if is_redis_available():

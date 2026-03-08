@@ -13,7 +13,6 @@ import httpx
 import websockets
 
 from core.config import (
-    ACTIVE_COINS,
     COINBASE_API_KEY,
     COINBASE_API_SECRET,
     COINBASE_REST_TICKER,
@@ -149,7 +148,7 @@ async def _bootstrap_prices(bot, broadcast_price) -> bool:
         )
         await broadcast_price()
         return True
-    
+
     # If we get here, everything failed.
     bot.add_log("❌ Price bootstrap FAILED — check API keys or regional blocks (Coinbase/Binance/Kraken/CG)", "error")
     return False
@@ -181,7 +180,7 @@ async def _fetch_coinbase_rest_prices(bot) -> bool:
     Uses a semaphore to prevent rate-limiting."""
     updated = False
     sem = asyncio.Semaphore(5)
-    
+
     async def fetch_with_sem(client, sym):
         async with sem:
             return await _fetch_single_coinbase_stats(client, sym)

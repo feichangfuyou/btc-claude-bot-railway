@@ -264,7 +264,7 @@ class OrderRouter:
                 await ex.close()
                 if res:
                     return {"success": True, "result": res}
-                    
+
             return {"success": False, "error": f"Execution failed on {target}"}
 
         except Exception as e:

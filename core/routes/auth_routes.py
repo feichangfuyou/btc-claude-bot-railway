@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request
 
 from api.exchange_validate import validate_exchange_keys
 from billing.stripe_handler import get_max_exchanges
-from core.auth import AuthenticatedUser, get_active_user, get_current_user
+from core.auth import AuthenticatedUser, get_current_user
 from core.redis_client import is_redis_available, rate_limit_check
 from core.shared import _exchange_validate_lock, _exchange_validate_ratelimit
 from core.user_config import (
@@ -40,14 +40,14 @@ def _check_exchange_validate_ratelimit(user_id: str) -> bool:
         if len(times) >= max_per_window:
             return False
         _exchange_validate_ratelimit[user_id].append(now)
-        
+
         # Global limit check (max 50 validations per minute across all users to protect server IP)
         global_times = _exchange_validate_ratelimit.setdefault("_global", [])
         global_times[:] = [t for t in global_times if now - t < 60]
         if len(global_times) >= 50:
             return False
         global_times.append(now)
-        
+
         return True
 
 

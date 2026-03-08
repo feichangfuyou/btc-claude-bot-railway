@@ -1,25 +1,17 @@
 import asyncio
 import time
-from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 
 from ai.claude_ai import call_claude, get_cost_tracker
 from api.agentkit_provider import agentkit
 from core.ai_state_builder import build_ai_state
-from core.auth import AuthenticatedUser, get_active_user, get_optional_user
+from core.auth import AuthenticatedUser, get_active_user
 from core.bot_manager import bot_manager
 from core.config import (
-    API_SECRET,
-    START_BALANCE,
-    TARGET_BALANCE,
     USE_CELERY_AI,
 )
 from core.database import (
-    db_get_equity_curve,
-    db_get_session_history,
-    db_load_all_trades,
-    db_save_state,
     file_log,
 )
 from core.redis_client import (
@@ -217,16 +209,16 @@ async def set_preset(body: dict = Body(default={}), user: AuthenticatedUser = De
     pid = (body.get("preset") or "").strip().lower()
     if pid not in PRESETS:
         return {"ok": False, "error": f"Unknown preset: {pid}"}
-    
+
     # Update the user's bot instance
     instance = await bot_manager.get_or_create(user.id)
     instance.config.trading_preset = pid
     instance.persist_state()
-    
+
     # Also save to user_preferences for persistence
     from core.user_config import save_user_preferences
     save_user_preferences(user.id, {"trading_preset": pid})
-    
+
     return {"ok": True, "preset": pid}
 
 
@@ -290,9 +282,10 @@ async def emergency_stop(request: Request, user: AuthenticatedUser = Depends(get
         if host not in ("127.0.0.1", "::1", "localhost"):
             raise HTTPException(status_code=403, detail="Emergency stop restricted to admins")
 
-    from core.bot_manager import bot_manager
     import asyncio
-    
+
+    from core.bot_manager import bot_manager
+
     # Broadcast CLOSE signals to all running bots
     targets = []
     for instance in bot_manager._instances.values():
@@ -302,7 +295,7 @@ async def emergency_stop(request: Request, user: AuthenticatedUser = Depends(get
                 "symbol": "ALL",
                 "reason": "ADMIN EMERGENCY STOP",
             }))
-    
+
     if targets:
         # Await their closures
         await asyncio.gather(*targets, return_exceptions=True)

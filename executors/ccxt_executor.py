@@ -22,10 +22,10 @@ class CCXTExecutor:
         if not ccxt:
             logger.error("CCXT library not installed")
             return None
-            
+
         if self._exchange is not None:
             return self._exchange
-            
+
         try:
             ex_class = getattr(ccxt, self.exchange_id)
             config = {
@@ -35,7 +35,7 @@ class CCXTExecutor:
             }
             if self.api_passphrase:
                 config["password"] = self.api_passphrase
-                
+
             self._exchange = ex_class(config)
             await self._exchange.load_markets()
             return self._exchange
@@ -48,7 +48,7 @@ class CCXTExecutor:
         ex = await self._get_exchange()
         if not ex:
             return 0.0
-            
+
         try:
             balance = await ex.fetch_balance()
             total = balance.get("total", {})
@@ -66,10 +66,10 @@ class CCXTExecutor:
         if not self.api_key or not self.api_secret:
             logger.error(f"{self.exchange_id} executor not configured with API keys")
             return None
-            
+
         base_asset = symbol.upper()
         formatted_symbol = f"{base_asset}/USDT"
-        
+
         # Dynamically find the right trading pair if USDT isn't available
         if formatted_symbol not in ex.markets:
             for quote in ["USDC", "USD"]:
@@ -85,9 +85,9 @@ class CCXTExecutor:
             if not current_price:
                 logger.error(f"Could not fetch price for {formatted_symbol} on {self.exchange_id}")
                 return None
-                
+
             raw_amount = usd_size / current_price
-            
+
             # Standardize precision to exchange limits
             amount_str = ex.amount_to_precision(formatted_symbol, raw_amount)
             amount = float(amount_str)
@@ -98,10 +98,10 @@ class CCXTExecutor:
             if min_amount and amount < min_amount:
                 logger.error(f"Order size {amount} too small. Minimum is {min_amount} on {self.exchange_id}")
                 return None
-                
+
             # Place market order
             order = await ex.create_market_order(formatted_symbol, side, amount)
-            
+
             if not order or "id" not in order:
                 logger.error(f"{self.exchange_id} order failed: {order}")
                 return None
@@ -109,7 +109,7 @@ class CCXTExecutor:
             status = order.get("status", "unknown").lower()
             if status == "closed":
                 status = "filled"
-                
+
             avg_price = order.get("average", current_price)
             filled = order.get("filled", amount)
             cost = order.get("cost", filled * avg_price)
@@ -133,10 +133,10 @@ class CCXTExecutor:
         ex = await self._get_exchange()
         if not ex:
             return None
-            
+
         base_asset = symbol.upper()
         formatted_symbol = f"{base_asset}/USDT"
-        
+
         # Dynamically find the right trading pair if USDT isn't available
         if formatted_symbol not in ex.markets:
             for quote in ["USDC", "USD"]:
@@ -144,7 +144,7 @@ class CCXTExecutor:
                 if alt_symbol in ex.markets:
                     formatted_symbol = alt_symbol
                     break
-                    
+
         try:
             order = await ex.fetch_order(order_id, formatted_symbol)
             status = order.get("status", "unknown").lower()

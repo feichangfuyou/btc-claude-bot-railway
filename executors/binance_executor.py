@@ -7,7 +7,6 @@ import logging
 from typing import Optional
 
 from api.binance_api import (
-    add_market_order,
     add_market_order_by_quote,
     binance_private_request,
     get_balance_usd,

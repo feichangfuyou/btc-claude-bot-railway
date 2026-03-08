@@ -34,7 +34,7 @@ async def execute_coinbase_spot(
     )
     if not keys and not is_configured():
         bot.add_log("⚠ Coinbase not configured — falling back to paper", "warning")
-        _set_paper_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision)
+        bot.set_paper_position(action, symbol, entry, tp, sl, coin_sz, usd_sz, decision)
         await bot.broadcast_trade_update()
         return
 
@@ -54,7 +54,7 @@ async def execute_coinbase_spot(
                 f"⚠ Coinbase order failed [{symbol}] — falling back to paper",
                 "error",
             )
-            _set_paper_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision)
+            bot.set_paper_position(action, symbol, entry, tp, sl, coin_sz, usd_sz, decision)
             await bot.broadcast_trade_update()
             return
 
@@ -65,7 +65,7 @@ async def execute_coinbase_spot(
             f"⚠ Coinbase order error [{symbol}]: {str(e)[:80]} — falling back to paper",
             "error",
         )
-        _set_paper_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision)
+        bot.set_paper_position(action, symbol, entry, tp, sl, coin_sz, usd_sz, decision)
         await bot.broadcast_trade_update()
 
 
@@ -192,10 +192,6 @@ def _set_coinbase_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, 
     )
 
 
-    bot.open_positions.append(new_pos)
-    bot.persist_position()
-    bot.persist_account()
-
 class CoinbaseExecutor:
     """Executor for Coinbase Advanced Trade Spot exchange."""
 
@@ -209,7 +205,7 @@ class CoinbaseExecutor:
             # quote_size_usd works for both buy and sell? No, for sell we usually need base_size.
             # However, for the 'unification', if we only have usd_size, we might need to fetch price first.
             # But create_spot_market_order handles quote_size_usd for BUYS.
-            
+
             if side == "buy":
                 res = await create_spot_market_order(
                     symbol, "buy", quote_size_usd=usd_size, api_key=self.api_key, api_secret=self.api_secret
@@ -227,10 +223,10 @@ class CoinbaseExecutor:
                 res = await create_spot_market_order(
                     symbol, "sell", base_size=base_size, api_key=self.api_key, api_secret=self.api_secret
                 )
-                
+
             if not res:
                 return None
-                
+
             return {
                 "id": res,
                 "exchange": "coinbase",

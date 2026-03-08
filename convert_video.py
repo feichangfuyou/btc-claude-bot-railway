@@ -1,4 +1,3 @@
-import imageio
 import imageio.v3 as iio
 
 input_path = '/Users/macbook2025/.gemini/antigravity/brain/8bd91762-6710-4ec2-bd83-025f3d44ec69/app_promo_video_1772856313027.webp'

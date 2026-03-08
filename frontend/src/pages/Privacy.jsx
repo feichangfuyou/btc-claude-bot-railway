@@ -28,17 +28,17 @@ export default function Privacy() {
                         <strong>Account data:</strong> email address, hashed password (via Supabase Auth).<br /><br />
                         <strong>Trading preferences:</strong> strategy, risk level, selected coins, paper/live mode — stored in our database.<br /><br />
                         <strong>Exchange credentials:</strong> API keys and secrets, encrypted at rest (AES-256 Fernet). We store only the encrypted ciphertext — plaintext keys are never persisted.<br /><br />
-                        <strong>Usage data:</strong> trade history, bot logs, and AI decisions — used to power the learning system and your trade history view.<br /><br />
-                        <strong>No financial data:</strong> We do not see your actual exchange balances, withdrawal addresses, or transaction history beyond what your API keys expose to the bot.
+                        <strong>Usage data:</strong> trade history, system logs, and automated decisions — used to power the platform and your trade history view.<br /><br />
+                        <strong>No financial data:</strong> We do not see your actual exchange balances, withdrawal addresses, or transaction history beyond what your API keys expose to the system.
                     </p>
                 </section>
 
                 <section style={s.section}>
                     <h2 style={s.h2}>2. How We Use It</h2>
                     <p style={s.p}>
-                        — To operate the trading bot on your behalf<br />
+                        — To operate the trading systems on your behalf<br />
                         — To display your trade history and analytics dashboard<br />
-                        — To improve AI trading strategies (aggregated, never individual)<br />
+                        — To improve trading strategies (aggregated, never individual)<br />
                         — To send billing-related emails and account notifications<br />
                         — To comply with legal obligations
                     </p>
@@ -50,7 +50,7 @@ export default function Privacy() {
                         We do not sell your data. We share data only with:<br /><br />
                         <strong>Supabase</strong> — database and auth provider (SOC 2 compliant)<br />
                         <strong>Stripe</strong> — payment processing (PCI-DSS compliant)<br />
-                        <strong>Anthropic</strong> — AI inference (market data only, no personal data sent)<br />
+                        <strong>Anthropic</strong> — Systematic inference (market data only, no personal data sent)<br />
                         <strong>Exchange APIs</strong> — your own exchange, using your keys
                     </p>
                 </section>
