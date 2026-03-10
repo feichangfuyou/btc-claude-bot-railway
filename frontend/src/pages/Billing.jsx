@@ -44,6 +44,13 @@ export default function Billing() {
   const getAuthHeaders = useAuthHeaders();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const [paymentStep, setPaymentStep] = useState("tiers"); // tiers, crypto-select, pay-details, pending
+  const [selectedTier, setSelectedTier] = useState(null);
+  const [selectedCrypto, setSelectedCrypto] = useState(null);
+  const [txid, setTxid] = useState("");
+  const [cryptoAddress, setCryptoAddress] = useState("");
+  const [cryptoAmount, setCryptoAmount] = useState(0);
+  const [history, setHistory] = useState([]);
 
   // Dev account always gets elite — overrides Supabase profile state
   const isDevUser = user?.email?.toLowerCase() === DEV_EMAIL;
@@ -62,25 +69,100 @@ export default function Billing() {
       setMessage({ type: "info", text: "Checkout cancelled." });
       setSearchParams({}, { replace: true });
     }
+    fetchHistory();
   }, [searchParams, refreshProfile, setSearchParams]);
 
-  async function handleSelectPlan(tierId) {
-    setLoading(true);
-    setMessage(null);
+  async function fetchHistory() {
     try {
       const base = BACKEND_BASE || "";
-      const url = base ? `${base}/billing/checkout` : "/billing/checkout";
-      const res = await fetch(url, {
+      const res = await fetch(`${base}/billing/manual-payments`, {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) setHistory(data);
+    } catch (e) {
+      console.error("History fetch failed", e);
+    }
+  }
+
+  const CRYPTO_OPTIONS = [
+    { id: "BTC", name: "Bitcoin", icon: "₿", color: "#F7931A" },
+    { id: "ETH", name: "Ethereum", icon: "Ξ", color: "#627EEA" },
+    { id: "SOL", name: "Solana", icon: "S", color: "#14F195" },
+    { id: "USDT", name: "USDT (ERC20)", icon: "₮", color: "#26A17B" },
+  ];
+
+  async function fetchCryptoPrice(crypto) {
+    try {
+      const idMap = { BTC: "bitcoin", ETH: "ethereum", SOL: "solana", USDT: "tether" };
+      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${idMap[crypto]}&vs_currencies=usd`);
+      const data = await res.json();
+      return data[idMap[crypto]].usd;
+    } catch (e) {
+      console.error("Price fetch failed", e);
+      return null;
+    }
+  }
+
+  async function handleStartPayment(tier) {
+    setSelectedTier(tier);
+    setPaymentStep("crypto-select");
+  }
+
+  async function handleSelectCrypto(crypto) {
+    setLoading(true);
+    setSelectedCrypto(crypto);
+    try {
+      // 1. Get Address from backend
+      const base = BACKEND_BASE || "";
+      const addrRes = await fetch(`${base}/billing/address/${crypto.id}`, {
+        headers: getAuthHeaders()
+      });
+      const addrData = await addrRes.json();
+      setCryptoAddress(addrData.address || "Address Error");
+
+      // 2. Calculate Amount
+      const price = await fetchCryptoPrice(crypto.id);
+      const tierPrice = parseInt(selectedTier.price.replace("$", ""));
+      if (price) {
+        setCryptoAmount((tierPrice / price).toFixed(crypto.id === "BTC" ? 8 : 6));
+      } else {
+        setCryptoAmount(`~${tierPrice} USD equivalent`);
+      }
+
+      setPaymentStep("pay-details");
+    } catch (e) {
+      setMessage({ type: "error", text: "Failed to initialize payment. Try again." });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSubmitTxid() {
+    if (!txid.trim()) {
+      setMessage({ type: "error", text: "Please enter your Transaction ID (TXID)." });
+      return;
+    }
+    setLoading(true);
+    try {
+      const base = BACKEND_BASE || "";
+      const res = await fetch(`${base}/billing/manual-payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ tier: tierId }),
+        body: JSON.stringify({
+          tier: selectedTier.id,
+          crypto_type: selectedCrypto.id,
+          amount: String(cryptoAmount),
+          txid: txid
+        }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (data.url) {
-        window.location.href = data.url;
-        return;
+      const data = await res.json();
+      if (data.success) {
+        setPaymentStep("pending");
+        setMessage({ type: "success", text: data.message });
+      } else {
+        setMessage({ type: "error", text: data.error || "Submission failed." });
       }
-      setMessage({ type: "error", text: data.error || "Stripe checkout unavailable. Please try again." });
     } catch (e) {
       setMessage({ type: "error", text: "Network error. Please try again." });
     } finally {
@@ -94,7 +176,10 @@ export default function Billing() {
       <div style={styles.container}>
         <div style={styles.page} className="billing-page">
           <div style={styles.header}>
-            <button style={styles.backBtn} onClick={() => navigate("/dashboard")}><ArrowLeft size={14} style={{ marginRight: "4px", verticalAlign: "middle" }} /> Dashboard</button>
+            <button style={styles.backBtn} onClick={() => paymentStep === "tiers" ? navigate("/dashboard") : setPaymentStep("tiers")}>
+              <ArrowLeft size={14} style={{ marginRight: "4px", verticalAlign: "middle" }} /> 
+              {paymentStep === "tiers" ? "Dashboard" : "Back"}
+            </button>
             <h1 style={styles.title}>BILLING</h1>
             {user && (
               <button style={styles.signOutBtn} onClick={signOut}>SIGN OUT</button>
@@ -138,57 +223,149 @@ export default function Billing() {
             </div>
           )}
 
-          <div style={styles.tierGrid} className="tier-grid">
-            {TIERS.map(tier => (
-              <div
-                key={tier.id}
-                className="tier-card"
-                style={{
-                  ...styles.tierCard,
-                  borderColor: tier.popular ? colors.gold : colors.border,
-                  ...(currentTier === tier.id ? { background: "rgba(212,175,55,0.03)" } : {}),
-                }}
-              >
-                {tier.popular && <div style={styles.popularBadge}>MOST POPULAR</div>}
-                <div className="tier-name" style={{ ...styles.tierName, color: tier.color }}>{tier.name}</div>
-                <div style={styles.tierPrice}>
-                  <span className="price-amount" style={styles.priceAmount}>{tier.price}</span>
-                  <span style={styles.pricePeriod}>{tier.period}</span>
-                </div>
-                <ul className="feature-list" style={styles.featureList}>
-                  {tier.features.map((f, i) => (
-                    <li key={i} className="feature-item" style={styles.featureItem}>
-                      <Check size={12} style={{ color: colors.success }} /> {f}
-                    </li>
-                  ))}
-                </ul>
-                {isDevUser && tier.id === "elite" ? (
-                  <div style={{ ...styles.currentBadge, borderColor: "rgba(212,175,55,0.4)", color: colors.gold, background: "rgba(212,175,55,0.06)" }}>✦ Developer Access</div>
-                ) : isDevUser ? (
-                  <div style={{ ...styles.currentBadge, color: colors.muted, borderColor: "rgba(255,255,255,0.06)" }}>Included in Dev</div>
-                ) : currentTier === tier.id ? (
-                  <div style={styles.currentBadge}>Current Plan</div>
-                ) : (
+          {paymentStep === "tiers" && (
+            <>
+              <div style={{ marginBottom: 20, padding: 12, borderRadius: 10, background: "rgba(212,175,55,0.05)", border: "1px solid rgba(212,175,55,0.15)", fontSize: 11, color: colors.gold, display: "flex", alignItems: "center", gap: 8 }}>
+                <Zap size={14} /> 
+                <span>We accept BTC, ETH, SOL and USDT for maximum privacy and manual verification.</span>
+              </div>
+
+              <div style={styles.tierGrid} className="tier-grid">
+                {TIERS.map(tier => (
+                  <div
+                    key={tier.id}
+                    className="tier-card"
+                    style={{
+                      ...styles.tierCard,
+                      borderColor: tier.popular ? colors.gold : colors.border,
+                      ...(currentTier === tier.id ? { background: "rgba(212,175,55,0.03)" } : {}),
+                    }}
+                  >
+                    {tier.popular && <div style={styles.popularBadge}>MOST POPULAR</div>}
+                    <div className="tier-name" style={{ ...styles.tierName, color: tier.color }}>{tier.name}</div>
+                    <div style={styles.tierPrice}>
+                      <span className="price-amount" style={styles.priceAmount}>{tier.price}</span>
+                      <span style={styles.pricePeriod}>{tier.period}</span>
+                    </div>
+                    <ul className="feature-list" style={styles.featureList}>
+                      {tier.features.map((f, i) => (
+                        <li key={i} className="feature-item" style={styles.featureItem}>
+                          <Check size={12} style={{ color: colors.success }} /> {f}
+                        </li>
+                      ))}
+                    </ul>
+                    {isDevUser && tier.id === "elite" ? (
+                      <div style={{ ...styles.currentBadge, borderColor: "rgba(212,175,55,0.4)", color: colors.gold, background: "rgba(212,175,55,0.06)" }}>✦ Developer Access</div>
+                    ) : isDevUser ? (
+                      <div style={{ ...styles.currentBadge, color: colors.muted, borderColor: "rgba(255,255,255,0.06)" }}>Included in Dev</div>
+                    ) : currentTier === tier.id ? (
+                      <div style={styles.currentBadge}>Current Plan</div>
+                    ) : (
+                      <button
+                        style={styles.selectBtn}
+                        onClick={() => handleStartPayment(tier)}
+                        disabled={loading}
+                      >
+                        {loading ? "Initializing…" : TIERS.findIndex(t => t.id === tier.id) > TIERS.findIndex(t => t.id === currentTier) ? "Upgrade" : "Downgrade"}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {paymentStep === "crypto-select" && (
+            <div style={styles.paymentSection}>
+              <h2 style={styles.sectionTitle}>Select Payment Method</h2>
+              <div style={styles.cryptoGrid}>
+                {CRYPTO_OPTIONS.map(crypto => (
                   <button
-                    style={styles.selectBtn}
-                    onClick={() => handleSelectPlan(tier.id)}
+                    key={crypto.id}
+                    style={{...styles.cryptoBtn, borderColor: crypto.color + "44"}}
+                    onClick={() => handleSelectCrypto(crypto)}
+                  >
+                    <span style={{...styles.cryptoIcon, color: crypto.color}}>{crypto.icon}</span>
+                    <span style={styles.cryptoName}>{crypto.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {paymentStep === "pay-details" && (
+            <div style={styles.paymentSection}>
+              <h2 style={styles.sectionTitle}>Send Payment</h2>
+              <div style={styles.payCard}>
+                <div style={styles.payRow}>
+                  <span style={styles.payLabel}>Plan:</span>
+                  <span style={styles.payValue}>{selectedTier.name} ({selectedTier.price})</span>
+                </div>
+                <div style={styles.payRow}>
+                  <span style={styles.payLabel}>Amount to Send:</span>
+                  <span style={{...styles.payValue, color: colors.gold, fontSize: 18}}>{cryptoAmount} {selectedCrypto.id}</span>
+                </div>
+                <div style={styles.payRow}>
+                  <span style={styles.payLabel}>Destination Address:</span>
+                  <div style={styles.addressBox}>
+                    <code style={styles.addressText}>{cryptoAddress}</code>
+                    <button style={styles.copyBtn} onClick={() => {navigator.clipboard.writeText(cryptoAddress); setMessage({type: "info", text: "Address copied!"})}}>Copy</button>
+                  </div>
+                </div>
+                
+                <div style={{marginTop: 24, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 20}}>
+                  <div style={{fontSize: 12, color: colors.muted, marginBottom: 8}}>Once you have sent the payment, enter the Transaction ID (TXID) below:</div>
+                  <input 
+                    style={styles.input}
+                    placeholder="Enter Transaction ID (TXID)"
+                    value={txid}
+                    onChange={(e) => setTxid(e.target.value)}
+                  />
+                  <button 
+                    style={styles.submitBtn}
+                    onClick={handleSubmitTxid}
                     disabled={loading}
                   >
-                    {loading ? "Redirecting…" : TIERS.findIndex(t => t.id === tier.id) > TIERS.findIndex(t => t.id === currentTier) ? "Upgrade" : "Downgrade"}
+                    {loading ? "Submitting..." : "Confirm Payment"}
                   </button>
-                )}
+                  <div style={{fontSize: 10, color: "#555", marginTop: 12, textAlign: "center"}}>
+                    Verification usually takes 10-60 minutes depending on network congestion.
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+
+          {paymentStep === "pending" && (
+            <div style={styles.paymentSection}>
+              <div style={{textAlign: "center", padding: "40px 20px"}}>
+                <div style={{fontSize: 48, marginBottom: 20}}>⏳</div>
+                <h2 style={styles.sectionTitle}>Payment Pending</h2>
+                <p style={{color: colors.muted, fontSize: 13, lineHeight: 1.6}}>
+                  We've received your transaction details for the <strong>{selectedTier.name}</strong> plan.<br/>
+                  Our automated scripts and manual auditors are verifying the payment on-chain.
+                </p>
+                <div style={{background: "rgba(212,175,55,0.05)", padding: 16, borderRadius: 12, marginTop: 20, textAlign: "left"}}>
+                  <div style={{fontSize: 11, color: colors.muted, marginBottom: 4}}>TXID:</div>
+                  <code style={{fontSize: 11, color: colors.gold, wordBreak: "break-all"}}>{txid}</code>
+                </div>
+                <button style={{...styles.backBtn, marginTop: 30, width: "100%"}} onClick={() => navigate("/dashboard")}>Back to Dashboard</button>
+              </div>
+            </div>
+          )}
 
           <div style={styles.faq}>
             <div style={styles.faqItem}>
+              <div style={styles.faqQ}>How does manual verification work?</div>
+              <div style={styles.faqA}>After you submit your TXID, our system monitors the blockchain explorer. Once confirmed, your account is automatically upgraded. In rare cases, a manual review by our team may be required.</div>
+            </div>
+            <div style={styles.faqItem}>
               <div style={styles.faqQ}>Can I cancel anytime?</div>
-              <div style={styles.faqA}>Yes. Cancel anytime from this page. Your strategy execution will continue until the end of your billing period.</div>
+              <div style={styles.faqA}>Yes. Since this is a manual crypto payment, you simply don't renew at the end of your period. Your strategy execution will continue until the end of your paid period.</div>
             </div>
             <div style={styles.faqItem}>
               <div style={styles.faqQ}>What happens if my payment fails?</div>
-              <div style={styles.faqA}>You get a 3-day grace period. After that, your platform pauses but your data is preserved.</div>
+              <div style={styles.faqA}>If you send the wrong amount or to the wrong address, please contact support with your TXID immediately.</div>
             </div>
             <div style={styles.faqItem}>
               <div style={styles.faqQ}>Do you touch my funds?</div>
@@ -228,6 +405,37 @@ export default function Billing() {
               </div>
             </div>
           </div>
+
+          {history.length > 0 && (
+            <div style={{...styles.paymentSection, marginTop: 32}}>
+              <h3 style={{...styles.sectionTitle, fontSize: 16, textAlign: "left", marginBottom: 16}}>Recent Submissions</h3>
+              <div style={styles.historyTable}>
+                {history.map((h) => (
+                  <div key={h.id} style={styles.historyRow}>
+                    <div style={{display: "flex", justifyContent: "space-between", marginBottom: 4}}>
+                      <span style={{color: colors.gold, fontSize: 13}}>{h.tier.toUpperCase()}</span>
+                      <span style={{
+                        fontSize: 10,
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        background: h.status === "verified" ? "rgba(39,174,96,0.1)" : h.status === "rejected" ? "rgba(192,57,43,0.1)" : "rgba(212,175,55,0.1)",
+                        color: h.status === "verified" ? colors.success : h.status === "rejected" ? colors.error : colors.gold,
+                        border: "1px solid",
+                        borderColor: h.status === "verified" ? "rgba(39,174,96,0.3)" : h.status === "rejected" ? "rgba(192,57,43,0.3)" : "rgba(212,175,55,0.3)",
+                      }}>{h.status.toUpperCase()}</span>
+                    </div>
+                    <div style={{display: "flex", justifyContent: "space-between", fontSize: 11, color: colors.muted}}>
+                      <span>{h.amount} {h.crypto_type}</span>
+                      <span>{new Date(h.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <div style={{fontSize: 9, color: "#444", marginTop: 4, fontFamily: typography.fontMono, wordBreak: "break-all"}}>
+                      TXID: {h.txid}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={styles.legalFooter}>
@@ -450,6 +658,124 @@ const styles = {
     color: "#555",
     textDecoration: "none",
     transition: "color 0.2s",
+  },
+  paymentSection: {
+    background: "rgba(17,17,17,0.55)",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+    border: "1px solid rgba(212,175,55,0.1)",
+    borderRadius: 20,
+    padding: "32px 24px",
+    marginBottom: 32,
+    boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+  },
+  sectionTitle: {
+    fontFamily: typography.fontDisplay,
+    fontSize: 20,
+    letterSpacing: 2,
+    color: colors.gold,
+    marginBottom: 24,
+    textAlign: "center",
+  },
+  cryptoGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 16,
+  },
+  cryptoBtn: {
+    background: "rgba(255,255,255,0.03)",
+    border: "1px solid",
+    borderRadius: 16,
+    padding: "20px 16px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 12,
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+    color: colors.text,
+  },
+  cryptoIcon: {
+    fontSize: 32,
+    fontWeight: 700,
+  },
+  cryptoName: {
+    fontSize: 14,
+    fontFamily: typography.fontButton,
+    letterSpacing: 1,
+  },
+  payCard: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+  },
+  payRow: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+  },
+  payLabel: {
+    fontSize: 11,
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  payValue: {
+    fontSize: 15,
+    fontFamily: typography.fontMono,
+    color: colors.text,
+  },
+  addressBox: {
+    background: "rgba(0,0,0,0.3)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 10,
+    padding: "12px 16px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  addressText: {
+    fontSize: 12,
+    color: colors.gold,
+    wordBreak: "break-all",
+    fontFamily: typography.fontMono,
+  },
+  copyBtn: {
+    background: "rgba(212,175,55,0.1)",
+    border: "1px solid rgba(212,175,55,0.3)",
+    borderRadius: 6,
+    color: colors.gold,
+    fontSize: 10,
+    padding: "4px 8px",
+    cursor: "pointer",
+    fontFamily: typography.fontButton,
+  },
+  input: {
+    width: "100%",
+    background: "rgba(0,0,0,0.3)",
+    border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: 10,
+    padding: "14px 16px",
+    color: colors.text,
+    fontFamily: typography.fontMono,
+    fontSize: 13,
+    boxSizing: "border-box",
+    marginBottom: 16,
+    outline: "none",
+  },
+  submitBtn: {
+    width: "100%",
+    padding: "14px",
+    borderRadius: 12,
+    border: "none",
+    background: `linear-gradient(180deg, ${colors.gold}, ${colors.goldDark})`,
+    color: colors.dark,
+    fontFamily: typography.fontButton,
+    fontWeight: 700,
+    letterSpacing: 2,
+    cursor: "pointer",
+    boxShadow: "0 4px 20px rgba(212,175,55,0.2)",
   },
 };
 

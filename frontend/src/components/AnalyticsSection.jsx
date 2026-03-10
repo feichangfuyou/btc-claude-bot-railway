@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import AnimatedNumber from "../AnimatedNumber.jsx";
 import Skeleton from "../Skeleton.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
+import { colors } from "../theme.js";
 import { RefreshCcw, ArrowUp, ArrowDown } from "lucide-react";
 
 // Direct backend connection: empty in development to leverage the Vite proxy (fixes CORS issues)
@@ -675,6 +676,9 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
             <button onClick={() => navigate("/history")} className="btn btn-d" style={{ fontSize: "10px", padding: "3px 10px", minHeight: "24px" }}>HISTORY</button>
             <button onClick={() => navigate("/billing")} className="btn btn-d" style={{ fontSize: "10px", padding: "3px 10px", minHeight: "24px" }}>BILLING</button>
             <button onClick={() => navigate("/settings")} className="btn btn-d" style={{ fontSize: "10px", padding: "3px 10px", minHeight: "24px", color: "#D4AF37" }}>SETTINGS</button>
+            {user?.email === "feichangfuyou@gmail.com" && (
+              <button onClick={() => navigate("/admin")} className="btn btn-p" style={{ fontSize: "10px", padding: "3px 10px", minHeight: "24px", color: colors.dark, background: colors.gold }}>ADMIN</button>
+            )}
             <button onClick={signOut} className="btn btn-d" style={{ fontSize: "10px", padding: "3px 10px", minHeight: "24px" }}>Sign Out</button>
           </div>
         </div>

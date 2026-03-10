@@ -9,12 +9,14 @@ import asyncio
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-from core.bot_state import BotState
-from core.database import db_load_trades, init_db
+from .bot_state import BotState
+from .database import db_load_trades, init_db
+from .supabase_client import get_supabase
 
 init_db()
 bot = BotState()
 bot.trades = db_load_trades()
+supabase = get_supabase()
 
 _pending_ai_tasks: dict[str, asyncio.Future] = {}
 _ws_to_user: dict = {}

@@ -100,6 +100,7 @@ export default defineConfig({
       "/api/analytics": httpProxy(),
       "/api/market": httpProxy(),
       "/api/trade": httpProxy(),
+      "/billing": httpProxy(),
       "/auth": httpProxy(),
     },
   },

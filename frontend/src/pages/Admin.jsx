@@ -6,7 +6,7 @@ import { colors, typography } from "../theme.js";
 import {
   Shield, ShieldCheck, Lock, AlertTriangle, RefreshCw, QrCode,
   Copy, Check, Users, Zap, Activity, Radio, BarChart2,
-  DollarSign, Terminal, ClipboardList, ChevronDown, X, Play, Square,
+  DollarSign, Terminal, ClipboardList, ChevronDown, X, Play, Square, ExternalLink
 } from "lucide-react";
 
 const BASE = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "");
@@ -200,7 +200,9 @@ export default function Admin() {
   const [aiCosts, setAiCosts] = useState(null);
   const [breaker, setBreaker] = useState(null);
   const [auditLog, setAuditLog] = useState([]);
-  const [liveLogs, setLiveLogs] = useState([]);
+    const [liveLogs, setLiveLogs] = useState([]);
+    const [manualPayments, setManualPayments] = useState([]);
+    const [paymentsFilter, setPaymentsFilter] = useState("pending");
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(null);
@@ -253,6 +255,11 @@ export default function Admin() {
       if (br.status === "fulfilled") setBreaker(br.value);
       if (al.status === "fulfilled") setAuditLog(al.value.entries || []);
       if (ll.status === "fulfilled") setLiveLogs(ll.value.logs || []);
+      
+      // Fetch manual payments separately or here
+      const payRes = await api(`/billing/admin/manual-payments?status=${paymentsFilter}`);
+      setManualPayments(payRes || []);
+
       setLastRefresh(new Date());
     } catch { /* continue */ }
     finally { setLoading(false); }
@@ -368,6 +375,25 @@ export default function Admin() {
     finally { setActionLoading(false); }
   };
 
+  const verifyPayment = async (txid, status) => {
+    if (!window.confirm(`Are you sure you want to ${status.toUpperCase()} this payment?`)) return;
+    setActionLoading(true);
+    try {
+      const res = await api("/billing/admin/verify-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ txid, status }),
+      });
+      if (res.success) {
+        alert(res.message);
+        fetchAll();
+      } else {
+        alert(res.error || "Action failed.");
+      }
+    } catch (e) { alert(e.message); }
+    finally { setActionLoading(false); }
+  };
+
   if (!verified) return <TwoFactorGate onVerified={() => setVerified(true)} />;
 
   const sessionLeft = Math.max(0, SESSION_TIMEOUT - sessionAge);
@@ -382,6 +408,7 @@ export default function Admin() {
     { id: "users", label: `Users (${users.length})`, icon: Users },
     { id: "signal", label: "Signal Hub", icon: Radio },
     { id: "readiness", label: "Readiness", icon: Zap },
+    { id: "payments", label: "Payments", icon: DollarSign },
     { id: "costs", label: "AI Costs", icon: DollarSign },
     { id: "logs", label: "Live Logs", icon: Terminal },
     { id: "audit", label: "Audit Log", icon: ClipboardList },
@@ -690,6 +717,76 @@ export default function Admin() {
                 {aiCosts.error && <div style={{ color: colors.error, fontSize: 12, marginTop: 12 }}>Error: {aiCosts.error}</div>}
               </div>
             ) : <div style={{ color: colors.muted, fontSize: 12 }}>Loading cost data…</div>}
+          </Section>
+        )}
+
+        {/* ── PAYMENTS ── */}
+        {activeTab === "payments" && (
+          <Section title="MANUAL CRYPTO PAYMENTS" icon={DollarSign}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+              {["pending", "verified", "rejected"].map(s => (
+                <button
+                  key={s}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 8,
+                    fontSize: 10,
+                    fontWeight: 800,
+                    border: "none",
+                    cursor: "pointer",
+                    background: paymentsFilter === s ? colors.gold : "rgba(255,255,255,0.05)",
+                    color: paymentsFilter === s ? colors.dark : colors.muted,
+                  }}
+                  onClick={() => setPaymentsFilter(s)}
+                >
+                  {s.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
+            <div style={s.tableWrap}>
+              <table style={s.table}>
+                <thead>
+                  <tr>{["Date", "User", "Plan", "Amount", "TXID", "Actions"].map(h => (
+                    <th key={h} style={s.th}>{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody>
+                  {manualPayments.map(p => (
+                    <tr key={p.id} style={s.tr} className="admin-row">
+                      <td style={s.td}><span style={{ color: colors.muted, fontSize: 10 }}>{new Date(p.created_at).toLocaleString()}</span></td>
+                      <td style={s.td}><div style={{ fontSize: 11 }}>{p.email}</div><div style={{ fontSize: 9, color: "#333" }}>{p.user_id}</div></td>
+                      <td style={s.td}><span style={{ fontSize: 10, fontWeight: 800, color: colors.gold }}>{p.tier.toUpperCase()}</span></td>
+                      <td style={s.td}><div style={{ fontSize: 12, fontWeight: 700 }}>{p.amount} {p.crypto_type}</div></td>
+                      <td style={s.td}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <code style={{ fontSize: 10, color: colors.gold, background: "rgba(0,0,0,0.3)", padding: "2px 6px", borderRadius: 4 }}>{p.txid.slice(0, 16)}...</code>
+                          <a 
+                            href={
+                              p.crypto_type === "BTC" ? `https://blockchair.com/bitcoin/transaction/${p.txid}` :
+                              (p.crypto_type === "ETH" || p.crypto_type === "USDT") ? `https://etherscan.io/tx/${p.txid}` :
+                              p.crypto_type === "SOL" ? `https://solscan.io/tx/${p.txid}` : "#"
+                            }
+                            target="_blank" rel="noopener noreferrer" style={{ color: colors.muted }}
+                          ><ExternalLink size={12} /></a>
+                        </div>
+                      </td>
+                      <td style={s.td}>
+                        {p.status === "pending" ? (
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button style={{ ...s.smBtn, color: colors.error }} onClick={() => verifyPayment(p.txid, "rejected")}><X size={10} /> REJECT</button>
+                            <button style={{ ...s.smBtn, color: colors.success }} onClick={() => verifyPayment(p.txid, "verified")}><Check size={10} /> APPROVE</button>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 10, fontWeight: 800, color: p.status === "verified" ? colors.success : colors.error }}>{p.status.toUpperCase()}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {!manualPayments.length && <tr><td colSpan={6} style={{ ...s.td, textAlign: "center", color: colors.muted, padding: 24 }}>No {paymentsFilter} payments</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </Section>
         )}
 
