@@ -248,6 +248,13 @@ def get_costs(user: AuthenticatedUser = Depends(get_active_user)):
     return get_cost_tracker()
 
 
+@router.get("/api/analytics/adversary")
+async def get_adversary_analytics(user: AuthenticatedUser = Depends(get_active_user)):
+    """Return stats on trades blocked or mitigated by the Adversary Security Agent."""
+    from core.database import db_get_adversary_stats
+    return db_get_adversary_stats()
+
+
 @router.get("/wallet")
 async def get_wallet(user: AuthenticatedUser = Depends(get_active_user)):
     status = agentkit.status_snapshot()

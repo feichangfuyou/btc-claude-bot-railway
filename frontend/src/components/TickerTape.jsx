@@ -31,11 +31,19 @@ export const FALLBACK_SYMBOL_TO_COINGECKO = {
   LOOM: "loom-network", BAKE: "bakerytoken", CELR: "celer-network", DENT: "dent",
   DUSK: "dusk-network", LEVER: "lever", LINA: "linear",
   STORJ: "storj", SFP: "safepal", SSV: "ssv-network", VANRY: "vanar-chain",
+  REKT: "rekt", COQ: "coq-inu", SPICE: "spice", APU: "apu", MEW: "cat-in-a-dogs-world",
+  DOGS: "dogs-2", WEN: "wen", TOSHI: "toshi", NEIRO: "neiro-3",
 };
 
 export const COINCAP_CDN = "https://assets.coincap.io/assets/icons";
-export const COIN_LOGOS_CDN = "https://cdn.jsdelivr.net/gh/simplr-sh/coin-logos/images";
-export const COINCAP_SYM_MAP = { POL: "matic", MATIC: "matic", APT: "apt", "1000PEPE": "pepe", "1000SATS": "sats", "1000BONK": "bonk", RNDR: "render", RENDER: "render" };
+export const LLAMA_ICONS_CDN = "https://icons.llama.fi";
+export const CRYPTO_ICONS_CDN = "https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color";
+export const COINCAP_SYM_MAP = {
+  POL: "matic", MATIC: "matic", APT: "apt", "1000PEPE": "pepe", "1000SATS": "sats", "1000BONK": "bonk",
+  RNDR: "render", RENDER: "render", DOGE: "dogecoin", SHIB: "shiba-inu", PEPE: "pepe",
+  REKT: "rekt", COQ: "coq", APU: "apu", MEW: "mew", TOSHI: "toshi", TURBO: "turbo",
+  SOL: "solana", ETH: "ethereum", BTC: "bitcoin", AVAX: "avalanche", LINK: "chainlink"
+};
 
 export function getTickerLogoUrl(sym) {
   const capId = COINCAP_SYM_MAP[sym] || sym?.toLowerCase?.();
@@ -43,8 +51,13 @@ export function getTickerLogoUrl(sym) {
 }
 
 export function getTickerLogoFallback1(sym) {
-  const cgId = FALLBACK_SYMBOL_TO_COINGECKO[sym] || sym?.toLowerCase?.()?.replace(/\s/g, "-");
-  return `${COIN_LOGOS_CDN}/${cgId}/small.png`;
+  // Llama.fi icons are very reliable for almost any DeFi/Crypto token
+  return `${LLAMA_ICONS_CDN}/${sym?.toLowerCase()}`;
+}
+
+export function getTickerLogoFallback2(sym) {
+  // CryptoIcons is a massive high-quality repository
+  return `${CRYPTO_ICONS_CDN}/${sym?.toLowerCase()}.png`;
 }
 
 export function getTickerLogoPlaceholder(sym) {
@@ -140,6 +153,9 @@ export const TickerTape = memo(function TickerTape({ marketTickers, activeCoins,
       img.src = getTickerLogoFallback1(sym);
     } else if (tier === 1) {
       img.dataset.fallbackTier = "2";
+      img.src = getTickerLogoFallback2(sym);
+    } else if (tier === 2) {
+      img.dataset.fallbackTier = "3";
       img.src = getTickerLogoPlaceholder(sym);
     }
   }, []);

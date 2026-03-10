@@ -1,10 +1,11 @@
+import { memo } from "react";
 import AnimatedNumber from "../AnimatedNumber.jsx";
 import { 
   ArrowUp, ArrowDown, Hand, Rocket, Smile, Zap, AlertTriangle, 
   Download, Camera, X, Box, Diamond, Circle, HelpCircle
 } from "lucide-react";
 
-export function TerminalBrainPanel({
+export const TerminalEnginePanel = memo(function TerminalEnginePanel({
   thinking, botOn, countdown, decision, lastCall, lastAiBlockReason,
   pendingDecision, pendingExpiresAt, pendingCountdown,
   handleApprovePending, handleRejectPending,
@@ -14,7 +15,7 @@ export function TerminalBrainPanel({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span className="dot" style={{ background: thinking ? "#D4AF37" : botOn ? "#00E676" : "#3a3a3a", animation: (thinking || botOn) ? "pulse 1.5s infinite" : "none", boxShadow: `0 0 8px ${thinking ? "#D4AF37" : botOn ? "#00E676" : "transparent"}` }} />
-          <span className="section-label">NEURAL ENGINE</span>
+          <span className="section-label">ANALYSIS ENGINE</span>
         </div>
         {botOn && !thinking && <span style={{ fontSize: "10px", color: "#3a3a3a" }}>next: <AnimatedNumber value={countdown} format={(v) => `${Math.round(v)}s`} duration={150} /></span>}
         {thinking && <span className="blink" style={{ fontSize: "10px", color: "#D4AF37" }}>analyzing...</span>}
@@ -23,7 +24,7 @@ export function TerminalBrainPanel({
       {/* Pending trade (approval required) */}
       {pendingDecision && (
         <div className="card fadein" style={{ border: "2px solid #ff9900", background: "#ff990008", marginBottom: "10px" }}>
-          <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "14px", color: "#ff9900", letterSpacing: "2px", marginBottom: "8px" }}>
+          <div style={{ fontSize: "14px", color: "#ff9900", letterSpacing: "2px", marginBottom: "8px", fontWeight: "700" }}>
             PENDING TRADE — AWAITING YOUR CALL
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
@@ -74,7 +75,7 @@ export function TerminalBrainPanel({
             <span className="tag" style={{
               background: { buy: "#00E67620", sell: "#FF174420", wait: "#ffffff10", close_all: "#ff990020" }[decision.action] || "#ffffff10",
               color: { buy: "#00E676", sell: "#FF1744", wait: "#5C5C5C", close_all: "#ff9900" }[decision.action] || "#5C5C5C",
-              fontSize: "12px", padding: "4px 12px", fontFamily: "'Montserrat', sans-serif", letterSpacing: "2px"
+              fontSize: "12px", padding: "4px 12px", letterSpacing: "2px"
             }}>
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 {decision.action === "buy" && <Rocket size={12} />}
@@ -90,11 +91,11 @@ export function TerminalBrainPanel({
                 <div style={{ height: "6px", background: "#1a1a1a", borderRadius: "3px", overflow: "hidden", border: "1px solid #2a2a2a" }}>
                   <div style={{ height: "100%", width: `${decision.confidence * 100}%`, background: decision.confidence > 0.7 ? "linear-gradient(90deg,#D4AF37,#00E676)" : decision.confidence > 0.5 ? "linear-gradient(90deg,#D4AF37,#ff9900)" : "linear-gradient(90deg,#C0392B,#FF1744)", transition: "width 0.6s", borderRadius: "2px" }} />
                 </div>
-                <div style={{ fontSize: "10px", color: "#5C5C5C", marginTop: "2px", fontFamily: "'Montserrat', sans-serif", letterSpacing: "1px" }}><AnimatedNumber value={decision.confidence * 100} format={(v) => `${v.toFixed(0)}%`} duration={250} /> POWER</div>
+                <div style={{ fontSize: "10px", color: "#5C5C5C", marginTop: "2px", letterSpacing: "1px" }}><AnimatedNumber value={decision.confidence * 100} format={(v) => `${v.toFixed(0)}%`} duration={250} /> POWER</div>
               </div>
             )}
           </div>
-          <div style={{ fontFamily: "'Playfair Display',serif", fontSize: "11px", color: "#D4D4D4", lineHeight: "1.6", borderLeft: "3px solid #D4AF3744", paddingLeft: "8px", marginBottom: "10px", fontStyle: "italic" }}>
+          <div style={{ fontSize: "11px", color: "#D4D4D4", lineHeight: "1.6", borderLeft: "3px solid #D4AF3744", paddingLeft: "8px", marginBottom: "10px", fontStyle: "italic" }}>
             &ldquo;{decision.reasoning}&rdquo;
           </div>
           {lastAiBlockReason && (
@@ -129,9 +130,9 @@ export function TerminalBrainPanel({
       )}
     </div>
   );
-}
+});
 
-export function MarketRegimePanel({ regime, fearGreed }) {
+export const MarketRegimePanel = memo(function MarketRegimePanel({ regime, fearGreed }) {
   const condColor = { ranging: "#D4AF37", trending_up: "#00E676", trending_down: "#FF1744", chaotic: "#ff9900" }[regime] || "#5C5C5C";
   const condLabel = { ranging: "RANGING", trending_up: "TRENDING UP", trending_down: "TRENDING DOWN", chaotic: "CHAOTIC" }[regime] || regime;
   const condIcon = { ranging: <Box size={14} />, trending_up: <ArrowUp size={14} />, trending_down: <ArrowDown size={14} />, chaotic: <Zap size={14} /> }[regime] || null;
@@ -141,7 +142,7 @@ export function MarketRegimePanel({ regime, fearGreed }) {
     <div className="card">
       <div className="section-label" style={{ marginBottom: "16px" }}>MARKET REGIME</div>
       <div style={{ padding: "14px", borderRadius: "5px", background: `${condColor}11`, border: `1px solid ${condColor}22`, textAlign: "center", marginBottom: "16px" }}>
-        <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontFamily: "'Montserrat', sans-serif", color: condColor, fontSize: "14px", letterSpacing: "2px" }}>
+        <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", color: condColor, fontSize: "14px", letterSpacing: "2px", fontWeight: "700" }}>
           {condIcon} {condLabel}
         </span>
       </div>
@@ -156,9 +157,9 @@ export function MarketRegimePanel({ regime, fearGreed }) {
       </div>
     </div>
   );
-}
+});
 
-export function AgentKitPanel({ agentKit, isLiveMode }) {
+export const AgentKitPanel = memo(function AgentKitPanel({ agentKit, isLiveMode }) {
   if (!isLiveMode) return null;
 
   return (
@@ -166,7 +167,7 @@ export function AgentKitPanel({ agentKit, isLiveMode }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span className="dot" style={{ background: agentKit.agentkit_ready ? "#D4AF37" : "#3a3a3a", boxShadow: agentKit.agentkit_ready ? "0 0 8px #D4AF37" : "none" }} />
-          <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "11px", color: "#D4AF37", fontWeight: "700", letterSpacing: "2px" }}>AGENTKIT WALLET</span>
+          <span style={{ fontSize: "11px", color: "#D4AF37", fontWeight: "700", letterSpacing: "2px" }}>AGENTKIT WALLET</span>
         </div>
         <span style={{ fontSize: "9px", color: agentKit.agentkit_ready ? "#D4AF37" : "#FF1744" }}>
           {agentKit.agentkit_ready ? "ON-CHAIN" : "OFFLINE"}
@@ -176,7 +177,7 @@ export function AgentKitPanel({ agentKit, isLiveMode }) {
         <div>
           <div className="row" style={{ fontSize: "11px" }}>
             <span style={{ color: "#3a3a3a" }}>ADDRESS</span>
-            <span style={{ color: "#D4AF37", fontFamily: "monospace", fontSize: "10px" }}>
+            <span className="mono-text" style={{ color: "#D4AF37", fontSize: "10px" }}>
               {agentKit.wallet_address ? `${agentKit.wallet_address.slice(0, 6)}...${agentKit.wallet_address.slice(-4)}` : "--"}
             </span>
           </div>
@@ -204,9 +205,9 @@ export function AgentKitPanel({ agentKit, isLiveMode }) {
       )}
     </div>
   );
-}
+});
 
-export function IndicatorsPanel({ indic, history }) {
+export const IndicatorsPanel = memo(function IndicatorsPanel({ indic, history }) {
   return (
     <div className="card">
       <div className="section-label" style={{ marginBottom: "16px" }}>LIVE INDICATORS</div>
@@ -239,9 +240,9 @@ export function IndicatorsPanel({ indic, history }) {
       </div>
     </div>
   );
-}
+});
 
-export function RiskMonitorPanel({ account, startBal, trades, winRate }) {
+export const RiskMonitorPanel = memo(function RiskMonitorPanel({ account, startBal, trades, winRate }) {
   const dailyLossPct = Math.abs(Math.min(0, account.daily_pnl) / Math.max(account.balance, 1) * 100);
 
   return (
@@ -270,7 +271,7 @@ export function RiskMonitorPanel({ account, startBal, trades, winRate }) {
         ].map(s => (
           <div key={s.label} style={{ background: "#0A0A0A", padding: "8px", borderRadius: "5px" }}>
             <div style={{ fontSize: "9px", color: "#3a3a3a", marginBottom: "2px" }}>{s.label}</div>
-            <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "13px", fontWeight: "700", color: s.color }}>
+            <div style={{ fontSize: "13px", fontWeight: "700", color: s.color }}>
               {s.num != null ? <AnimatedNumber value={s.num} format={s.fmt} duration={200} /> : "--"}
             </div>
           </div>
@@ -278,9 +279,9 @@ export function RiskMonitorPanel({ account, startBal, trades, winRate }) {
       </div>
     </div>
   );
-}
+});
 
-export function RecentTradesPanel({
+export const RecentTradesPanel = memo(function RecentTradesPanel({
   trades, connected, exportTrades, tradeTypeBadge, openTradeDetail,
   setShowHistory, fetchHistory, tradesContainerRef,
 }) {
@@ -301,7 +302,7 @@ export function RecentTradesPanel({
         {trades.length === 0
           ? <div style={{ textAlign: "center", padding: "20px", color: "#2a2a2a", fontSize: "11px" }}>No trades yet — start the bot</div>
           : trades.map(tr => (
-            <div key={tr.id} className="trow fadein" style={{ fontSize: "11px", cursor: "pointer" }}
+            <div key={tr.id} className="trow" style={{ fontSize: "11px", cursor: "pointer" }}
               onClick={() => openTradeDetail(tr)} title="Click to view trade chart">
               <div>
                 <span className="tag" style={{ display: "flex", alignItems: "center", gap: "4px", background: tr.side === "buy" ? "#00E67618" : "#FF174418", color: tr.side === "buy" ? "#00E676" : "#FF1744", marginRight: "5px" }}>
@@ -321,13 +322,13 @@ export function RecentTradesPanel({
       </div>
     </div>
   );
-}
+});
 
-export function ActivityLogPanel({ logs, botOn, connected, logsContainerRef }) {
+export const ActivityLogPanel = memo(function ActivityLogPanel({ logs, botOn, connected, logsContainerRef }) {
   return (
     <div className="card" style={{ flex: "1 1 0", display: "flex", flexDirection: "column", overflow: "hidden", minHeight: "180px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-        <span className="section-label">MAMA'S BOY LOG</span>
+        <span className="section-label">SYSTEM ACTIVITY</span>
         {(botOn || connected) && <span className="blink" style={{ fontSize: "9px", color: "#00E676" }}>LIVE</span>}
       </div>
       <div ref={logsContainerRef} style={{ flex: "1 1 0", overflowY: "auto" }} role="log" aria-label="Activity log">
@@ -343,7 +344,7 @@ export function ActivityLogPanel({ logs, botOn, connected, logsContainerRef }) {
                   claude: <Diamond size={8} />, 
                   sell: <ArrowDown size={8} />, 
                   dim: <Circle size={4} fill="currentColor" /> 
-                })[e.type] || <HelpCircle size={8} />} 
+                 })[e.type] || <HelpCircle size={8} />} 
               </span> 
               {e.msg}
             </span>
@@ -352,4 +353,4 @@ export function ActivityLogPanel({ logs, botOn, connected, logsContainerRef }) {
       </div>
     </div>
   );
-}
+});

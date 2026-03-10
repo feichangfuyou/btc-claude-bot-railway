@@ -1,5 +1,5 @@
 """
-Claude AI integration — v3 HYBRID trading brain.
+Institutional Trading System — v3 HYBRID execution engine.
 Elite Wall Street trader persona: institutional discipline, capital preservation first,
 cut losers fast, press winners hard. Uses a cheap scout (Haiku) for scanning; escalates
 to the trade model (Opus/Sonnet) only when edge is detected.
@@ -15,6 +15,7 @@ import json
 import math
 import re
 import time
+from typing import Any
 
 import httpx
 
@@ -22,6 +23,7 @@ from ai.adversary_agent import adversary_review
 from ai.claude_schema import validate_scout_response, validate_trade_decision
 from ai.vision_feed import ENABLE_VISION, get_vision_confirmation
 from api.agentkit_provider import agentkit
+from feeds.news_feeds import fetch_latest_news
 from core.anthropic_keys import get_next_key, pool_size
 from core.config import (
     ACTIVE_COINS,
@@ -47,6 +49,7 @@ from core.config import (
     TRADE_COST_PER_CALL,
 )
 from learning.memory_compactor import get_compacted_wisdom
+from learning.meta_reviewer import get_meta_guidance
 from learning.trade_memory import build_memory_briefing, get_pattern_verdict
 from safety.kya_compliance import (
     build_audit_entry,
@@ -71,15 +74,15 @@ ALLOWED_MODELS = {
 }
 
 MODEL_DISPLAY_NAMES = {
-    "claude-opus-4-6": "Opus 4.6",
-    "claude-sonnet-4-6": "Sonnet 4.6",
-    "claude-opus-4-5-20251101": "Opus 4.5",
-    "claude-sonnet-4-5-20250929": "Sonnet 4.5",
-    "claude-haiku-4-5-20251001": "Haiku 4.5",
-    "claude-opus-4-1-20250805": "Opus 4.1",
-    "claude-opus-4-20250514": "Opus 4",
-    "claude-sonnet-4-20250514": "Sonnet 4",
-    "claude-3-haiku-20240307": "Haiku 3",
+    "claude-opus-4-6": "Platinum Engine 4.6",
+    "claude-sonnet-4-6": "Platinum Engine 4.6",
+    "claude-opus-4-5-20251101": "Platinum Engine 4.5",
+    "claude-sonnet-4-5-20250929": "Gold Engine 4.5",
+    "claude-haiku-4-5-20251001": "Silver Engine 4.5",
+    "claude-opus-4-1-20250805": "Platinum Engine 4.1",
+    "claude-opus-4-20250514": "Platinum Engine 4",
+    "claude-sonnet-4-20250514": "Gold Engine 4",
+    "claude-3-haiku-20240307": "Base Engine 3",
 }
 
 _api_cost_tracker = {
@@ -236,13 +239,13 @@ CLAUDE_SYSTEM_BASE = (
     "STEP 6 — DECISION: If trade reasons outweigh wait reasons, TRADE. Don't seek perfection. "
     "This is a trading bot—its job is to trade when edge exists, not to wait forever.\n"
     "\n"
-    "═══ TRADE REQUIREMENTS ═══\n"
-    "1. 3+ confirming signals in one direction (from any tier)\n"
-    "2. Price action: prefer medium/high; 6+ signals can override 'low' or 'choppy'\n"
-    "3. Confidence >= 45% (50% after 1 loss, 60% after 3+ losses)\n"
-    "4. R:R >= 1.4:1 (1.2 when 6+ signals align). Positive expectancy = edge.\n"
-    "5. If can_trade is false → action MUST be 'wait' (keep reasoning brief: 'Circuit breaker. WAIT.')\n"
-    "6. size_percent: 15-25 (20-25 when A+ setup + memory supports; 12-15 when chaotic or recovering from losses)\n"
+    "═══ SNIPER MODE REQUIREMENTS (High-Accuracy Calibration) ═══\n"
+    "1. 5+ confirming signals in one direction (A+ setups only)\n"
+    "2. Perfect alignment: 1H and 15m regimes MUST match direction\n"
+    "3. Confidence >= 65% (We only want the most obvious 'layup' trades)\n"
+    "4. R:R >= 1.6:1 (Ensures the move has room to run)\n"
+    "5. NO trade if market_condition is 'chaotic' or 'choppy' - STAY OUT.\n"
+    "6. size_percent: 10-15 (Lower size to handle the higher bar for entries)\n"
     "\n"
     "═══ INDICATORS ═══\n"
     "EMA(9,21), MTF EMA alignment, RSI(14), Stochastic RSI, MACD histogram,\n"
@@ -315,7 +318,7 @@ CLAUDE_LIVE_ADDENDUM = (
 )
 
 
-def get_claude_system(preset_id: str | None = None, model_id: str | None = None) -> str:
+def get_claude_system(preset_id: str | None = None, model_id: str | None = None, news: dict | None = None) -> str:
     """Build system prompt. Injects preset-specific TP/SL guidance when preset_id given.
     For non-Opus models, appends Opus emulation layer (few-shot + step-by-step reasoning)."""
     preset = get_preset(preset_id)
@@ -328,6 +331,31 @@ def get_claude_system(preset_id: str | None = None, model_id: str | None = None)
     # Opus emulation: give Haiku/Sonnet the structure to reason like Opus
     if model_id and _use_opus_emulation(model_id):
         prompt += OPUS_EMULATION_ADDENDUM
+    
+    # Weekly Strategic Review (Self-Correction)
+    prompt += get_meta_guidance()
+    
+    # ─── NEWS & SENTIMENT (Institutional Pulse) ───
+    if news and not news.get("error"):
+        sentiment = news.get("sentiment", "neutral").upper()
+        fng = news.get("fear_greed", {"value": 50, "classification": "Neutral"})
+        lunar = news.get("social_pulse", {"sentiment": "neutral", "galaxy_score": 50})
+        
+        headlines = "\n".join([f"- {h['title']} (Source: {h.get('domain', 'Market Feed')})" for h in news.get("headlines", [])])
+        
+        news_block = (
+            f"\n\n═══ INSTITUTIONAL SENTIMENT & SOCIAL PULSE ({sentiment}) ═══\n"
+            f"Composite Sentiment Score: {news.get('sentiment_score', 0)} (-10 to +10)\n"
+            f"Fear & Greed Index: {fng['value']} ({fng['classification']})\n"
+            f"Social Galaxy Score: {lunar['galaxy_score']}/100 (Sentiment: {lunar['sentiment']})\n"
+            f"\nTop Headlines:\n{headlines}\n"
+            f"\nTRADER GUIDANCE:\n"
+            f"- If Sentiment Score is < -6 (EXTREME PANIC), only trade if technically 'oversold' with 5+ signals.\n"
+            f"- If Sentiment Score is > +6 (EXTREME EUPHORIA), beware of 'blow-off tops'.\n"
+            f"- If headlines describe a major 'black swan' or 'hack', favor WAIT regardless of technicals."
+        )
+        prompt += news_block
+    
     return prompt
 
 
@@ -541,9 +569,10 @@ def _check_rate_limit() -> bool:
     return True
 
 
-async def _api_call(model: str, system: str, user_msg: str, max_tokens: int = 800) -> str:
+async def _api_call(model: str, system: Any, user_msg: Any, max_tokens: int = 800) -> str:
     """Single API call to Anthropic with multi-model fallback. Returns raw text response.
-    Retries on 429 (rate limit) with exponential backoff up to 3 times."""
+    Retries on 429 (rate limit) with exponential backoff up to 3 times.
+    Supports list-based blocks for system and user_msg to enable prompt caching."""
     if not _check_rate_limit():
         raise Exception("Rate limit reached — too many API calls. Waiting for cooldown.")
     _api_call_timestamps.append(time.time())
@@ -560,6 +589,15 @@ async def _api_call(model: str, system: str, user_msg: str, max_tokens: int = 80
     max_retries = 3
     base_delay = 2.0
 
+    # Convert to blocks if they are strings
+    sys_blocks = system
+    if isinstance(system, str):
+        sys_blocks = [{"type": "text", "text": system}]
+    
+    msg_blocks = user_msg
+    if isinstance(user_msg, str):
+        msg_blocks = [{"role": "user", "content": user_msg}]
+
     for attempt in range(max_retries + 1):
         try:
             async with httpx.AsyncClient(timeout=timeout_sec) as client:
@@ -569,12 +607,13 @@ async def _api_call(model: str, system: str, user_msg: str, max_tokens: int = 80
                         "x-api-key": api_key,
                         "anthropic-version": "2023-06-01",
                         "content-type": "application/json",
+                        "anthropic-beta": "prompt-caching-2024-07-31",
                     },
                     json={
                         "model": effective_model,
                         "max_tokens": max_tokens,
-                        "system": system,
-                        "messages": [{"role": "user", "content": user_msg}],
+                        "system": sys_blocks,
+                        "messages": msg_blocks,
                     },
                 )
 
@@ -709,7 +748,7 @@ def _build_scout_snapshot(bot, coins_snapshot: dict) -> str:
     )
 
 
-async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_limit: int = 0):
+async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_limit: int = 0, tier: str = "starter"):
     """Run AI analysis. skip_scout=True bypasses scout and goes straight to trade model (manual Ask Claude)."""
     global _claude_lock
     if _claude_lock is None:
@@ -744,7 +783,13 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
         bot.last_claude_call = time.strftime("%H:%M:%S")
         trade_model = bot.claude_model
         trade_model_short = _model_display_name(trade_model)
-        scout_short = _model_display_name(SCOUT_MODEL)
+        
+        # ELITE/PRO Optimization: Use Sonnet for scouting instead of Haiku for better quality filtering
+        scout_model = SCOUT_MODEL
+        if tier in ("pro", "elite"):
+            scout_model = "claude-sonnet-4-6"
+            
+        scout_short = _model_display_name(scout_model)
 
         coins_snapshot = {}
         for sym, cs in bot.coins.items():
@@ -777,7 +822,14 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
         if not skip_scout:
             try:
                 scout_msg = _build_scout_snapshot(bot, coins_snapshot)
-                scout_raw = await _api_call(SCOUT_MODEL, SCOUT_SYSTEM, scout_msg, max_tokens=SCOUT_MAX_TOKENS)
+                scout_system = SCOUT_SYSTEM
+                
+                # Caching for Scout System Prompt
+                scout_sys_blocks = [
+                    {"type": "text", "text": scout_system, "cache_control": {"type": "ephemeral"}}
+                ]
+                
+                scout_raw = await _api_call(scout_model, scout_sys_blocks, scout_msg, max_tokens=SCOUT_MAX_TOKENS)
                 scout_result = _extract_json(scout_raw)
                 try:
                     scout_result = validate_scout_response(scout_result)
@@ -884,6 +936,19 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
         fee_pct = ROUND_TRIP_FEE + (ONCHAIN_SLIPPAGE if is_live else 0)
         fixed_cost = AI_COST_PER_TRADE + (GAS_COST_USD * 2 if is_live else 0)
 
+        trade_analytics = _build_trade_analytics(bot.trades)
+        
+        # ─── NEWS CONTEXT (Institutional Briefing) ───
+        news_context = None
+        if escalate:
+            news_symbol = scout_result.get("symbol", "all") if scout_result else "all"
+            # Limit symbols to those we actually care about to save tokens/API calls
+            if news_symbol not in ACTIVE_COINS and news_symbol != "all":
+                news_symbol = "all"
+            news_context = await fetch_latest_news(news_symbol)
+            if news_context and not news_context.get("error"):
+                bot.add_log(f"📰 News pulse ({news_symbol}): {news_context.get('sentiment', 'neutral')}", "dim")
+
         recent_trades = bot.trades[:5]
         recent_losses = sum(1 for t in recent_trades if t.get("pnl", 0) <= 0)
         losing_streak = 0
@@ -971,43 +1036,63 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
             ),
         }
 
+        user_msg_blocks = []
+        
+        # Block 1: Strategy Drive / Learned Rules (Persistent across many calls)
         compacted_wisdom = get_compacted_wisdom()
-        compacted_section = f"\n\n{compacted_wisdom}\n" if compacted_wisdom else ""
+        if compacted_wisdom:
+            user_msg_blocks.append({
+                "type": "text", 
+                "text": f"═══ STRATEGY DRIVE (synthesized from trade history) ═══\n{compacted_wisdom}\n",
+                "cache_control": {"type": "ephemeral"}
+            })
 
+        # Block 2: Memory Briefing (Semi-persistent)
+        if memory_briefing:
+             user_msg_blocks.append({
+                "type": "text", 
+                "text": f"═══ TRADING MEMORY ═══\n{memory_briefing}\n",
+                "cache_control": {"type": "ephemeral"}
+            })
+
+        # Block 3: Dynamic Market Snapshot (Changes every call)
         emulation_reminder = ""
         if _use_opus_emulation(trade_model):
             emulation_reminder = (
                 "APPLY the OPUS-STYLE REASONING (6 steps + self-check) from your system prompt. "
                 "Fill reasons_to_trade and reasons_to_wait from that analysis, then output JSON.\n\n"
             )
-        user_msg = (
-            f"Market Snapshot (v3 hybrid — escalated from scout):\n{json.dumps(snap)}\n"
-            f"{scout_hint}{compacted_section}\n\n"
-            f"{emulation_reminder}"
-            "DECISION FRAMEWORK:\n"
-            "1. REGIME: What regime is each coin in?\n"
-            "2. SIGNALS: How many signals confirm per coin? (3+ = actionable)\n"
-            "3. MEMORY: lessons_from_wins (scale into), lessons_from_losses (avoid), lessons_from_everything.\n"
-            "4. COSTS: Will TP profit exceed trading costs?\n"
-            "5. WEIGH BOTH SIDES: List reasons TO TRADE (signals, regime, R:R, memory supports). "
-            "List reasons TO WAIT (memory avoids, confluence opposes, choppy, costs high). "
-            "Only trade when reasons_to_trade clearly outweigh reasons_to_wait.\n"
-            "6. DECISION: Trade only if the scale tips clearly toward trade. Otherwise WAIT. Be decisive.\n\n"
-            "Return JSON with reasons_to_trade, reasons_to_wait, and your decision:"
-        )
+
+        user_msg_blocks.append({
+            "type": "text",
+            "text": (
+                f"Market Snapshot (v3 hybrid — escalated from scout):\n{json.dumps(snap)}\n"
+                f"{scout_hint}\n\n"
+                f"{emulation_reminder}"
+                "DECISION FRAMEWORK:\n"
+                "1. REGIME: What regime is each coin in?\n"
+                "2. SIGNALS: How many signals confirm per coin? (3+ = actionable)\n"
+                "3. MEMORY: lessons_from_wins (scale into), lessons_from_losses (avoid).\n"
+                "4. COSTS: Will TP profit exceed trading costs?\n"
+                "5. WEIGH BOTH SIDES: List reasons TO TRADE vs reasons TO WAIT.\n"
+                "6. DECISION: Trade only if edge is clear. Otherwise WAIT.\n\n"
+                "Return JSON with reasons_to_trade, reasons_to_wait, and your decision:"
+            )
+        })
+
+        system_prompt = get_claude_system(getattr(bot, "strategy_preset", None), model_id=trade_model, news=news_context)
+        system_blocks = [
+            {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
+        ]
 
         raw = ""
         try:
             base_max = MODEL_MAX_TOKENS.get(trade_model, 2400)
-            # Extra headroom: Opus emulation + circuit-breaker / long reasoning (avoids Unterminated string)
             max_tok = base_max + 500
             raw = await _api_call(
                 trade_model,
-                get_claude_system(
-                    getattr(bot, "trading_preset", None),
-                    model_id=trade_model,
-                ),
-                user_msg,
+                system_blocks,
+                user_msg_blocks,
                 max_tokens=max_tok,
             )
             _api_cost_tracker["trade_calls"] += 1
@@ -1081,6 +1166,7 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
                             memory_briefing,
                             bot.open_positions,
                             bot.fear_greed,
+                            news=news_context,
                         )
                         _api_cost_tracker["adversary_calls"] += 1
                         _api_cost_tracker["total_adversary_cost"] += ADVERSARY_COST_PER_CALL

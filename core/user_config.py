@@ -10,9 +10,17 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Optional
 
-from core.encryption import decrypt_ciphertext, encrypt_plaintext
+from core.config import ADMIN_EMAILS
+from core.encryption import (
+    decrypt_ciphertext,
+    decrypt_with_key,
+    encrypt_plaintext,
+    encrypt_with_key,
+    generate_dek,
+)
 from core.redis_client import cache_delete, cache_get, cache_set, is_redis_available
 from core.supabase_client import get_supabase
+from strategy.trading_presets import PRESETS
 
 logger = logging.getLogger("claudebot.user_config")
 
@@ -27,9 +35,10 @@ def _evict_oldest_if_needed() -> None:
         return
     # Sort by timestamp ascending (oldest first), evict until under 80% of max
     target = int(_USER_CONFIG_CACHE_MAX * 0.8)
-    entries = [(uid, ts) for uid, (ts, _) in _USER_CONFIG_CACHE.items()]
-    entries.sort(key=lambda x: x[1])
-    for uid, _ in entries[: len(entries) - target]:
+    entries = sorted(_USER_CONFIG_CACHE.items(), key=lambda x: x[1][0])
+    to_remove = len(entries) - target
+    for i in range(to_remove):
+        uid, _ = entries[i]
         _USER_CONFIG_CACHE.pop(uid, None)
 
 
@@ -46,6 +55,7 @@ class UserConfig:
     user_id: str
     email: str = ""
     display_name: str = ""
+    role: str = "authenticated"
     onboarding_complete: bool = False
     subscription_tier: str = "none"
     subscription_status: str = "inactive"
@@ -66,7 +76,7 @@ class UserConfig:
     trade_mode: str = "spot"
     sl_atr_widen: float = 1.3
     trailing_stop_pct: float = 1.5
-    claude_interval: int = 90
+    analysis_interval: int = 90
     scout_min_signals: int = 2
     scout_min_confidence: float = 0.35
 
@@ -79,6 +89,7 @@ def _config_to_dict(cfg: UserConfig) -> dict:
         "user_id": cfg.user_id,
         "email": cfg.email,
         "display_name": cfg.display_name,
+        "role": cfg.role,
         "onboarding_complete": cfg.onboarding_complete,
         "subscription_tier": cfg.subscription_tier,
         "subscription_status": cfg.subscription_status,
@@ -98,7 +109,7 @@ def _config_to_dict(cfg: UserConfig) -> dict:
         "trade_mode": cfg.trade_mode,
         "sl_atr_widen": cfg.sl_atr_widen,
         "trailing_stop_pct": cfg.trailing_stop_pct,
-        "claude_interval": cfg.claude_interval,
+        "analysis_interval": cfg.analysis_interval,
         "scout_min_signals": cfg.scout_min_signals,
         "scout_min_confidence": cfg.scout_min_confidence,
         "connected_exchanges": cfg.connected_exchanges,
@@ -111,6 +122,7 @@ def _dict_to_config(d: dict) -> UserConfig:
         user_id=d["user_id"],
         email=d.get("email", ""),
         display_name=d.get("display_name", ""),
+        role=d.get("role", "authenticated"),
         onboarding_complete=d.get("onboarding_complete", False),
         subscription_tier=d.get("subscription_tier", "none"),
         subscription_status=d.get("subscription_status", "inactive"),
@@ -120,36 +132,25 @@ def _dict_to_config(d: dict) -> UserConfig:
         start_balance=float(d.get("start_balance", 1000)),
         target_balance=float(d.get("target_balance", 5000)),
         direction_bias=d.get("direction_bias", "both"),
-        require_trade_approval=d.get("require_trade_approval", False),
-        max_concurrent_positions=d.get("max_concurrent_positions", 8),
-        max_position_usd=float(d.get("max_position_usd", 500)),
-        min_trade_usd=float(d.get("min_trade_usd", 75)),
-        coins=d.get("coins", ["BTC", "ETH", "SOL", "LINK"]),
-        enable_futures=d.get("enable_futures", False),
-        futures_leverage=d.get("futures_leverage", 2),
-        trade_mode=d.get("trade_mode", "spot"),
-        sl_atr_widen=float(d.get("sl_atr_widen", 1.3)),
-        trailing_stop_pct=float(d.get("trailing_stop_pct", 1.5)),
-        claude_interval=d.get("claude_interval", 90),
-        scout_min_signals=d.get("scout_min_signals", 2),
-        scout_min_confidence=float(d.get("scout_min_confidence", 0.35)),
-        connected_exchanges=d.get("connected_exchanges", []),
+        require_trade_approval=bool(d.get("require_trade_approval", False)),
+        max_concurrent_positions=int(d.get("max_concurrent_positions", 8) or 8),
+        max_position_usd=float(d.get("max_position_usd", 500.0) or 500.0),
+        min_trade_usd=float(d.get("min_trade_usd", 75.0) or 75.0),
+        coins=d.get("coins") if isinstance(d.get("coins"), list) else ["BTC", "ETH", "SOL", "LINK"],
+        enable_futures=bool(d.get("enable_futures", False)),
+        futures_leverage=int(d.get("futures_leverage", 2) or 2),
+        trade_mode=str(d.get("trade_mode", "spot") or "spot"),
+        sl_atr_widen=float(d.get("sl_atr_widen", 1.3) or 1.3),
+        trailing_stop_pct=float(d.get("trailing_stop_pct", 1.5) or 1.5),
+        analysis_interval=int(d.get("analysis_interval") or d.get("claude_interval") or 90),
+        scout_min_signals=int(d.get("scout_min_signals", 2) or 2),
+        scout_min_confidence=float(d.get("scout_min_confidence", 0.35) or 0.35),
+        connected_exchanges=d.get("connected_exchanges") if isinstance(d.get("connected_exchanges"), list) else [],
     )
-
 
 def load_user_config(user_id: str) -> UserConfig:
     """Load full user config from Supabase (profile + preferences + exchanges) in parallel."""
     now = time.time()
-
-    # Return mock config for admin/system bypass
-    if user_id == "admin":
-        return UserConfig(
-            user_id="admin",
-            email="admin@claudebot.local",
-            display_name="System Admin",
-            subscription_tier="elite",
-            subscription_status="active"
-        )
 
     # Redis cache (distributed)
     if is_redis_available():
@@ -184,9 +185,12 @@ def load_user_config(user_id: str) -> UserConfig:
     pr = prefs.data or {}
 
     email = p.get("email", "")
+    role = p.get("role", "authenticated")
     tier = p.get("subscription_tier", "none")
     status = p.get("subscription_status", "inactive")
-    if email.lower() == "feichangfuyou@gmail.com":
+
+    if email.lower() in [e.strip().lower() for e in ADMIN_EMAILS.split(",") if e.strip()]:
+        role = "admin"
         tier = "elite"
         status = "active"
 
@@ -194,29 +198,30 @@ def load_user_config(user_id: str) -> UserConfig:
         user_id=user_id,
         email=email,
         display_name=p.get("display_name", ""),
+        role=role,
         onboarding_complete=p.get("onboarding_complete", False),
         subscription_tier=tier,
         subscription_status=status,
-        trading_preset=pr.get("trading_preset", "turtle"),
-        risk_level=pr.get("risk_level", "moderate"),
-        paper_trading=pr.get("paper_trading", True),
-        start_balance=float(pr.get("start_balance", 1000)),
-        target_balance=float(pr.get("target_balance", 5000)),
-        direction_bias=pr.get("direction_bias", "both"),
-        require_trade_approval=pr.get("require_trade_approval", False),
-        max_concurrent_positions=pr.get("max_concurrent_positions", 8),
-        max_position_usd=float(pr.get("max_position_usd", 500)),
-        min_trade_usd=float(pr.get("min_trade_usd", 75)),
-        coins=pr.get("coins", ["BTC", "ETH", "SOL", "LINK"]),
-        enable_futures=pr.get("enable_futures", False),
-        futures_leverage=pr.get("futures_leverage", 2),
-        trade_mode=pr.get("trade_mode", "spot"),
-        sl_atr_widen=float(pr.get("sl_atr_widen", 1.3)),
-        trailing_stop_pct=float(pr.get("trailing_stop_pct", 1.5)),
-        claude_interval=pr.get("claude_interval", 90),
-        scout_min_signals=pr.get("scout_min_signals", 2),
-        scout_min_confidence=float(pr.get("scout_min_confidence", 0.35)),
-        connected_exchanges=[e["exchange"] for e in (exchanges.data or [])],
+        trading_preset=str(pr.get("trading_preset", "turtle") or "turtle"),
+        risk_level=str(pr.get("risk_level", "moderate") or "moderate"),
+        paper_trading=bool(pr.get("paper_trading", True)),
+        start_balance=float(pr.get("start_balance", 1000.0) or 1000.0),
+        target_balance=float(pr.get("target_balance", 5000.0) or 5000.0),
+        direction_bias=str(pr.get("direction_bias", "both") or "both"),
+        require_trade_approval=bool(pr.get("require_trade_approval", False)),
+        max_concurrent_positions=int(pr.get("max_concurrent_positions", 8) or 8),
+        max_position_usd=float(pr.get("max_position_usd", 500.0) or 500.0),
+        min_trade_usd=float(pr.get("min_trade_usd", 75.0) or 75.0),
+        coins=pr.get("coins") if isinstance(pr.get("coins"), list) else ["BTC", "ETH", "SOL", "LINK"],
+        enable_futures=bool(pr.get("enable_futures", False)),
+        futures_leverage=int(pr.get("futures_leverage", 2) or 2),
+        trade_mode=str(pr.get("trade_mode", "spot") or "spot"),
+        sl_atr_widen=float(pr.get("sl_atr_widen", 1.3) or 1.3),
+        trailing_stop_pct=float(pr.get("trailing_stop_pct", 1.5) or 1.5),
+        analysis_interval=int(pr.get("analysis_interval") or pr.get("claude_interval") or 90),
+        scout_min_signals=int(pr.get("scout_min_signals", 2) or 2),
+        scout_min_confidence=float(pr.get("scout_min_confidence", 0.35) or 0.35),
+        connected_exchanges=[str(e["exchange"]) for e in (exchanges.data or []) if "exchange" in e],
     )
     if is_redis_available():
         cache_set(f"user_config:{user_id}", _config_to_dict(cfg), ttl_sec=_USER_CONFIG_TTL)
@@ -227,7 +232,6 @@ def load_user_config(user_id: str) -> UserConfig:
 
 def save_user_preferences(user_id: str, prefs: dict) -> bool:
     """Update user preferences in Supabase. Validates trading_preset against known presets."""
-    from strategy.trading_presets import PRESETS
 
     sb = get_supabase()
     allowed = {
@@ -247,7 +251,7 @@ def save_user_preferences(user_id: str, prefs: dict) -> bool:
         "trade_mode",
         "sl_atr_widen",
         "trailing_stop_pct",
-        "claude_interval",
+        "analysis_interval",
         "scout_min_signals",
         "scout_min_confidence",
     }
@@ -263,6 +267,32 @@ def save_user_preferences(user_id: str, prefs: dict) -> bool:
     return True
 
 
+def _get_or_create_user_dek(user_id: str) -> Optional[str]:
+    """Get or create a per-user Data Encryption Key (DEK), encrypted by KEK."""
+    sb = get_supabase()
+    # Check profile for existing DEK
+    res = sb.table("profiles").select("encrypted_dek").eq("id", user_id).single().execute()
+    data = res.data or {}
+    enc_dek = data.get("encrypted_dek")
+
+    if enc_dek:
+        # Decrypt DEK using system Master Key (KEK)
+        dek = decrypt_ciphertext(enc_dek)
+        if dek:
+            return dek
+
+    # Generat new DEK
+    new_dek = generate_dek()
+    new_enc_dek = encrypt_plaintext(new_dek)
+    if not new_enc_dek:
+        return None
+
+    # Save to profile
+    sb.table("profiles").update({"encrypted_dek": new_enc_dek}).eq("id", user_id).execute()
+    invalidate_user_config_cache(user_id)
+    return new_dek
+
+
 def complete_onboarding(user_id: str):
     """Mark user onboarding as complete."""
     sb = get_supabase()
@@ -271,7 +301,7 @@ def complete_onboarding(user_id: str):
 
 
 def get_user_exchange_keys(user_id: str, exchange: str) -> Optional[dict]:
-    """Load exchange credentials for a user. Decrypts api_key_enc/api_secret_enc if encrypted."""
+    """Load exchange credentials for a user. Decrypts using Envelope Encryption."""
     sb = get_supabase()
     try:
         result = (
@@ -287,27 +317,38 @@ def get_user_exchange_keys(user_id: str, exchange: str) -> Optional[dict]:
         if not data:
             return None
     except Exception as e:
-        # Supabase throws an exception on .single() if 0 rows returned
         if "0 rows" in str(e) or "contains no rows" in str(e) or "PGRST116" in str(e):
             return None
         raise e
-    # Decrypt if stored encrypted; legacy plaintext is returned as-is (decrypt returns None)
-    api_key = data.get("api_key_enc")
-    api_secret = data.get("api_secret_enc")
-    if api_key:
-        dec = decrypt_ciphertext(api_key)
-        if dec is not None:
-            data = {**data, "api_key_enc": dec}
-    if api_secret:
-        dec = decrypt_ciphertext(api_secret)
-        if dec is not None:
-            data = {**data, "api_secret_enc": dec}
-    return dict(data)
+
+    # Decrypt all fields ending in _enc
+    user_dek = _get_or_create_user_dek(user_id)
+    processed = dict(data)
+    
+    for k, v in data.items():
+        if k.endswith("_enc") and isinstance(v, str) and v:
+            dec = None
+            if user_dek:
+                dec = decrypt_with_key(v, user_dek)
+            
+            if dec is None:
+                # Fallback to legacy KEK decryption
+                dec = decrypt_ciphertext(v)
+            
+            if dec is not None:
+                processed[k] = dec
+            
+    return processed
 
 
 def save_user_exchange(user_id: str, exchange: str, connection_type: str, **kwargs) -> bool:
-    """Save or update exchange connection for a user. Encrypts api_key/api_secret before storing."""
+    """Save or update exchange connection for a user. Encrypts using Envelope Encryption."""
     sb = get_supabase()
+
+    user_dek = _get_or_create_user_dek(user_id)
+    if not user_dek:
+        raise ValueError("Encryption service (DEK) unavailable. Cannot save sensitive keys.")
+
     data = {
         "user_id": user_id,
         "exchange": exchange,
@@ -317,16 +358,11 @@ def save_user_exchange(user_id: str, exchange: str, connection_type: str, **kwar
     for k, v in kwargs.items():
         if v is None:
             continue
-        if k == "api_key_enc" and isinstance(v, str):
-            enc = encrypt_plaintext(v)
+        if k.endswith("_enc") and isinstance(v, str):
+            enc = encrypt_with_key(v, user_dek)
             if enc is None:
-                raise ValueError("Encryption service unavailable. Cannot save sensitive keys.")
-            data["api_key_enc"] = enc
-        elif k == "api_secret_enc" and isinstance(v, str):
-            enc = encrypt_plaintext(v)
-            if enc is None:
-                raise ValueError("Encryption service unavailable. Cannot save sensitive secrets.")
-            data["api_secret_enc"] = enc
+                raise ValueError(f"Encryption failed for {k}. Cannot save credentials.")
+            data[k] = enc
         else:
             data[k] = v
     sb.table("user_exchanges").upsert(data, on_conflict="user_id,exchange").execute()

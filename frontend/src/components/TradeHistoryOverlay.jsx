@@ -11,19 +11,19 @@ export function TradeHistoryOverlay({
   if (!showHistory) return null;
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(6,6,15,0.95)", zIndex:9998, display:"flex", flexDirection:"column", animation:"fadein 0.2s ease" }}>
+    <div className="glass-overlay fadein" style={{ position: "fixed", inset: 0, zIndex: 9998, display: "flex", flexDirection: "column", padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}>
       {/* Header */}
-      <div style={{ padding:"20px 24px 0", flexShrink:0 }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"16px" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-            <span style={{ fontFamily:"'Montserrat', sans-serif", fontSize:"20px", color:"#D4AF37", letterSpacing:"4px" }}>THE RECORD</span>
-            <span style={{ fontSize:"10px", color:"#5C5C5C" }}>{historyTotal} total trades in database</span>
+      <div className="glass-heavy" style={{ margin: "24px", padding: "24px", display: "flex", flexDirection: "column", flex: 1, minHeight: 0, animation: "fadein 0.35s ease" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span className="section-label" style={{ fontSize: "20px", color: "#D4AF37", letterSpacing: "4px" }}>THE RECORD</span>
+            <span style={{ fontSize: "10px", color: "#5C5C5C" }}>{historyTotal} total trades in database</span>
           </div>
-          <div style={{ display:"flex", gap:"8px" }}>
+          <div style={{ display: "flex", gap: "8px" }}>
             {historyTrades.length > 0 && (
               <button className="btn btn-d" onClick={() => exportTrades(historyTrades)} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "9px" }}><Download size={14} /> EXPORT CSV</button>
             )}
-            <button className="btn btn-d" onClick={() => setShowHistory(false)} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#FF1744", borderColor: "#FF174433", padding: "6px 14px" }}><X size={14} /> CLOSE</button>
+            <button className="btn btn-r" onClick={() => setShowHistory(false)} style={{ width: "36px", height: "36px", borderRadius: "50%", padding: 0, minWidth: "36px", minHeight: "36px" }}><X size={18} /></button>
           </div>
         </div>
 
@@ -32,17 +32,20 @@ export function TradeHistoryOverlay({
           <div>
             <div style={{ fontSize:"8px", color:"#3a3a3a", letterSpacing:"1px", marginBottom:"3px" }}>FROM</div>
             <input type="date" value={historyFilters.date_from} onChange={e => applyHistoryFilter("date_from", e.target.value)}
-              style={{ fontFamily:"'Space Mono',monospace", fontSize:"10px", padding:"6px 10px", borderRadius:"4px", border:"1px solid #2a2a2a", background:"#111111", color:"#D4D4D4", outline:"none" }} />
+              className="mono-text"
+              style={{ fontSize:"10px", padding:"6px 10px", borderRadius:"4px", border:"1px solid #2a2a2a", background:"#111111", color:"#D4D4D4", outline:"none" }} />
           </div>
           <div>
             <div style={{ fontSize:"8px", color:"#3a3a3a", letterSpacing:"1px", marginBottom:"3px" }}>TO</div>
             <input type="date" value={historyFilters.date_to} onChange={e => applyHistoryFilter("date_to", e.target.value)}
-              style={{ fontFamily:"'Space Mono',monospace", fontSize:"10px", padding:"6px 10px", borderRadius:"4px", border:"1px solid #2a2a2a", background:"#111111", color:"#D4D4D4", outline:"none" }} />
+              className="mono-text"
+              style={{ fontSize:"10px", padding:"6px 10px", borderRadius:"4px", border:"1px solid #2a2a2a", background:"#111111", color:"#D4D4D4", outline:"none" }} />
           </div>
           <div>
             <div style={{ fontSize:"8px", color:"#3a3a3a", letterSpacing:"1px", marginBottom:"3px" }}>COIN</div>
             <select value={historyFilters.symbol} onChange={e => applyHistoryFilter("symbol", e.target.value)}
-              style={{ fontFamily:"'Space Mono',monospace", fontSize:"10px", padding:"6px 10px", borderRadius:"4px", border:"1px solid #2a2a2a", background:"#111111", color:"#D4D4D4", outline:"none", appearance:"none", minWidth:"80px" }}>
+              className="mono-text"
+              style={{ fontSize:"10px", padding:"6px 10px", borderRadius:"4px", border:"1px solid #2a2a2a", background:"#111111", color:"#D4D4D4", outline:"none", appearance:"none", minWidth:"80px" }}>
               <option value="">ALL</option>
               {activeCoins.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -50,7 +53,8 @@ export function TradeHistoryOverlay({
           <div>
             <div style={{ fontSize:"8px", color:"#3a3a3a", letterSpacing:"1px", marginBottom:"3px" }}>SIDE</div>
             <select value={historyFilters.side} onChange={e => applyHistoryFilter("side", e.target.value)}
-              style={{ fontFamily:"'Space Mono',monospace", fontSize:"10px", padding:"6px 10px", borderRadius:"4px", border:"1px solid #2a2a2a", background:"#111111", color:"#D4D4D4", outline:"none", appearance:"none", minWidth:"80px" }}>
+              className="mono-text"
+              style={{ fontSize:"10px", padding:"6px 10px", borderRadius:"4px", border:"1px solid #2a2a2a", background:"#111111", color:"#D4D4D4", outline:"none", appearance:"none", minWidth:"80px" }}>
               <option value="">ALL</option>
               <option value="buy">BUY</option>
               <option value="sell">SELL</option>
@@ -59,7 +63,8 @@ export function TradeHistoryOverlay({
           <div>
             <div style={{ fontSize:"8px", color:"#3a3a3a", letterSpacing:"1px", marginBottom:"3px" }}>RESULT</div>
             <select value={historyFilters.result} onChange={e => applyHistoryFilter("result", e.target.value)}
-              style={{ fontFamily:"'Space Mono',monospace", fontSize:"10px", padding:"6px 10px", borderRadius:"4px", border:"1px solid #2a2a2a", background:"#111111", color:"#D4D4D4", outline:"none", appearance:"none", minWidth:"80px" }}>
+              className="mono-text"
+              style={{ fontSize:"10px", padding:"6px 10px", borderRadius:"4px", border:"1px solid #2a2a2a", background:"#111111", color:"#D4D4D4", outline:"none", appearance:"none", minWidth:"80px" }}>
               <option value="">ALL</option>
               <option value="win">WINS</option>
               <option value="loss">LOSSES</option>
@@ -68,7 +73,8 @@ export function TradeHistoryOverlay({
           <div>
             <div style={{ fontSize:"8px", color:"#3a3a3a", letterSpacing:"1px", marginBottom:"3px" }}>TYPE</div>
             <select value={historyFilters.product_type} onChange={e => applyHistoryFilter("product_type", e.target.value)}
-              style={{ fontFamily:"'Space Mono',monospace", fontSize:"10px", padding:"6px 10px", borderRadius:"4px", border:"1px solid #2a2a2a", background:"#111111", color:"#D4D4D4", outline:"none", appearance:"none", minWidth:"90px" }}>
+              className="mono-text"
+              style={{ fontSize:"10px", padding:"6px 10px", borderRadius:"4px", border:"1px solid #2a2a2a", background:"#111111", color:"#D4D4D4", outline:"none", appearance:"none", minWidth:"90px" }}>
               <option value="">ALL</option>
               <option value="spot">SPOT</option>
               <option value="futures">FUTURES</option>
@@ -92,7 +98,7 @@ export function TradeHistoryOverlay({
           ].map(s => (
             <div key={s.label} style={{ background:"#111111", border:"1px solid #1e1e1e", borderRadius:"5px", padding:"8px 14px" }}>
               <div style={{ fontSize:"8px", color:"#3a3a3a", letterSpacing:"1px" }}>{s.label}</div>
-              <div style={{ fontFamily:"'Montserrat', sans-serif", fontSize:"14px", fontWeight:"700", color:s.color }}>{s.val}</div>
+              <div style={{ fontSize:"14px", fontWeight:"700", color:s.color }}>{s.val}</div>
             </div>
           ))}
         </div>
@@ -118,9 +124,7 @@ export function TradeHistoryOverlay({
             </div>
           ) : (
             historyTrades.map(tr => (
-              <div key={tr.id} style={{ display:"grid", gridTemplateColumns:"140px 55px 55px 55px 90px 90px 80px 70px 1fr", gap:"8px", padding:"8px 12px", borderBottom:"1px solid #1a1a1a", fontSize:"11px", transition:"background 0.1s", cursor:"pointer" }}
-                onMouseEnter={e => e.currentTarget.style.background="#1a1a1a"}
-                onMouseLeave={e => e.currentTarget.style.background="transparent"}
+              <div key={tr.id} className="trow" style={{ display:"grid", gridTemplateColumns:"140px 55px 55px 55px 90px 90px 80px 70px 1fr", gap:"8px", padding:"8px 12px", borderBottom:"1px solid #1a1a1a", fontSize:"11px", cursor:"pointer" }}
                 onClick={() => openTradeDetail(tr)}
                 title="Click to view trade chart screenshots">
                 <span style={{ color:"#5C5C5C", fontSize:"10px" }}>

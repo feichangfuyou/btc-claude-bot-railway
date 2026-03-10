@@ -48,19 +48,6 @@ async def get_current_user(
 ) -> AuthenticatedUser:
     """Extract and verify the Supabase JWT from the Authorization header.
     Returns an AuthenticatedUser or raises 401."""
-    from core.config import API_SECRET
-
-    secret_header = request.headers.get("x-bot-secret")
-    secret_query = request.query_params.get("secret")
-    if API_SECRET and (secret_header == API_SECRET or secret_query == API_SECRET):
-        return AuthenticatedUser(
-            user_id="admin",
-            email="admin@claudebot.local",
-            role="admin",
-            tier="elite",
-            status="active"
-        )
-
     token = None
 
     if credentials:
@@ -69,6 +56,8 @@ async def get_current_user(
         token = request.query_params.get("token")
 
     if not token:
+        # Fallback to x-bot-secret ONLY if explicitly allowed for certain system paths
+        # For now, we enforce token-based auth for everything in this dependency
         raise HTTPException(status_code=401, detail="Missing authentication token")
 
     try:
@@ -83,8 +72,12 @@ async def get_current_user(
         config = load_user_config(user.id)
 
         email = user.email or ""
-        role = user.role or "authenticated"
-        if email.lower() == "feichangfuyou@gmail.com":
+        # Role should come from the user's profile/config, not hardcoded emails
+        role = config.role if hasattr(config, "role") else "authenticated"
+
+        # Check for admin emails in environment if role is not already admin
+        from core.config import ADMIN_EMAILS
+        if role != "admin" and email.lower() in [e.strip().lower() for e in ADMIN_EMAILS.split(",") if e.strip()]:
             role = "admin"
 
         return AuthenticatedUser(

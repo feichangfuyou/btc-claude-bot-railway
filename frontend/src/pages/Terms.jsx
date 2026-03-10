@@ -9,9 +9,9 @@ export default function Terms() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        document.title = "Terms of Service — DoYou.trade";
+        document.title = "Terms of Service — DoYou.trade | Professional Trading Agreement";
         const meta = document.querySelector('meta[name="description"]');
-        if (meta) meta.setAttribute("content", "Read the Terms of Service for DoYou.trade. Professional-grade non-custodial trading terminal services and user agreement.");
+        if (meta) meta.setAttribute("content", "Read the Terms of Service for DoYou.trade. Professional-grade non-custodial trading terminal services, risk disclosure, and user agreement.");
     }, []);
 
     return (

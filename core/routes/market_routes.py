@@ -23,6 +23,7 @@ from core.shared import (
     _io_executor,
     bot,
 )
+from feeds.news_feeds import fetch_latest_news
 from strategy.symbol_registry import get_coingecko_id
 
 router = APIRouter(tags=["market"])
@@ -140,7 +141,8 @@ async def proxy_coinbase_tickers(symbols: str = "BTC,ETH,SOL,DOGE,LINK,AVAX,UNI,
                             ch = float(data[cg_id].get("usd_24h_change") or 0)
                             results[sym] = {"price": p, "price_change24h": ch}
             except Exception as e:
-                file_log(f"CoinGecko fallback error: {e}", "warning")
+                err_msg = str(e) or "Timeout or Network Error"
+                file_log(f"CoinGecko fallback error: {err_msg}", "warning")
 
     if not results and "BTC" in sym_list:
         try:
@@ -155,8 +157,12 @@ async def proxy_coinbase_tickers(symbols: str = "BTC,ETH,SOL,DOGE,LINK,AVAX,UNI,
                         "price": float(d["bitcoin"]["usd"]),
                         "price_change24h": float(d["bitcoin"].get("usd_24h_change") or 0),
                     }
+            else:
+                if r.status_code != 200:
+                    file_log(f"CoinGecko BTC fallback returned status {r.status_code}", "dim")
         except Exception as e:
-            file_log(f"CoinGecko BTC fallback error: {e}", "warning")
+            err_msg = str(e) or "Timeout or Network Error"
+            file_log(f"CoinGecko BTC fallback error: {err_msg}", "warning")
 
     return {"coins": results}
 
@@ -329,3 +335,9 @@ async def proxy_alternative(path: str, request: Request, user: AuthenticatedUser
             {"error": "upstream returned invalid JSON"},
             status_code=502,
         )
+
+@router.get("/api/market/news")
+async def get_market_news(symbol: str = "all", user: AuthenticatedUser = Depends(get_active_user)):
+    """Fetch latest market news from CryptoPanic."""
+    news = await fetch_latest_news(symbol)
+    return news

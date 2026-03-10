@@ -6,10 +6,10 @@ import Skeleton from "../Skeleton.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
 import { RefreshCcw, ArrowUp, ArrowDown } from "lucide-react";
 
-const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL
-  || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
+// Direct backend connection: empty in development to leverage the Vite proxy (fixes CORS issues)
+const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL || "";
 
-export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnabled, binanceEnabled, hasBrain, isLiveMode, agentKit, paperMode, directionBias, requireTradeApproval, price, priceAge, wsRetrying }) {
+export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnabled, binanceEnabled, hasEngine, isLiveMode, agentKit, paperMode, directionBias, requireTradeApproval, price, priceAge, wsRetrying }) {
   const { user, profile, signOut } = useAuth();
   const getAuthHeaders = useAuthHeaders();
   const navigate = useNavigate();
@@ -18,12 +18,15 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
   const [analyticsData, setAnalyticsData] = useState(null);
   const [memoryData, setMemoryData] = useState(null);
   const [calibrationData, setCalibrationData] = useState(null);
+  const [newsData, setNewsData] = useState(null);
   const [backtestResult, setBacktestResult] = useState(null);
   const [backtestLoading, setBacktestLoading] = useState(false);
   const [btParams, setBtParams] = useState({ symbol: "BTC", days: 30, tp: 2.5, sl: 1.0, confluence: 5, rr: 1.8 });
   const [loading, setLoading] = useState(false);
+  const [adversaryStats, setAdversaryStats] = useState(null);
 
-  const backendBase = BACKEND_BASE || `${window.location.protocol}//${window.location.hostname}:8000`;
+  const [selectedNews, setSelectedNews] = useState(null);
+
 
   const fetchData = useCallback(async (tab) => {
     if (!connected) return;
@@ -41,27 +44,34 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
       };
 
       if (tab === "equity") {
-        const d = await safeFetch(`${backendBase}/equity`);
+        const d = await safeFetch(`/equity`);
         setEquityData(d);
       } else if (tab === "analytics") {
-        const d = await safeFetch(`${backendBase}/memory/analysis`);
+        const d = await safeFetch(`/memory/analysis`);
         setAnalyticsData(d);
       } else if (tab === "memory") {
         const [rules, patterns] = await Promise.all([
-          safeFetch(`${backendBase}/memory/rules`),
-          safeFetch(`${backendBase}/memory/patterns`),
+          safeFetch(`/memory/rules`),
+          safeFetch(`/memory/patterns`),
         ]);
         setMemoryData({ ...rules, ...patterns });
       } else if (tab === "calibration") {
-        const d = await safeFetch(`${backendBase}/memory/calibration`);
+        const d = await safeFetch(`/memory/calibration`);
         setCalibrationData(d);
+      } else if (tab === "news") {
+        const [n, a] = await Promise.all([
+          safeFetch(`/api/market/news?symbol=all`),
+          safeFetch(`/api/analytics/adversary`),
+        ]);
+        setNewsData(n);
+        setAdversaryStats(a);
       }
     } catch (e) {
       log?.(`Analytics: ${e.message}`, "error");
     } finally {
       setLoading(false);
     }
-  }, [connected, backendBase, log, getAuthHeaders]);
+  }, [connected, log, getAuthHeaders]);
 
   useEffect(() => { fetchData(activeTab); }, [activeTab, fetchData]);
 
@@ -73,7 +83,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
         tp_atr_mult: btParams.tp, sl_atr_mult: btParams.sl,
         min_confluence: btParams.confluence, min_rr: btParams.rr,
       });
-      const r = await fetch(`${backendBase}/backtest?${params}`, { method: "POST", headers: getAuthHeaders() });
+      const r = await fetch(`/backtest?${params}`, { method: "POST", headers: getAuthHeaders() });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const type = r.headers.get("content-type");
       if (!type || !type.includes("application/json")) {
@@ -92,8 +102,9 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
   const tabs = [
     { id: "equity", label: "EQUITY CURVE" },
     { id: "analytics", label: "TRADE ANALYTICS" },
-    { id: "memory", label: "BRAIN / MEMORY" },
+    { id: "memory", label: "DECISION ENGINE" },
     { id: "calibration", label: "CONFIDENCE" },
+    { id: "news", label: "INSTITUTIONAL PULSE" },
     { id: "backtest", label: "BACKTEST" },
   ];
 
@@ -233,10 +244,10 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
             </div>
           )}
 
-          {/* ── BRAIN / MEMORY ── */}
+          {/* ── DECISION ENGINE ── */}
           {activeTab === "memory" && !loading && memoryData && (
             <div>
-              <div className="section-label" style={{ marginBottom: "12px" }}>LEARNED RULES & PATTERNS</div>
+              <div className="section-label" style={{ marginBottom: "12px" }}>LEARNED RULES & SIGNALS</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }} className="analytics-grid">
                 <div>
                   <div style={{ fontSize: "9px", color: "#5C5C5C", letterSpacing: "1px", marginBottom: "8px" }}>
@@ -290,7 +301,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
             <div>
               <div className="section-label" style={{ marginBottom: "6px" }}>CONFIDENCE CALIBRATION</div>
               <div style={{ fontSize: "10px", color: "#5C5C5C", marginBottom: "14px" }}>
-                Does Claude&apos;s confidence actually predict win rate? Perfect calibration = predicted matches actual.
+                Does signal confidence actually predict win rate? Perfect calibration = predicted matches actual.
               </div>
               {(calibrationData.calibration || []).length === 0 ? (
                 <div style={{ fontSize: "10px", color: "#2a2a2a", padding: "20px", textAlign: "center" }}>Need more trades with confidence data</div>
@@ -304,9 +315,9 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                     return (
                       <div key={c.predicted_band} style={{ background: "#0A0A0A", borderRadius: "5px", padding: "12px", border: `1px solid ${calibrated ? "#00E67622" : "#ff990022"}`, textAlign: "center" }}>
                         <div style={{ fontSize: "8px", color: "#3a3a3a", letterSpacing: "1px", marginBottom: "6px" }}>PREDICTED {c.predicted_band}</div>
-                        <div style={{ fontSize: "16px", fontFamily: "'Montserrat', sans-serif", fontWeight: "700", color: "#D4AF37" }}>{predicted}%</div>
+                        <div style={{ fontSize: "16px", fontWeight: "700", color: "#D4AF37" }}>{predicted}%</div>
                         <div style={{ fontSize: "8px", color: "#3a3a3a", margin: "4px 0" }}>vs actual</div>
-                        <div style={{ fontSize: "16px", fontFamily: "'Montserrat', sans-serif", fontWeight: "700", color: actual >= 50 ? "#00E676" : "#FF1744" }}>{actual}%</div>
+                        <div style={{ fontSize: "16px", fontWeight: "700", color: actual >= 50 ? "#00E676" : "#FF1744" }}>{actual}%</div>
                         <div style={{ fontSize: "8px", color: calibrated ? "#00E676" : "#ff9900", marginTop: "6px" }}>
                           {calibrated ? "CALIBRATED" : `${gap.toFixed(0)}% OFF`}
                         </div>
@@ -314,6 +325,145 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── INSTITUTIONAL PULSE ── */}
+          {activeTab === "news" && !loading && newsData && (
+            <div>
+              <div className="section-label" style={{ marginBottom: "6px" }}>INSTITUTIONAL PULSE</div>
+              <div style={{ fontSize: "10px", color: "#5C5C5C", marginBottom: "14px" }}>
+                Real-time sentiment and headlines from our proprietary intelligence stream. Processed by institutional models for trade screening.
+              </div>
+              
+              {newsData.error ? (
+                <div style={{ fontSize: "11px", color: "#FF1744", padding: "20px", textAlign: "center" }}>{newsData.error}</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {/* Sentiment Summary Dashboard */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px", marginBottom: "20px" }}>
+                    <div style={{ background: "#0A0A0A", borderRadius: "8px", padding: "12px", border: "1px solid #D4AF3733", textAlign: "center" }}>
+                      <div style={{ fontSize: "8px", color: "#3a3a3a", letterSpacing: "1px", marginBottom: "4px" }}>COMPOSITE SCORE</div>
+                      <div style={{ fontSize: "18px", fontWeight: "700", color: newsData.sentiment_score >= 0 ? "#00E676" : "#FF1744" }}>
+                        {newsData.sentiment_score > 0 ? "+" : ""}{newsData.sentiment_score}
+                      </div>
+                      <div style={{ fontSize: "8px", color: "#5C5C5C", marginTop: "2px" }}>{newsData.sentiment?.replace("_", " ").toUpperCase()}</div>
+                    </div>
+                    <div style={{ background: "#0A0A0A", borderRadius: "8px", padding: "12px", border: "1px solid #1e1e1e", textAlign: "center" }}>
+                      <div style={{ fontSize: "8px", color: "#3a3a3a", letterSpacing: "1px", marginBottom: "4px" }}>FEAR & GREED</div>
+                      <div style={{ fontSize: "18px", fontWeight: "700", color: "#D4AF37" }}>
+                        {newsData.fear_greed?.value}
+                      </div>
+                      <div style={{ fontSize: "8px", color: "#5C5C5C", marginTop: "2px" }}>{newsData.fear_greed?.classification?.toUpperCase()}</div>
+                    </div>
+                    {newsData.social_pulse && (
+                      <div style={{ background: "#0A0A0A", borderRadius: "8px", padding: "12px", border: "1px solid #1e1e1e", textAlign: "center" }}>
+                        <div style={{ fontSize: "8px", color: "#3a3a3a", letterSpacing: "1px", marginBottom: "4px" }}>SOCIAL PULSE</div>
+                        <div style={{ fontSize: "18px", fontWeight: "700", color: "#60A5FA" }}>
+                          {newsData.social_pulse.galaxy_score}
+                        </div>
+                        <div style={{ fontSize: "8px", color: "#5C5C5C", marginTop: "2px" }}>{newsData.social_pulse.sentiment?.toUpperCase()}</div>
+                      </div>
+                    )}
+                    {newsData.macro_event && newsData.macro_event !== "none" && (
+                      <div style={{ background: "#C0392B15", borderRadius: "8px", padding: "12px", border: "1px solid #C0392B44", textAlign: "center" }}>
+                        <div style={{ fontSize: "8px", color: "#FF1744", letterSpacing: "1px", marginBottom: "4px" }}>MACRO ALERT</div>
+                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#FF1744" }}>
+                          {newsData.macro_event}
+                        </div>
+                        <div style={{ fontSize: "8px", color: "#FF174488", marginTop: "2px" }}>DANGER ZONE</div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Adversary Security Dashboard */}
+                  {adversaryStats && (adversaryStats.total_vetoes > 0 || adversaryStats.total_reduces > 0) && (
+                    <div style={{ padding: "16px", background: "#FF174408", border: "1px solid #FF174422", borderRadius: "10px", marginBottom: "20px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                        <div style={{ fontSize: "9px", color: "#FF1744", fontWeight: "700", letterSpacing: "1px" }}>ADVERSARY SECURITY MITIGATION</div>
+                        <div className="tag" style={{ background: "#FF174415", color: "#FF1744", fontSize: "8px", border: "1px solid #FF174433" }}>PROTECTION ACTIVE</div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
+                        <div style={{ background: "#000000", padding: "10px", borderRadius: "6px", border: "1px solid #1e1e1e" }}>
+                          <div style={{ fontSize: "8px", color: "#5C5C5C", marginBottom: "4px" }}>TRADES KILLED</div>
+                          <div style={{ fontSize: "20px", fontWeight: "700", color: "#FF1744" }}>{adversaryStats.total_vetoes}</div>
+                        </div>
+                        <div style={{ background: "#000000", padding: "10px", borderRadius: "6px", border: "1px solid #1e1e1e" }}>
+                          <div style={{ fontSize: "8px", color: "#5C5C5C", marginBottom: "4px" }}>SIZE REDUCTIONS</div>
+                          <div style={{ fontSize: "20px", fontWeight: "700", color: "#D4AF37" }}>{adversaryStats.total_reduces}</div>
+                        </div>
+                      </div>
+                      {adversaryStats.latest_vetoes?.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: "8px", color: "#3a3a3a", letterSpacing: "1px", marginBottom: "8px" }}>LATEST VETOED ASSETS</div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            {adversaryStats.latest_vetoes.map((v, idx) => (
+                              <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "start", fontSize: "10px", borderBottom: "1px solid #1e1e1e", paddingBottom: "6px" }}>
+                                <div style={{ display: "flex", flexDirection: "column" }}>
+                                  <span style={{ color: "#D4D4D4", fontWeight: "700" }}>{v.symbol}</span>
+                                  <span style={{ color: "#5C5C5C", fontSize: "9px", marginTop: "2px" }}>{v.reasoning?.substring(0, 100)}...</span>
+                                </div>
+                                <span style={{ color: "#3a3a3a", fontSize: "8px" }}>{v.ts?.split(" ")[1]}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {(newsData.headlines || []).length === 0 ? (
+                    <div style={{ fontSize: "10px", color: "#2a2a2a", padding: "20px", textAlign: "center" }}>No headlines found</div>
+                  ) : (
+                    (newsData.headlines || []).map((h, i) => (
+                      <div 
+                        key={i} 
+                        onClick={() => setSelectedNews(h)}
+                        style={{ 
+                          background: "#0A0A0A", 
+                          borderRadius: "8px", 
+                          padding: "16px", 
+                          border: "1px solid #1e1e1e",
+                          textDecoration: "none",
+                          display: "block",
+                          transition: "all 0.2s ease",
+                          cursor: "pointer"
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = "#D4AF3744";
+                          e.currentTarget.style.background = "#0F0F0F";
+                          e.currentTarget.style.transform = "translateY(-1px)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = "#1e1e1e";
+                          e.currentTarget.style.background = "#0A0A0A";
+                          e.currentTarget.style.transform = "none";
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", alignItems: "flex-start" }}>
+                          <span style={{ fontSize: "12px", fontWeight: "700", color: "#D4AF37", lineHeight: "1.5", paddingRight: "10px" }}>{h.title}</span>
+                          <span style={{ fontSize: "9px", color: "#3a3a3a", whiteSpace: "nowrap", marginTop: "2px" }}>
+                            {newsData.last_updated}
+                          </span>
+                        </div>
+                        {h.description && (
+                          <div style={{ fontSize: "11px", color: "#888", lineHeight: "1.7", marginBottom: "12px", display: "-webkit-box", WebkitLineClamp: "3", WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                            {h.description}
+                          </div>
+                        )}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <span className="tag" style={{ background: "#D4AF3715", color: "#D4AF37", fontSize: "9px", border: "1px solid #D4AF3733" }}>
+                              SENTIMENT: {h.sentiment?.toUpperCase() || "NEUTRAL"}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: "9px", color: "#5C5C5C", fontWeight: "600", letterSpacing: "1px" }}>VIEW DETAILS &rarr;</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
             </div>
@@ -336,13 +486,15 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                     <div style={{ fontSize: "8px", color: "#3a3a3a", letterSpacing: "1px", marginBottom: "3px" }}>{f.label}</div>
                     {f.type === "select" ? (
                       <select value={btParams[f.key]} onChange={e => setBtParams(p => ({ ...p, [f.key]: e.target.value }))}
-                        style={{ fontFamily: "'Space Mono',monospace", fontSize: "10px", padding: "6px 10px", borderRadius: "4px", border: "1px solid #2a2a2a", background: "#111111", color: "#D4D4D4", outline: "none" }}>
+                        className="mono-text"
+                        style={{ fontSize: "10px", padding: "6px 10px", borderRadius: "4px", border: "1px solid #2a2a2a", background: "#111111", color: "#D4D4D4", outline: "none" }}>
                         {f.options.map(o => <option key={o} value={o}>{o}</option>)}
                       </select>
                     ) : (
                       <input type="number" value={btParams[f.key]} onChange={e => setBtParams(p => ({ ...p, [f.key]: +e.target.value }))}
+                        className="mono-text"
                         min={f.min} max={f.max} step={f.step || 1}
-                        style={{ fontFamily: "'Space Mono',monospace", fontSize: "10px", padding: "6px 10px", borderRadius: "4px", border: "1px solid #2a2a2a", background: "#111111", color: "#D4D4D4", outline: "none", width: "70px" }} />
+                        style={{ fontSize: "10px", padding: "6px 10px", borderRadius: "4px", border: "1px solid #2a2a2a", background: "#111111", color: "#D4D4D4", outline: "none", width: "70px" }} />
                     )}
                   </div>
                 ))}
@@ -366,7 +518,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                     ].map(s => (
                       <div key={s.label} style={{ background: "#0A0A0A", borderRadius: "5px", padding: "8px 10px", textAlign: "center" }}>
                         <div style={{ fontSize: "8px", color: "#3a3a3a", marginBottom: "3px" }}>{s.label}</div>
-                        <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "13px", fontWeight: "700", color: s.color }}>{s.val}</div>
+                        <div style={{ fontSize: "13px", fontWeight: "700", color: s.color }}>{s.val}</div>
                       </div>
                     ))}
                   </div>
@@ -410,7 +562,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
             position: "fixed", bottom: "60px", left: "50%", transform: "translateX(-50%)",
             background: "#1a0a0a", border: "1px solid #C0392B55", borderRadius: "8px",
             padding: "12px 20px", boxShadow: "0 4px 24px rgba(192,57,43,0.3)",
-            fontFamily: "'Montserrat', sans-serif", fontSize: "13px", fontWeight: "800",
+            fontSize: "13px", fontWeight: "800",
             color: "#FF1744", letterSpacing: "2px", zIndex: 9999,
             animation: "lossToastIn 0.3s ease-out",
           }}
@@ -433,7 +585,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
         boxShadow: "0 -4px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)",
       }}>
         {/* Left: user identity */}
-        <span className="status-bar-user" style={{ fontSize: "10px", color: "#5C5C5C", fontFamily: "'Space Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "120px", flexShrink: 0 }}>
+        <span className="status-bar-user" style={{ fontSize: "10px", color: "#5C5C5C", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "120px", flexShrink: 0 }}>
           {profile?.display_name || user?.email?.split("@")[0] || ""}
         </span>
 
@@ -443,8 +595,8 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
             { label: "BACKEND", ok: connected, on: "LIVE", off: "OFFLINE", dotColor: connected ? "#00E676" : "#FF1744", textColor: connected ? "#00E676" : "#FF1744" },
             { label: "COINBASE", ok: cbLive, on: "REAL-TIME", off: "REST", dotColor: cbLive ? "#00E676" : connected ? "#ff9900" : "#FF1744", textColor: cbLive ? "#00E676" : connected ? "#ff9900" : "#FF1744" },
             { label: "BINANCE", ok: binanceEnabled, on: "SPOT+FUT", off: "OFF", dotColor: binanceEnabled ? "#00E676" : "#FF1744", textColor: binanceEnabled ? "#00E676" : "#3a3a3a" },
-            { label: "KRAKEN", ok: krakenEnabled, on: "SPOT+FUT", off: "OFF", dotColor: krakenEnabled ? "#00E676" : "#FF1744", textColor: krakenEnabled ? "#00E676" : "#3a3a3a" },
-            { label: "BRAIN", ok: hasBrain, on: "READY", off: "NO KEY", dotColor: hasBrain ? "#00E676" : "#ff9900", textColor: hasBrain ? "#00E676" : "#ff9900" },
+            {label: "KRAKEN", ok: krakenEnabled, on: "SPOT+FUT", off: "OFF", dotColor: krakenEnabled ? "#00E676" : "#FF1744", textColor: krakenEnabled ? "#00E676" : "#3a3a3a" },
+            { label: "ENGINE", ok: hasEngine, on: "READY", off: "ERROR", dotColor: hasEngine ? "#00E676" : "#ff9900", textColor: hasEngine ? "#00E676" : "#ff9900" },
             { label: "MODE", ok: isLiveMode, on: "LIVE", off: "PAPER", dotColor: isLiveMode ? "#FF1744" : "#ff9900", textColor: isLiveMode ? "#FF1744" : "#ff9900" },
             { label: "AGENTKIT", ok: agentKit.agentkit_ready, on: "ON-CHAIN", off: paperMode ? "PAPER" : "OFFLINE", dotColor: agentKit.agentkit_ready ? "#00E676" : paperMode ? "#ff9900" : "#FF1744", textColor: agentKit.agentkit_ready ? "#00E676" : "#3a3a3a" },
           ].map(s => (
@@ -473,13 +625,44 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
         <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
           {/* Desktop nav links — hidden on mobile by CSS */}
           <div className="status-bar-badges" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <button onClick={() => navigate("/history")} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "10px", fontWeight: "800", letterSpacing: "1.5px", padding: "3px 10px", border: "1px solid #1A1A1A", borderRadius: "3px", background: "transparent", color: "#888", cursor: "pointer" }}>HISTORY</button>
-            <button onClick={() => navigate("/billing")} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "10px", fontWeight: "800", letterSpacing: "1.5px", padding: "3px 10px", border: "1px solid #1A1A1A", borderRadius: "3px", background: "transparent", color: "#888", cursor: "pointer" }}>BILLING</button>
-            <button onClick={() => navigate("/settings")} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "10px", fontWeight: "800", letterSpacing: "1.5px", padding: "3px 10px", border: "1px solid #1A1A1A", borderRadius: "3px", background: "transparent", color: "#D4AF37", cursor: "pointer" }}>SETTINGS</button>
-            <button onClick={signOut} style={{ fontFamily: "'Space Mono',monospace", fontSize: "10px", padding: "3px 8px", border: "1px solid #1A1A1A", borderRadius: "3px", background: "transparent", color: "#5C5C5C", cursor: "pointer" }}>Sign Out</button>
+            <button onClick={() => navigate("/history")} className="btn btn-d" style={{ fontSize: "10px", padding: "3px 10px", minHeight: "24px" }}>HISTORY</button>
+            <button onClick={() => navigate("/billing")} className="btn btn-d" style={{ fontSize: "10px", padding: "3px 10px", minHeight: "24px" }}>BILLING</button>
+            <button onClick={() => navigate("/settings")} className="btn btn-d" style={{ fontSize: "10px", padding: "3px 10px", minHeight: "24px", color: "#D4AF37" }}>SETTINGS</button>
+            <button onClick={signOut} className="btn btn-d" style={{ fontSize: "10px", padding: "3px 10px", minHeight: "24px" }}>Sign Out</button>
           </div>
         </div>
       </div>
+      {/* ── NEWS DETAIL MODAL ── */}
+      {selectedNews && (
+        <div className="glass-overlay fadein" style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={() => setSelectedNews(null)}>
+          <div className="glass-heavy" style={{ maxWidth: "600px", width: "100%", padding: "40px", position: "relative" }} onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setSelectedNews(null)}
+              style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", color: "#5C5C5C", fontSize: "14px", cursor: "pointer" }}
+            >
+              &times;
+            </button>
+            <div className="section-label" style={{ marginBottom: "16px", color: "#D4AF37" }}>INTELLIGENCE REPORT</div>
+            <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#fff", lineHeight: "1.4", marginBottom: "20px", letterSpacing: "0.5px" }}>
+              {selectedNews.title}
+            </h2>
+            <div style={{ display: "flex", gap: "10px", marginBottom: "24px" }}>
+              <span className="tag" style={{ background: "#D4AF3722", color: "#D4AF37" }}>
+                SENTIMENT: {selectedNews.sentiment?.toUpperCase() || "NEUTRAL"}
+              </span>
+              <span className="tag" style={{ background: "#111", color: "#5C5C5C" }}>
+                {newsData.last_updated}
+              </span>
+            </div>
+            <div style={{ fontSize: "14px", color: "#AAA", lineHeight: "1.8", marginBottom: "32px", maxHeight: "300px", overflowY: "auto", paddingRight: "10px" }}>
+              {selectedNews.description || "No extended description available for this headline."}
+            </div>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button className="btn btn-p" onClick={() => setSelectedNews(null)} style={{ flex: 1 }}>ACKNOWLEDGE & CLOSE</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

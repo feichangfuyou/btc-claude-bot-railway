@@ -138,7 +138,7 @@ function TwoFactorGate({ onVerified }) {
               <img src={qrUrl} alt="QR" style={{ display: "block", width: 160, height: 160, borderRadius: 8 }} />
             </div>}
             <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 14px", width: "100%" }}>
-              <code style={{ fontFamily: typography.fontMono, fontSize: 11, color: colors.gold, flex: 1, wordBreak: "break-all", textAlign: "left" }}>{qrData?.secret}</code>
+            <code className="mono-text" style={{ fontSize: 11, color: colors.gold, flex: 1, wordBreak: "break-all", textAlign: "left" }}>{qrData?.secret}</code>
               <button style={{ background: "none", border: "none", color: colors.muted, cursor: "pointer", padding: 4 }}
                 onClick={() => { navigator.clipboard.writeText(qrData?.secret || ""); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
                 {copied ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
@@ -162,7 +162,7 @@ function StatCard({ label, value, sub, color }) {
   return (
     <div style={s.statCard}>
       <div style={{ fontSize: 10, color: colors.muted, letterSpacing: 1, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, fontFamily: typography.fontMono, color: color || colors.gold }}>{value}</div>
+      <div className="mono-text" style={{ fontSize: 22, fontWeight: 800, color: color || colors.gold }}>{value}</div>
       {sub && <div style={{ fontSize: 10, color: colors.muted, marginTop: 4 }}>{sub}</div>}
     </div>
   );
@@ -393,8 +393,8 @@ export default function Admin() {
 
       {/* Tier Modal */}
       {tierModal && (
-        <div style={s.modalOverlay}>
-          <div style={s.modal} className="modal">
+        <div className="glass-overlay fadein" style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setTierModal(null)}>
+          <div className="glass-heavy" style={{ maxWidth: "400px", width: "100%", padding: "28px", boxSizing: "border-box", animation: "fadein 0.35s ease", position: "relative" }} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3 style={{ color: colors.gold, margin: 0, fontSize: 14, letterSpacing: 2 }}>SET TIER</h3>
               <button style={{ background: "none", border: "none", color: colors.muted, cursor: "pointer" }} onClick={() => setTierModal(null)}><X size={16} /></button>
@@ -487,10 +487,10 @@ export default function Admin() {
                       {breaker.triggered ? "🚨 TRIGGERED" : "✅ NOMINAL"}
                     </div>
                     <div style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
-                      Platform daily P&L: <span style={{ color: pnlColor(breaker.total_daily_pnl), fontFamily: typography.fontMono }}>{fmt2(breaker.total_daily_pnl)}</span>
+                      Platform daily P&L: <span className="mono-text" style={{ color: pnlColor(breaker.total_daily_pnl) }}>{fmt2(breaker.total_daily_pnl)}</span>
                     </div>
                     <div style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
-                      Threshold: <span style={{ color: colors.error, fontFamily: typography.fontMono }}>${breaker.threshold?.toLocaleString()}</span>
+                      Threshold: <span className="mono-text" style={{ color: colors.error }}>${breaker.threshold?.toLocaleString()}</span>
                     </div>
                   </div>
                   <div>
@@ -500,7 +500,7 @@ export default function Admin() {
                 </div>
                 <button 
                   onClick={setMaxLoss}
-                  style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: colors.muted, fontSize: 11, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}
+                  style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: colors.muted, fontSize: 11, cursor: "pointer" }}
                   className="admin-action-btn">
                   ⚙️ Update Max Loss Limit
                 </button>
@@ -513,7 +513,7 @@ export default function Admin() {
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {Object.entries(tierBadge).map(([t, c]) => (
                 <div key={t} style={{ padding: "10px 20px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${c}33`, minWidth: 90, textAlign: "center" }}>
-                  <div style={{ fontSize: 20, fontWeight: 800, fontFamily: typography.fontMono, color: c }}>{tierCounts[t] || 0}</div>
+                  <div className="mono-text" style={{ fontSize: 20, fontWeight: 800, color: c }}>{tierCounts[t] || 0}</div>
                   <div style={{ fontSize: 10, color: c, marginTop: 4, letterSpacing: 1 }}>{tierLabel[t]}</div>
                 </div>
               ))}
@@ -536,7 +536,7 @@ export default function Admin() {
                 <tbody>
                   {filteredUsers.map(u => (
                     <tr key={u.id} style={s.tr} className="admin-row">
-                      <td style={s.td}><span style={{ fontFamily: typography.fontMono, fontSize: 11 }}>{u.email || "—"}</span></td>
+                      <td style={s.td}><span className="mono-text" style={{ fontSize: 11 }}>{u.email || "—"}</span></td>
                       <td style={s.td}>{u.display_name || "—"}</td>
                       <td style={s.td}>
                         <span style={{ padding: "2px 8px", borderRadius: 6, background: `${tierBadge[u.tier] || "#555"}22`, color: tierBadge[u.tier] || "#555", fontSize: 10, fontWeight: 800, letterSpacing: 1 }}>
@@ -545,8 +545,8 @@ export default function Admin() {
                       </td>
                       <td style={s.td}><span style={{ color: u.status === "active" ? colors.success : colors.muted, fontSize: 11 }}>{u.status}</span></td>
                       <td style={s.td}><span style={{ color: u.bot_running ? colors.success : "#444", fontSize: 11 }}>{u.bot_running ? "● RUN" : "○ OFF"}</span></td>
-                      <td style={s.td}><span style={{ color: pnlColor(u.daily_pnl), fontFamily: typography.fontMono, fontSize: 11 }}>{fmt2(u.daily_pnl)}</span></td>
-                      <td style={s.td}><span style={{ color: pnlColor(u.total_pnl), fontFamily: typography.fontMono, fontSize: 11 }}>{fmt2(u.total_pnl)}</span></td>
+                      <td style={s.td}><span className="mono-text" style={{ color: pnlColor(u.daily_pnl), fontSize: 11 }}>{fmt2(u.daily_pnl)}</span></td>
+                      <td style={s.td}><span className="mono-text" style={{ color: pnlColor(u.total_pnl), fontSize: 11 }}>{fmt2(u.total_pnl)}</span></td>
                       <td style={s.td}><span style={{ color: colors.muted, fontSize: 10 }}>{ago(u.created_at)}</span></td>
                       <td style={s.td}>
                         <div style={{ display: "flex", gap: 6 }}>
@@ -627,7 +627,7 @@ export default function Admin() {
           <Section title="PLATFORM READINESS SCORECARD" icon={Zap}>
             {readiness ? (<>
               <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 24 }}>
-                <div style={{ fontSize: 56, fontWeight: 900, fontFamily: typography.fontMono, color: readiness.score >= 90 ? colors.success : readiness.score >= 75 ? colors.gold : colors.error, lineHeight: 1 }}>{readiness.score}</div>
+                <div className="mono-text" style={{ fontSize: 56, fontWeight: 900, color: readiness.score >= 90 ? colors.success : readiness.score >= 75 ? colors.gold : colors.error, lineHeight: 1 }}>{readiness.score}</div>
                 <div>
                   <div style={{ fontSize: 28, fontWeight: 900, color: readiness.score >= 90 ? colors.success : colors.gold }}>{readiness.grade}</div>
                   <div style={{ fontSize: 11, color: colors.muted }}>out of {readiness.target}</div>
@@ -643,7 +643,7 @@ export default function Admin() {
                   <div key={key} style={{ padding: "12px 14px", background: "rgba(255,255,255,0.02)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.04)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: 11, color: colors.muted, textTransform: "capitalize" }}>{key.replace(/_/g, " ")}</span>
-                      <span style={{ fontFamily: typography.fontMono, fontSize: 13, fontWeight: 800, color: val >= 8 ? colors.success : val >= 5 ? colors.gold : colors.error }}>{val}/10</span>
+                      <span className="mono-text" style={{ fontSize: 13, fontWeight: 800, color: val >= 8 ? colors.success : val >= 5 ? colors.gold : colors.error }}>{val}/10</span>
                     </div>
                     <div style={{ height: 3, background: "rgba(255,255,255,0.05)", borderRadius: 2, marginTop: 6, overflow: "hidden" }}>
                       <div style={{ height: "100%", width: `${val * 10}%`, background: val >= 8 ? colors.success : val >= 5 ? colors.gold : colors.error, borderRadius: 2 }} />
@@ -656,7 +656,7 @@ export default function Admin() {
                 {Object.entries(readiness.checks || {}).slice(0, 12).map(([k, v]) => (
                   <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
                     <span style={{ fontSize: 12, color: colors.muted, textTransform: "capitalize" }}>{k.replace(/_/g, " ")}</span>
-                    <span style={{ fontSize: 11, fontFamily: typography.fontMono, color: v === true ? colors.success : v === false ? colors.error : colors.gold }}>{typeof v === "boolean" ? (v ? "✓" : "✗") : String(v)}</span>
+                    <span className="mono-text" style={{ fontSize: 11, color: v === true ? colors.success : v === false ? colors.error : colors.gold }}>{typeof v === "boolean" ? (v ? "✓" : "✗") : String(v)}</span>
                   </div>
                 ))}
               </div>
@@ -684,7 +684,7 @@ export default function Admin() {
                 ].map(([k, v]) => (
                   <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                     <span style={{ color: colors.muted, fontSize: 13 }}>{k}</span>
-                    <span style={{ color: colors.gold, fontFamily: typography.fontMono, fontSize: 13, fontWeight: 700 }}>{String(v)}</span>
+                    <span className="mono-text" style={{ color: colors.gold, fontSize: 13, fontWeight: 700 }}>{String(v)}</span>
                   </div>
                 ))}
                 {aiCosts.error && <div style={{ color: colors.error, fontSize: 12, marginTop: 12 }}>Error: {aiCosts.error}</div>}
@@ -704,8 +704,8 @@ export default function Admin() {
                 const c = t === "error" ? colors.error : t === "warning" ? colors.gold : t === "success" ? colors.success : "#888";
                 return (
                   <div key={i} style={{ display: "flex", gap: 10, padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.02)", alignItems: "flex-start" }}>
-                    <span style={{ color: "#444", fontSize: 10, fontFamily: typography.fontMono, flexShrink: 0, paddingTop: 1 }}>{log.ts || ""}</span>
-                    <span style={{ color: c, fontSize: 11, fontFamily: typography.fontMono, flex: 1, wordBreak: "break-word" }}>
+                    <span className="mono-text" style={{ color: "#444", fontSize: 10, flexShrink: 0, paddingTop: 1 }}>{log.ts || ""}</span>
+                    <span className="mono-text" style={{ color: c, fontSize: 11, flex: 1, wordBreak: "break-word" }}>
                       {log.admin_only && <span style={{ color: colors.gold, border: `1px solid ${colors.gold}44`, padding: "1px 4px", borderRadius: 4, marginRight: 6, fontSize: 9 }}>DEV</span>}
                       {log.msg || String(log)}
                     </span>
@@ -724,9 +724,9 @@ export default function Admin() {
               {auditLog.length === 0 && <div style={{ color: "#333", fontSize: 11 }}>No admin actions yet this session.</div>}
               {auditLog.map((e, i) => (
                 <div key={i} style={{ display: "flex", gap: 10, padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.02)" }}>
-                  <span style={{ color: "#444", fontSize: 10, fontFamily: typography.fontMono, flexShrink: 0 }}>{new Date(e.ts).toLocaleTimeString()}</span>
+                  <span className="mono-text" style={{ color: "#444", fontSize: 10, flexShrink: 0 }}>{new Date(e.ts).toLocaleTimeString()}</span>
                   <span style={{ color: colors.gold, fontSize: 10, flexShrink: 0 }}>{e.admin}</span>
-                  <span style={{ color: "#aaa", fontSize: 11, fontFamily: typography.fontMono }}>{e.action}</span>
+                  <span className="mono-text" style={{ color: "#aaa", fontSize: 11 }}>{e.action}</span>
                 </div>
               ))}
             </div>
@@ -741,13 +741,13 @@ export default function Admin() {
 
 // ─── Gate Styles ───────────────────────────────────────────────────────────────
 const gs = {
-  overlay: { minHeight: "100vh", background: "#050505", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Inter', sans-serif" },
+  overlay: { minHeight: "100vh", background: "#050505", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 },
   card: { width: "100%", maxWidth: 420, background: "rgba(12,12,12,0.95)", border: "1px solid rgba(212,175,55,0.12)", borderRadius: 28, padding: "44px 36px 36px", boxShadow: "0 24px 80px rgba(0,0,0,0.7)", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", backdropFilter: "blur(20px)" },
   iconRing: { width: 72, height: 72, borderRadius: "50%", background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.2)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 40px rgba(212,175,55,0.08)", marginBottom: 24 },
   title: { fontFamily: typography.fontDisplay, fontSize: 20, fontWeight: 800, letterSpacing: 4, color: colors.gold, margin: "0 0 10px", textShadow: `0 0 20px ${colors.gold}22` },
   sub: { fontSize: 13, color: colors.muted, lineHeight: 1.6, margin: "0 0 28px", maxWidth: 280 },
   row: { display: "flex", gap: 10, marginBottom: 20 },
-  digit: { width: 46, height: 58, borderRadius: 12, background: "rgba(255,255,255,0.03)", color: colors.gold, fontSize: 24, fontFamily: typography.fontMono, fontWeight: 700, textAlign: "center", outline: "none", transition: "all 0.2s ease", caretColor: "transparent" },
+  digit: { width: 46, height: 58, borderRadius: 12, background: "rgba(255,255,255,0.03)", color: colors.gold, fontSize: 24, fontWeight: 700, textAlign: "center", outline: "none", transition: "all 0.2s ease", caretColor: "transparent" },
   err: { display: "flex", alignItems: "center", color: colors.error, fontSize: 12, marginBottom: 16, background: "rgba(192,57,43,0.08)", border: `1px solid ${colors.error}22`, padding: "8px 14px", borderRadius: 8, textAlign: "left", width: "100%" },
   btn: { width: "100%", padding: 16, borderRadius: 14, background: `linear-gradient(135deg, ${colors.gold}cc, ${colors.gold}88)`, border: "none", color: "#000", fontSize: 14, fontWeight: 900, letterSpacing: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.3s ease", marginBottom: 16 },
   link: { background: "none", border: "none", color: colors.muted, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", opacity: 0.7, letterSpacing: 0.5 },
@@ -755,14 +755,14 @@ const gs = {
 
 // ─── Admin Console Styles ──────────────────────────────────────────────────────
 const s = {
-  container: { minHeight: "100vh", background: "#050505", color: "#E0E0E0", fontFamily: "'Inter', sans-serif", display: "flex", justifyContent: "center", padding: "40px 16px" },
+  container: { minHeight: "100vh", background: "#050505", color: "#E0E0E0", display: "flex", justifyContent: "center", padding: "40px 16px" },
   page: { width: "100%", maxWidth: 1100 },
   header: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 },
   backBtn: { background: "none", border: "none", color: colors.muted, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center" },
   title: { fontFamily: typography.fontDisplay, fontSize: 28, letterSpacing: 6, color: colors.gold, margin: 0, textShadow: `0 0 20px ${colors.gold}22` },
   badge: { fontSize: 10, letterSpacing: 2, padding: "4px 12px", borderRadius: 20, background: "rgba(212,175,55,0.1)", border: `1px solid ${colors.gold}33`, color: colors.gold, fontWeight: 800 },
   tabs: { display: "flex", gap: 6, marginBottom: 24, flexWrap: "wrap" },
-  tab: { padding: "8px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: colors.muted, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", fontFamily: "'Inter', sans-serif", transition: "all 0.2s ease", letterSpacing: 0.5 },
+  tab: { padding: "8px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: colors.muted, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", transition: "all 0.2s ease", letterSpacing: 0.5 },
   tabActive: { background: "rgba(212,175,55,0.1)", border: `1px solid ${colors.gold}44`, color: colors.gold },
   section: { background: "rgba(15,15,15,0.6)", backdropFilter: "blur(20px)", border: "1px solid", borderRadius: 20, padding: 28, boxShadow: "0 10px 40px rgba(0,0,0,0.3)", marginBottom: 20 },
   sTitle: { fontSize: 11, letterSpacing: 3, color: colors.muted, textTransform: "uppercase", margin: 0, fontWeight: 700 },
@@ -777,12 +777,12 @@ const s = {
   tr: { transition: "background 0.15s ease" },
   td: { padding: "9px 12px", fontSize: 12, borderBottom: "1px solid rgba(255,255,255,0.03)", whiteSpace: "nowrap" },
   smBtn: { padding: "4px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: colors.muted, cursor: "pointer", fontSize: 10, display: "flex", alignItems: "center" },
-  searchInput: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "#E0E0E0", fontSize: 12, outline: "none", boxSizing: "border-box", fontFamily: "'Inter', sans-serif" },
+  searchInput: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "#E0E0E0", fontSize: 12, outline: "none", boxSizing: "border-box" },
   label: { display: "block", fontSize: 11, color: colors.muted, marginBottom: 8, letterSpacing: 1 },
-  select: { width: "100%", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#E0E0E0", fontSize: 12, outline: "none", fontFamily: "'Inter', sans-serif", cursor: "pointer" },
-  input: { width: "100%", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#E0E0E0", fontSize: 12, outline: "none", boxSizing: "border-box", fontFamily: "'Inter', sans-serif" },
+  select: { width: "100%", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#E0E0E0", fontSize: 12, outline: "none", cursor: "pointer" },
+  input: { width: "100%", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#E0E0E0", fontSize: 12, outline: "none", boxSizing: "border-box" },
   logBox: { background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.04)", borderRadius: 12, padding: 16, height: 380, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 },
-  refreshBtn: { background: "none", border: `1px solid ${colors.muted}44`, color: colors.muted, padding: "8px 16px", borderRadius: 8, fontSize: 11, cursor: "pointer", fontFamily: "'Inter', sans-serif" },
+  refreshBtn: { background: "none", border: `1px solid ${colors.muted}44`, color: colors.muted, padding: "8px 16px", borderRadius: 8, fontSize: 11, cursor: "pointer" },
   modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, backdropFilter: "blur(6px)" },
   modal: { background: "#111", border: `1px solid ${colors.gold}33`, borderRadius: 20, padding: 28, width: 340, boxShadow: "0 24px 80px rgba(0,0,0,0.7)" },
   footer: { marginTop: 60, textAlign: "center", color: "#333", fontSize: 10, letterSpacing: 2 },

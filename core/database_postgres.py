@@ -850,3 +850,24 @@ def db_save_log(msg: str, log_type: str):
         )
     log_level = {"error": "error", "warning": "warning", "success": "info"}.get(log_type, "debug")
     file_log(msg, log_level)
+
+
+def db_save_admin_log(admin_email: str, action: str):
+    """Save an admin action to the persistent audit log (Postgres)."""
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO app_admin_audit_log (admin_email, action, ts) VALUES (%s, %s, %s)",
+            (admin_email, action, datetime.now().isoformat() + "Z"),
+        )
+
+
+def db_get_admin_logs(limit: int = 100) -> list[dict]:
+    """Retrieve the most recent admin audit logs (Postgres)."""
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT admin_email as admin, action, ts FROM app_admin_audit_log ORDER BY id DESC LIMIT %s",
+            (limit,),
+        )
+        return [dict(r) for r in cur.fetchall()]

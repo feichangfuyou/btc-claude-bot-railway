@@ -55,6 +55,7 @@ export const typography = {
   fontMono: "'Space Mono', monospace",
   fontDisplay: "'Montserrat', sans-serif",
   fontButton: "'Montserrat', sans-serif",
+  fontBody: "'Inter', sans-serif",
   sizeXs: 9,
   sizeSm: 10,
   sizeMd: 11,

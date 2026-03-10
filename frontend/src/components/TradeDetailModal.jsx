@@ -15,18 +15,18 @@ export function TradeDetailModal({ tradeDetail, closeTradeDetail, tradeDetailLoa
   const authParam = getAuthQueryParam();
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(6,6,15,0.97)", zIndex: 9999, display: "flex", flexDirection: "column", animation: "fadein 0.2s ease", overflow: "auto" }}
+    <div className="glass-overlay fadein" style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", flexDirection: "column", overflow: "auto", padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}
       onClick={closeTradeDetail}>
-      <div style={{ maxWidth: "min(1100px, calc(100vw - 24px))", width: "100%", margin: "max(12px, env(safe-area-inset-top)) auto 20px", padding: "0 clamp(12px, 4vw, 20px)", boxSizing: "border-box" }} ref={popIn} onClick={e => e.stopPropagation()}>
+      <div className="glass-heavy" style={{ maxWidth: "min(1100px, calc(100vw - 24px))", width: "100%", margin: "24px auto", padding: "24px", boxSizing: "border-box", animation: "fadein 0.35s ease", position: "relative" }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "22px", color: "#D4AF37", letterSpacing: "4px" }}>TRADE REVIEW</span>
+            <span className="section-label" style={{ fontSize: "22px", color: "#D4AF37", letterSpacing: "4px" }}>TRADE REVIEW</span>
             <span className="tag" style={{ background: tradeDetail.trade?.win ? "#00E67618" : "#FF174418", color: tradeDetail.trade?.win ? "#00E676" : "#FF1744", fontSize: "11px", padding: "3px 10px" }}>
               {tradeDetail.trade?.win ? "WIN" : "LOSS"}
             </span>
           </div>
-          <button className="btn btn-d" onClick={closeTradeDetail} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#FF1744", borderColor: "#FF174433", padding: "6px 14px" }}><X size={14} /> CLOSE</button>
+          <button className="btn btn-r" onClick={closeTradeDetail} style={{ width: "36px", height: "36px", borderRadius: "50%", padding: 0, minWidth: "36px", minHeight: "36px" }}><X size={18} /></button>
         </div>
 
         {/* Trade Summary Bar */}

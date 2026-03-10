@@ -187,8 +187,10 @@ def udb_get_equity_curve(user_id: str, limit: int = 500) -> list[dict]:
 def udb_save_audit_entry(user_id: str, entry: dict):
     """Save a decision audit log entry."""
     sb = get_supabase()
-    decision = entry.get("decision", {})
-    adversary = entry.get("adversary", {})
+    from core.sanitizer import sanitize_dict
+    decision = sanitize_dict(entry.get("decision", {}))
+    adversary = sanitize_dict(entry.get("adversary", {}))
+    order_json = sanitize_dict(entry.get("order"))
     sb.table("user_audit_log").insert(
         {
             "user_id": user_id,
@@ -202,7 +204,7 @@ def udb_save_audit_entry(user_id: str, entry: dict):
             "key_signals": decision.get("key_signals", []),
             "market_condition": decision.get("market_condition", ""),
             "confluence_score": decision.get("confluence_score", 0),
-            "order_json": entry.get("order"),
+            "order_json": order_json,
             "model_used": entry.get("model_used", "unknown"),
             "stage": entry.get("stage", "unknown"),
             "adversary_verdict": adversary.get("verdict", "none"),

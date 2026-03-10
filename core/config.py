@@ -19,6 +19,7 @@ ANTHROPIC_API_KEYS = (
 )
 COINBASE_API_KEY = os.getenv("COINBASE_API_KEY", "")
 COINBASE_API_SECRET = os.getenv("COINBASE_API_SECRET", "")
+CRYPTOPANIC_API_KEY = os.getenv("CRYPTOPANIC_API_KEY", "")
 PAPER_TRADING = os.getenv("PAPER_TRADING", "true").lower() == "true"
 START_BALANCE = float(os.getenv("START_BALANCE", "1000"))  # Paper wallet starting capital ($1k realistic seed)
 TARGET_BALANCE = float(os.getenv("TARGET_BALANCE", "5000"))  # Goal: grow 1k → 5k
@@ -140,6 +141,8 @@ COINBASE_REST_TICKER = "https://api.exchange.coinbase.com/products"
 # When this email logs in, use .env exchange keys instead of user_exchanges.
 # Lets the dev use personal keys without storing them in Supabase.
 DEV_USER_EMAIL = (os.getenv("DEV_USER_EMAIL") or "").strip()
+# Comma-separated list of emails with admin/system access
+ADMIN_EMAILS = os.getenv("ADMIN_EMAILS", "feichangfuyou@gmail.com")
 
 # ─── Kraken (spot CEX) ───────────────────────────────────────────────────────
 ENABLE_KRAKEN = os.getenv("ENABLE_KRAKEN", "false").lower() == "true"

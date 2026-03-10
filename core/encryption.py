@@ -50,37 +50,55 @@ def _get_fernet_key() -> bytes | None:
     return None
 
 
+def generate_dek() -> str:
+    """Generate a new unique Data Encryption Key (DEK)."""
+    return Fernet.generate_key().decode()
+
+
+def encrypt_with_key(plain: str, key_str: str) -> str | None:
+    """Encrypt a string using a specific key (e.g. a user's DEK)."""
+    if not plain or not key_str:
+        return plain
+    try:
+        f = Fernet(key_str.encode())
+        return f.encrypt(plain.encode()).decode()
+    except Exception as e:
+        logger.warning(f"Encryption with key failed: {e}")
+        return None
+
+
+def decrypt_with_key(cipher: str, key_str: str) -> str | None:
+    """Decrypt a string using a specific key (e.g. a user's DEK)."""
+    if not cipher or not key_str:
+        return cipher
+    try:
+        f = Fernet(key_str.encode())
+        return f.decrypt(cipher.encode()).decode()
+    except InvalidToken:
+        return None
+    except Exception as e:
+        logger.warning(f"Decryption with key failed: {e}")
+        return None
+
+
 def encrypt_plaintext(plain: str) -> str | None:
-    """Encrypt a string. Returns base64-encoded ciphertext or None if encryption unavailable."""
+    """Encrypt using the SYSTEM Master Key (KEK). Use for DEKs or legacy config."""
     if not plain:
         return plain
     key = _get_fernet_key()
     if not key:
         return None
-    try:
-        f = Fernet(key)
-        return f.encrypt(plain.encode()).decode()
-    except Exception as e:
-        logger.warning(f"Encryption failed: {e}")
-        return None
+    return encrypt_with_key(plain, key.decode())
 
 
 def decrypt_ciphertext(cipher: str) -> str | None:
-    """Decrypt a base64-encoded ciphertext. Returns plaintext or None on failure."""
+    """Decrypt using the SYSTEM Master Key (KEK)."""
     if not cipher:
         return cipher
     key = _get_fernet_key()
     if not key:
         return None
-    try:
-        f = Fernet(key)
-        return f.decrypt(cipher.encode()).decode()
-    except InvalidToken:
-        # Could be legacy plaintext or wrong key; don't replace in get_user_exchange_keys
-        return None
-    except Exception as e:
-        logger.warning(f"Decryption failed: {e}")
-        return None
+    return decrypt_with_key(cipher, key.decode())
 
 
 def is_encryption_available() -> bool:

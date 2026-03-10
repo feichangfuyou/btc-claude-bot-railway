@@ -78,6 +78,7 @@ from feeds.price_feeds import (
     stats_refresh_cycle,
 )
 from learning.memory_compactor import run_synthesis_loop, should_compact
+from learning.meta_reviewer import run_meta_review, should_run_review
 from learning.trade_memory import run_learning_cycle
 from strategy.trading_presets import PRESETS
 
@@ -157,7 +158,9 @@ async def _safe_claude_call(skip_scout: bool = False):
     """Wrapper so create_task exceptions are logged instead of silently lost.
     skip_scout=True: skip scout, go straight to trade model (manual Ask Claude)."""
     try:
-        await call_claude(bot, broadcast_price, skip_scout=skip_scout)
+        # Manual/Ask Claude: Use the user's specific tier limits
+        user_tier = getattr(bot, "subscription_tier", "starter")
+        await call_claude(bot, broadcast_price, skip_scout=skip_scout, tier=user_tier)
     except Exception as e:
         bot.add_log(f"Claude call crashed: {str(e)[:80]}", "error")
 
@@ -281,24 +284,28 @@ async def hub_scan_cycle(tier: str):
 
             if active_users > 0:
                 # Master Scan for this tier
-                # We skip_scout for Elite to ensure they get Opus every time
-                skip_scout = (tier == "elite")
+                # ELITE optimization: Use Sonnet scouting instead of direct Opus
+                # to maintain high quality while cutting scan costs by 80%.
+                skip_scout = False
 
-                # Perform analysis using the shared 'bot' state (prices/feeds)
-                # But we'll override the model for this specific call
+                # Perform analysis
                 bot.claude_model = model
 
-                # This call will populate bot.claude_decision
-                await call_claude(bot, broadcast_price, skip_scout=skip_scout, coin_limit=coin_limit)
+                # Point 1 & 2: Adaptive interval (slow down in ranging/choppy, speed up in volatile)
+                adaptive_int = _adaptive_interval()
+                final_interval = max(interval, adaptive_int)
 
-                # Point 1 & 2: Broadcast to all eligible users
+                # This call will populate bot.claude_decision
+                await call_claude(bot, broadcast_price, skip_scout=skip_scout, coin_limit=coin_limit, tier=tier)
+
+                # Point 3: Broadcast to all eligible users
                 if bot.claude_decision:
                     await bot_manager.broadcast_managed_signal(
                         bot.claude_decision,
                         tier=tier
                     )
 
-                await asyncio.sleep(interval)
+                await asyncio.sleep(final_interval)
             else:
                 await asyncio.sleep(10) # Wait for users to join
 
@@ -325,6 +332,26 @@ async def snapshot_cycle():
         except Exception as e:
             bot.add_log(f"Snapshot cycle error: {str(e)[:60]}", "error")
             await asyncio.sleep(60)
+
+
+async def meta_review_cycle():
+    """Multi-timeframe Self-Correction (Daily, Weekly, Monthly)."""
+    while True:
+        try:
+            for timeframe in ["daily", "weekly", "monthly"]:
+                if should_run_review(timeframe):
+                    bot.add_log(f"🧠 Starting {timeframe.upper()} Strategic Review (Market Intelligence)...", "claude")
+                    res = await run_meta_review(timeframe)
+                    if res.get("success"):
+                        bot.add_log(f"✅ {timeframe.capitalize()} Mandated updated.", "success")
+                    elif "error" in res:
+                        # Log error but don't stop the whole cycle
+                        bot.add_log(f"⚠ {timeframe.capitalize()} Meta-Review failed: {res['error'][:60]}", "warning")
+        except Exception as e:
+            bot.add_log(f"Meta-Review cycle error: {str(e)[:60]}", "error")
+        
+        # Check all periods every 30 minutes
+        await asyncio.sleep(1800)
 
 
 async def learning_cycle():
@@ -371,6 +398,8 @@ async def compaction_cycle():
                         f"🧬 Compaction complete: {result.get('rules_count', 0)} rules synthesized",
                         "success",
                     )
+                elif result.get("skipped"):
+                    bot.add_log(f"🧬 Compaction paused: {result['reason']}", "dim")
                 elif result.get("error"):
                     bot.add_log(f"Compaction error: {result['error'][:60]}", "dim")
             await asyncio.sleep(300)
@@ -448,7 +477,7 @@ async def lifespan(app: FastAPI):
     _shared._PRESETS_CACHE = None
 
     bot.add_log(
-        f"🚀 ClaudeBot v7 starting... ({len(ACTIVE_COINS)} coins: {', '.join(ACTIVE_COINS)})",
+        f"🚀 Institutional Trading v7 starting... ({len(ACTIVE_COINS)} coins: {', '.join(ACTIVE_COINS)})",
         "info",
     )
     from core.anthropic_keys import pool_size
@@ -457,7 +486,7 @@ async def lifespan(app: FastAPI):
     _claude_status = (
         f"✅ ready ({_key_count} key{'s' if _key_count > 1 else ''})" if _key_count else "❌ no key in .env"
     )
-    bot.add_log(f"  Claude:   {_claude_status}", "info")
+    bot.add_log(f"  Models:   {_claude_status}", "info")
 
     if COINBASE_API_KEY and COINBASE_API_SECRET:
         bot.add_log("  Coinbase: ✅ authenticated WS", "info")
@@ -566,6 +595,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(hub_scan_cycle("starter"))
     asyncio.create_task(hub_scan_cycle("pro"))
     asyncio.create_task(hub_scan_cycle("elite"))
+    asyncio.create_task(meta_review_cycle())
 
     asyncio.create_task(bot_cycle())
 
@@ -619,14 +649,21 @@ async def lifespan(app: FastAPI):
 
 # ─── FastAPI app ─────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="ClaudeBot Backend",
+    title="Institutional Trading Backend",
     lifespan=lifespan,
     docs_url=None, # Disable Swagger UI for security
     redoc_url=None, # Disable Redoc for security
 )
 
-_DEFAULT_CORS = "https://doyou.trade,https://www.doyou.trade,http://localhost:5173,http://127.0.0.1:5173"
+_DEFAULT_CORS = "https://doyou.trade,https://www.doyou.trade"
+_DEV_CORS = "http://localhost:5173,http://127.0.0.1:5173"
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", _DEFAULT_CORS).split(",") if o.strip()]
+
+# Only allow localhost/dev origins if explicitly in development
+if os.getenv("RAILWAY_ENVIRONMENT", "development") == "development":
+    for o in _DEV_CORS.split(","):
+        if o not in ALLOWED_ORIGINS:
+            ALLOWED_ORIGINS.append(o)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -675,7 +712,14 @@ if API_SECRET:
             token = (request.headers.get("x-bot-secret") or request.query_params.get("secret") or "").strip()
             jwt_token = (request.query_params.get("token") or "").strip()
             auth_header = request.headers.get("authorization", "")
-            secret_ok = token == API_SECRET
+            secret_ok = False
+            if token == API_SECRET:
+                client_ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+                            or (request.client.host if request.client else "unknown") or "unknown")
+                # Only allow BOT_API_SECRET for localhost (service-to-service)
+                if client_ip in ("127.0.0.1", "::1", "localhost"):
+                    secret_ok = True
+
             bearer_ok = False
             if auth_header.startswith("Bearer "):
                 bearer_token = auth_header[7:].strip()

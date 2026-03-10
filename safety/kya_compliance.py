@@ -94,6 +94,7 @@ def hash_reasoning(decision: dict) -> str:
         "key_signals": sorted(decision.get("key_signals", [])),
         "patterns_detected": sorted(decision.get("patterns_detected", [])),
         "market_condition": decision.get("market_condition", ""),
+        "regime": decision.get("regime", decision.get("market_condition", "")),
         "confluence_score": decision.get("confluence_score", 0),
     }
 
@@ -172,6 +173,7 @@ def build_audit_entry(
             "key_signals": decision.get("key_signals", []),
             "patterns_detected": decision.get("patterns_detected", []),
             "market_condition": decision.get("market_condition", ""),
+            "regime": decision.get("regime", decision.get("market_condition", "")),
             "confluence_score": decision.get("confluence_score", 0),
         },
         "order": decision.get("order"),

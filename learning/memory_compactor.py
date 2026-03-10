@@ -164,7 +164,10 @@ async def run_synthesis_loop() -> dict:
             )
         data = r.json()
         if "error" in data:
-            return {"error": data["error"].get("message", "API error")}
+            msg = data["error"].get("message", "API error")
+            if "credit balance" in msg.lower():
+                return {"skipped": True, "reason": "Anthropic API: Credit balance too low"}
+            return {"error": msg}
 
         raw_text = "".join(b.get("text", "") for b in data.get("content", []))
         rules_data = _extract_rules_json(raw_text)

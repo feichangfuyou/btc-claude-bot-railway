@@ -74,14 +74,13 @@ function TickerItem({
 
   return (
     <button
-      className="coin-btn"
+      className={`coin-btn ticker-text ${isSelected ? "selected" : ""}`}
       onClick={onClick}
       style={{
         display: "flex",
         alignItems: "center",
         gap: "5px",
         flexShrink: 0,
-        fontFamily: "'Space Mono',monospace",
         fontSize: "10px",
         fontWeight: "700",
         padding: "5px 10px",

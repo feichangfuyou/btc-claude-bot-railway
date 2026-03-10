@@ -117,7 +117,7 @@ const COIN_CATEGORIES = {
   "DeFi": ["UNI", "AAVE", "MKR", "CRV", "LDO", "COMP", "SNX", "BAL", "YFI", "1INCH", "SUSHI", "DYDX", "GMX", "PENDLE", "ENA", "ETHFI", "EIGEN", "MORPHO"],
   "L2 / Ecosystem": ["OP", "ARB", "MATIC", "STRK", "IMX", "ZK", "MANTA", "SCROLL", "METIS", "BOBA", "BLAST", "BASE", "CYBER", "TAIKO"],
   "Gaming / Meta": ["AXS", "SAND", "MANA", "ENJ", "GALA", "ILV", "GODS", "YGG", "PYR", "RON", "SLP", "PRIME", "BEAM", "MAGIC"],
-  "AI / Data": ["FET", "AGIX", "OCEAN", "RNDR", "WLD", "TAO", "GRT", "NMR", "ARKM", "AIXBT", "VIRTUAL", "KAITO", "ATH"],
+  "Intelligence / Data": ["FET", "AGIX", "OCEAN", "RNDR", "WLD", "TAO", "GRT", "NMR", "ARKM", "AIXBT", "VIRTUAL", "KAITO", "ATH"],
   "RWA / Infra": ["ONDO", "POLYX", "CFG", "MPL", "TRU", "PRCL", "ALTA", "QRDO", "POL", "CELESTIA", "TIA", "PYTH", "JTO", "JUP", "WEN"],
 };
 const ALL_COINS = [...new Set(Object.values(COIN_CATEGORIES).flat())];
@@ -625,6 +625,7 @@ export default function Settings() {
                 placeholder="Search symbols..."
                 value={coinSearch}
                 onChange={e => setCoinSearch(e.target.value)}
+                className="mono-text"
                 style={{ ...styles.input, flex: 2, padding: "6px 10px" }}
               />
               <div style={{ display: "flex", flex: 1, gap: 4 }}>
@@ -642,6 +643,7 @@ export default function Settings() {
                       }
                     }
                   }}
+                  className="mono-text"
                   style={{ ...styles.input, padding: "6px 10px", width: "100%" }}
                 />
                 <button 
@@ -756,7 +758,7 @@ export default function Settings() {
                 </div>
               </div>
               <div style={styles.capitalNote}>
-                <Zap size={14} /> <strong>Why these limits?</strong> A ${backendConfig.min_trade_usd} trade costs ~${(backendConfig.min_trade_usd * backendConfig.round_trip_fee).toFixed(2)} in exchange fees + AI costs. We require the take-profit to net at least ${backendConfig.min_profit_after_costs} above all costs.
+                <Zap size={14} /> <strong>Why these limits?</strong> A ${backendConfig.min_trade_usd} trade costs ~${(backendConfig.min_trade_usd * backendConfig.round_trip_fee).toFixed(2)} in exchange fees + system costs. We require the take-profit to net at least ${backendConfig.min_profit_after_costs} above all costs.
               </div>
             </div>
 
@@ -792,8 +794,8 @@ export default function Settings() {
             const closeModal = () => { setKeyModal(false); setApiKey(""); setApiSecret(""); setApiPassphrase(""); setWalletAddress(""); setKeyError(""); };
 
             return (
-              <div style={styles.modalOverlay} onClick={closeModal}>
-                <div style={styles.modal} className="settings-modal" onClick={e => e.stopPropagation()}>
+              <div className="glass-overlay fadein" style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={closeModal}>
+                <div className="glass-heavy" style={{ maxWidth: "460px", width: "calc(100% - 32px)", padding: "28px", boxSizing: "border-box", animation: "fadein 0.35s ease", position: "relative" }} onClick={e => e.stopPropagation()}>
                   <h3 style={styles.modalTitle}>Connect New Exchange</h3>
                   
                   <select 
@@ -910,7 +912,6 @@ export default function Settings() {
 
 const styles = {
   container: {
-    fontFamily: typography.fontMono,
     background: colors.dark,
     color: colors.text,
     minHeight: "100dvh",

@@ -76,9 +76,9 @@ export default function Signup() {
   const [oauthLoading, setOauthLoading] = useState(null);
   
   useEffect(() => {
-    document.title = "Join DoYou.trade — Create Your Trading Account";
+    document.title = "Join DoYou.trade — Create Your Advanced Trading Account";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Start your non-custodial trading journey today. Create a secure account on DoYou.trade and automate your crypto portfolio.");
+    if (meta) meta.setAttribute("content", "Start your non-custodial trading journey today. Create a secure, professional-grade account on DoYou.trade and automate your crypto portfolio with institutional speed.");
   }, []);
 
   async function handleSubmit(e) {
@@ -129,7 +129,7 @@ export default function Signup() {
     <div className="landing-container">
       <nav className="landing-nav">
         <Link to="/" className="landing-nav__logo">
-          <img src="/Bravo.svg" alt="Logo" style={{ width: "32px" }} />
+          <img src="/Bravo.svg" alt="DoYou.trade Professional Trading Terminal" style={{ width: "32px" }} />
           <span className="auth-brand" style={{ fontSize: "20px", letterSpacing: "3px" }}>DOYOU.TRADE</span>
         </Link>
         <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
@@ -300,7 +300,7 @@ export default function Signup() {
         </div>
         <div style={{ textAlign: "center", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "40px" }}>
           <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-            <img src="/Bravo.svg" alt="DoYou Trade Logo" style={{ width: "20px", opacity: 0.5 }} />
+            <img src="/Bravo.svg" alt="DoYou.trade Logo" style={{ width: "20px", opacity: 0.5 }} />
             <span style={{ opacity: 0.3 }}>&copy; 2025 DOYOU.TRADE. ALL RIGHTS RESERVED.</span>
           </div>
         </div>

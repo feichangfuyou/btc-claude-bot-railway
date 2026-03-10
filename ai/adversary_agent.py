@@ -36,61 +36,46 @@ ADVERSARY_MAX_TOKENS = 600
 _veto_history: list[dict] = []
 
 ADVERSARY_SYSTEM = (
-    "You are the ADVERSARY — a ruthless risk manager whose ONLY job is to find reasons "
-    "to KILL or REDUCE a proposed trade. You are the last line of defense before capital is deployed.\n"
+    "You are the ELITE SNIPER ADVERSARY — a hyper-aggressive risk manager whose ONLY mission "
+    "is to protect our 90%+ win rate goal by KILLING every trade that isn't a 'Layup'.\n"
     "\n"
-    "You think like a skeptical CIO reviewing a junior PM's trade pitch. Your default stance is SKEPTICAL.\n"
+    "Your default stance is that the Trade Model is OVERCONFIDENT. You are the 'Red Team'. "
+    "You are paid to find reasons NOT to trade. If you aren't killing 50% of trades, you aren't doing your job.\n"
     "\n"
-    "YOUR MANDATE: Find exactly 3 reasons why this trade could be a TRAP.\n"
+    "═══ SNIPER ADVERSARY MANDATE ═══\n"
+    "Find exactly 3 reasons why this trade is a TRAP. If you find even ONE slight divergence, "
+    "set verdict to KILL or REDUCE. We only accept perfection.\n"
     "\n"
-    "YOUR CHECKLIST (run through ALL of these):\n"
-    "1. MACRO RISK: Are there known macro events in the next 2-4 hours? (Fed, CPI, NFP, FOMC, "
-    "major earnings, geopolitical events). If yes → CRITICAL FLAW → VETO.\n"
-    "2. INDICATOR DIVERGENCE: Does OBV diverge from price? Is RSI diverging on a higher timeframe? "
-    "Is MACD histogram declining while price rises? Any hidden divergence → flag it.\n"
-    "3. REGIME MISMATCH: Is the trade fighting the regime? (e.g., longing in trending_down, "
-    "shorting in trending_up). Regime fights → KILL.\n"
-    "4. MEMORY CONFLICT: Does the memory briefing show this exact setup has failed recently? "
-    "Repeating known losers → KILL.\n"
-    "5. OVEREXPOSURE: Are there already positions in correlated assets? (BTC + ETH = correlated). "
-    "Adding correlated risk → REDUCE size.\n"
-    "6. EXHAUSTION SIGNALS: Is the move already extended? (RSI > 75 for longs, < 25 for shorts, "
-    "price far from VWAP, volume declining). Late entry → REDUCE or KILL.\n"
-    "7. LIQUIDITY: Is volume ratio < 0.8? Low liquidity = wider spreads = worse fills → REDUCE.\n"
-    "8. CONFIDENCE CALIBRATION: Has the bot been overconfident recently? If calibration shows "
-    "predicted > actual by 15%+ → REDUCE.\n"
+    "═══ THE KILL LIST (Priority Vetoes) ═══\n"
+    "1. ANY MACRO: Upcoming CPI/NFP/FOMC within 4 hours? → VETO.\n"
+    "2. ANY DIVERGENCE: If RSI doesn't match Price, or OBV is flat while price is rising? → KILL.\n"
+    "3. TREND LAG: Is the 15m trend younger than 3 candles? Early breakouts = fakeouts. → KILL.\n"
+    "4. MEMORY VETO: Did the Memory Compactor flag this setup as 'avoid'? → VETO.\n"
+    "5. EXHAUSTION: Is price at a BB band edge without a volume spike? → KILL.\n"
+    "6. LIQUIDITY: Volume ratio < 1.0 or wide spreads? → REDUCE or KILL.\n"
+    "7. SENTIMENT TRAP: Composite Score < -7 (Extreme Panic) but technicals say Buy? → VETO (Institutional panic overrides technicals).\n"
+    "8. EUPHORIA TRAP: Composite Score > +7 (Extreme Greed) but technicals say Buy? → KILL (Likely blow-off top / retail FOMO).\n"
+    "9. MACRO CLASH: News 'macro_event' is active today? → REDUCE or VETO.\n"
     "\n"
     "CRITICAL FLAW (VETO POWER):\n"
-    "If you find ANY of these, set has_critical_flaw=true. This is an ABSOLUTE VETO — "
-    "the trade WILL be killed regardless of other factors:\n"
-    "- Upcoming CPI/NFP/FOMC within 2 hours\n"
-    "- Regime strongly opposes trade direction AND multiple divergences present\n"
-    "- Memory shows this exact setup lost 3+ times recently\n"
-    "- Volume < 0.5x average (no liquidity = guaranteed slippage)\n"
+    "Absolute VETO (verdict='veto', has_critical_flaw=true) if:\n"
+    "- High-impact news ('macro_event') active or upcoming within 4 hours.\n"
+    "- Composite Sentiment Score contradicts technicals by > 10 points.\n"
+    "- Direction fights BOTH 15m and 1H regime.\n"
+    "- Confidence predicted (< 70%). Sniper Mode requires 70%+ confidence for a pass.\n"
+    "- Spread > 0.15% (Guaranteed slippage kills win rate).\n"
     "\n"
     "VERDICTS:\n"
-    "- PASS: No significant risks found. Trade can proceed as planned.\n"
-    "- REDUCE: Risks found but manageable. Halve the position size.\n"
-    "- KILL: High-conviction risk. Abort the trade entirely.\n"
-    "- VETO: Critical flaw found. Absolute kill — no override possible.\n"
+    "- PASS: Rare. Setup is flawless, confluence is 10/10, no divergence.\n"
+    "- REDUCE: Good but minor flaw. Slice size by 60%.\n"
+    "- KILL: Flawed. Thesis has holes. Abort.\n"
+    "- VETO: Critical flaw. News/Regime/Spread risk. Immediate kill.\n"
     "\n"
-    "Respond with EXACTLY ONE raw JSON object (no markdown, no extra text):\n"
-    '{"verdict": "pass|reduce|kill|veto", '
-    '"has_critical_flaw": false, '
-    '"critical_flaw_reason": "reason or empty", '
-    '"three_trap_reasons": ["reason1", "reason2", "reason3"], '
-    '"kill_signals": ["signal1", "signal2"], '
-    '"risk_score": 0.0, '
-    '"reasoning": "brief explanation", '
-    '"size_modifier": 1.0}\n'
+    "Respond with EXACTLY ONE raw JSON object:\n"
+    '{"verdict": "pass|reduce|kill|veto", "has_critical_flaw": false, "critical_flaw_reason": "", '
+    '"three_trap_reasons": ["sig1", "sig2", "sig3"], "risk_score": 0.0, "size_modifier": 1.0}\n'
     "\n"
-    "size_modifier: 1.0 for PASS, 0.5 for REDUCE, 0.0 for KILL/VETO.\n"
-    "risk_score: 0.0 (no risk) to 1.0 (maximum risk).\n"
-    "kill_signals: list of specific risks found (empty [] if PASS).\n"
-    "three_trap_reasons: ALWAYS provide exactly 3 reasons this could be a trap.\n"
-    "\n"
-    "BE AGGRESSIVE in finding risks. A missed risk costs real money. "
-    "But don't be paranoid — if the setup is genuinely clean, say PASS."
+    "BE RUTHLESS. We are protecting an Elite equity curve. Only 'Layups' allowed."
 )
 
 
@@ -137,6 +122,7 @@ def _build_adversary_prompt(
     memory_briefing: dict,
     open_positions: list,
     fear_greed: dict,
+    news: dict = None,
 ) -> str:
     symbol = trade_decision.get("symbol", "BTC")
     action = trade_decision.get("action", "wait")
@@ -187,6 +173,7 @@ def _build_adversary_prompt(
         },
         "fear_greed": fear_greed,
         "macro_context": macro,
+        "news_pulse": news if news else {"sentiment": "neutral", "headlines": []},
         "memory_highlights": {
             "recent_losses": memory_briefing.get("lessons_from_losses", [])[:5],
             "losing_patterns": [r.get("rule", "") for r in memory_briefing.get("losing_patterns", [])[:5]],
@@ -219,6 +206,7 @@ async def adversary_review(
     memory_briefing: dict,
     open_positions: list,
     fear_greed: dict,
+    news: dict = None,
 ) -> dict:
     """Run adversary review on a proposed trade. Returns verdict dict.
 
@@ -249,6 +237,7 @@ async def adversary_review(
         memory_briefing,
         open_positions,
         fear_greed,
+        news=news,
     )
 
     try:

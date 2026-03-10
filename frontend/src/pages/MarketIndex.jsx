@@ -139,8 +139,7 @@ function PriceWidget({ symbol, cgId, accentColor }) {
 
       // ── Source 1: backend /api/prices/multi (fast, real-time, same as terminal) ──
       try {
-        const base = (BACKEND_BASE || "").replace(/\/$/, "");
-        const url = base ? `${base}/api/prices/multi?symbols=${sym}` : `/api/prices/multi?symbols=${sym}`;
+        const url = `/api/prices/multi?symbols=${sym}`;
         const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
         if (r.ok) {
           const d = await r.json();
@@ -324,15 +323,15 @@ export default function MarketIndex() {
 
   useEffect(() => {
     if (!data) { navigate("/", { replace: true }); return; }
-    document.title = `${data.label} — DoYou.trade Advanced Trading`;
+    document.title = `${data.label} — Advanced Crypto Trading | DoYou.trade`;
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", `${data.tagline} Automate your ${data.name} trading with DoYou.trade.`);
+    if (meta) meta.setAttribute("content", `${data.tagline} Automate your ${data.name} trading with professional-grade algorithmic strategies on DoYou.trade. High-precision execution for ${data.symbol}.`);
   }, [data, navigate]);
 
   if (!data) return null;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#050505", color: "#D4D4D4", fontFamily: "'Space Mono', monospace" }}>
+    <div style={{ minHeight: "100vh", background: "#050505", color: "#D4D4D4" }}>
 
       {/* ── Nav ── */}
       <nav style={{
@@ -343,7 +342,7 @@ export default function MarketIndex() {
         borderBottom: "1px solid rgba(212,175,55,0.1)",
       }}>
         <Link to="/" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
-          <img src="/Bravo.svg" alt="DoYou.trade" style={{ width: "28px" }} />
+          <img src="/Bravo.svg" alt="DoYou.trade Professional Systematic Trading" style={{ width: "28px" }} />
           <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "20px", color: colors.gold, letterSpacing: "3px" }}>DOYOU.TRADE</span>
         </Link>
         <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
@@ -450,7 +449,7 @@ export default function MarketIndex() {
           ))}
         </div>
 
-        {/* ── AI Strategies ── */}
+        {/* ── Systematic Strategies ── */}
         <div style={{ marginBottom: "60px" }}>
           <div style={{ marginBottom: "24px" }}>
             <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "22px", fontWeight: "800", color: "#ccc", letterSpacing: "2px", marginBottom: "8px" }}>
@@ -477,7 +476,7 @@ export default function MarketIndex() {
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "32px" }}>
             {[
-              { icon: <Zap size={20} />, title: "SCAN", desc: `480+ data points per scan — price action, indicators, volume, macro sentiment.` },
+              { icon: <Zap size={20} />, title: "SCAN", desc: `480+ data points per scan — price action, indicators, volume, market sentiment.` },
               { icon: <Cpu size={20} />, title: "ANALYZE", desc: `The system evaluates confidence score, risk/reward, and regime fit before every trade.` },
               { icon: <Shield size={20} />, title: "EXECUTE", desc: `Trade signals fire in milliseconds with pre-defined stop-loss and take-profit levels.` },
             ].map((step) => (
@@ -503,7 +502,7 @@ export default function MarketIndex() {
             START TRADING {data.symbol}
           </h2>
           <p style={{ fontSize: "13px", color: "#666", maxWidth: "480px", margin: "0 auto 32px", lineHeight: "1.8" }}>
-            Non-custodial. Your funds stay on your exchange. Set up takes under 5 minutes.
+            Non-custodial. Your capital stays on your exchange. Set up takes under 5 minutes.
           </p>
           <Link to="/signup" style={{
             fontFamily: "'Montserrat', sans-serif", fontWeight: "800", fontSize: "13px",

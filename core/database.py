@@ -9,7 +9,7 @@ import os
 import sqlite3
 import threading
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging.handlers import RotatingFileHandler
 
 DB_PATH = os.getenv("DB_PATH", "bot.db")
@@ -324,6 +324,7 @@ def init_db():
                 reasoning_hash TEXT,
                 signature TEXT,
                 action TEXT,
+                side TEXT,
                 symbol TEXT,
                 confidence REAL,
                 reasoning TEXT,
@@ -346,6 +347,24 @@ def init_db():
                 solver_gas_saved REAL,
                 trade_pnl REAL,
                 trade_win INTEGER,
+                regime TEXT,
+                ts TEXT
+            )""")
+        try:
+            c.execute("ALTER TABLE decision_audit_log ADD COLUMN side TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            c.execute("ALTER TABLE decision_audit_log ADD COLUMN regime TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+        # ── Admin Audit log: Platform management activity ──────────────
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS admin_audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_email TEXT,
+                action TEXT,
                 ts TEXT
             )""")
 
@@ -1253,8 +1272,8 @@ def db_save_audit_entry(entry: dict):
              adversary_verdict, adversary_risk_score, adversary_reasoning,
              vision_structure, vision_conviction, vision_confirms,
              solver_network, solver_slippage_saved, solver_gas_saved,
-             trade_pnl, trade_win, ts)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             trade_pnl, trade_win, regime, ts)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 entry.get("audit_id", ""),
                 entry.get("bot_did", ""),
@@ -1283,6 +1302,7 @@ def db_save_audit_entry(entry: dict):
                 solver.get("gas_saved", 0),
                 trade_result.get("pnl", 0),
                 int(trade_result.get("win", False)),
+                decision.get("regime", decision.get("market_condition", "unknown")),
                 entry.get("timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
             ),
         )
@@ -1352,11 +1372,69 @@ def db_cleanup_old_audit_entries(retention_days: int = 365):
     """Remove audit entries older than retention period."""
     conn = get_conn()
     try:
-        cutoff = (datetime.now() - __import__("datetime").timedelta(days=retention_days)).strftime("%Y-%m-%d %H:%M:%S")
+        cutoff = (datetime.now() - timedelta(days=retention_days)).strftime("%Y-%m-%d %H:%M:%S")
         conn.execute("DELETE FROM decision_audit_log WHERE ts < ?", (cutoff,))
         conn.commit()
     except Exception as e:
         file_log(f"Audit cleanup error: {e}", "error")
+    finally:
+        conn.close()
+
+
+def db_save_admin_log(admin_email: str, action: str):
+    """Save an admin action to the persistent audit log."""
+    conn = get_conn()
+    try:
+        conn.execute(
+            "INSERT INTO admin_audit_log (admin_email, action, ts) VALUES (?, ?, ?)",
+            (admin_email, action, datetime.now().isoformat() + "Z"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def db_get_admin_logs(limit: int = 100) -> list[dict]:
+    """Retrieve the most recent admin audit logs."""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT admin_email as admin, action, ts FROM admin_audit_log ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
+
+def db_get_adversary_stats() -> dict:
+    """Summarize Adversary Agent activity (vetoes, reduces, risks)."""
+    conn = get_conn()
+    try:
+        total_vetoes = conn.execute(
+            "SELECT COUNT(*) FROM decision_audit_log WHERE adversary_verdict IN ('veto', 'kill')"
+        ).fetchone()[0]
+        
+        total_reduces = conn.execute(
+            "SELECT COUNT(*) FROM decision_audit_log WHERE adversary_verdict = 'reduce'"
+        ).fetchone()[0]
+        
+        latest_vetoes = conn.execute(
+            "SELECT symbol, adversary_reasoning as reasoning, ts FROM decision_audit_log "
+            "WHERE adversary_verdict IN ('veto', 'kill') ORDER BY id DESC LIMIT 5"
+        ).fetchall()
+        
+        # Estimate capital saved: average position size * frequency of vetoes
+        # This is a 'wow' metric for institutional users.
+        return {
+            "total_vetoes": total_vetoes,
+            "total_reduces": total_reduces,
+            "latest_vetoes": [dict(v) for v in latest_vetoes]
+        }
+    except Exception:
+        return {"total_vetoes": 0, "total_reduces": 0, "latest_vetoes": []}
     finally:
         conn.close()
 
@@ -1377,4 +1455,13 @@ def _use_postgres_storage() -> bool:
 
 
 if _use_postgres_storage():
-    pass
+    try:
+        from core.database_postgres import (
+            db_get_admin_logs as _pg_get_admin_logs,
+            db_save_admin_log as _pg_save_admin_log,
+        )
+
+        db_save_admin_log = _pg_save_admin_log
+        db_get_admin_logs = _pg_get_admin_logs
+    except ImportError:
+        pass

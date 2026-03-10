@@ -97,6 +97,8 @@ export default defineConfig({
       "/api/presets": httpProxy(),
       "/api/config": httpProxy(),
       "/api/admin": httpProxy(),
+      "/api/analytics": httpProxy(),
+      "/api/market": httpProxy(),
       "/api/trade": httpProxy(),
       "/auth": httpProxy(),
     },

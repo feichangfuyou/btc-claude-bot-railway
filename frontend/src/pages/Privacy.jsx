@@ -10,9 +10,9 @@ export default function Privacy() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        document.title = "Privacy Policy — DoYou.trade";
+        document.title = "Privacy Policy — DoYou.trade | Encrypted Global Trading Privacy";
         const meta = document.querySelector('meta[name="description"]');
-        if (meta) meta.setAttribute("content", "Privacy Policy for DoYou.trade. Learn how we protect your encrypted API keys and trading data with non-custodial security standards.");
+        if (meta) meta.setAttribute("content", "Privacy Policy for DoYou.trade. Learn how we protect your encrypted API keys and private trading data with advanced non-custodial security standards and institutional-grade encryption.");
     }, []);
 
     return (

@@ -77,9 +77,9 @@ export default function Login() {
   const [resetSent, setResetSent] = useState(false);
 
   useEffect(() => {
-    document.title = "DoYou.trade — Advanced Trading Terminal | Crypto Intelligence";
+    document.title = "DoYou.trade — Professional Crypto Trading Terminal | Institutional Intelligence";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "DoYou.trade — The world's most advanced trading terminal. Automate your crypto strategy with high-performance systems. Professional-grade algorithmic trading for everyone.");
+    if (meta) meta.setAttribute("content", "DoYou.trade — The world's most advanced non-custodial trading terminal. Automate your crypto strategy with professional-grade algorithmic systems. Connect your exchange and trade like a pro.");
     
     const err = searchParams.get("error");
     if (err) {
@@ -136,7 +136,7 @@ export default function Login() {
     <div className="landing-container" style={{ paddingBottom: "100px" }}>
       <nav className="landing-nav">
         <Link to="/" className="landing-nav__logo">
-          <img src="/Bravo.svg" alt="Logo" style={{ width: "32px" }} />
+          <img src="/Bravo.svg" alt="DoYou.trade Professional Trading System" style={{ width: "32px" }} />
           <span className="auth-brand" style={{ fontSize: "20px", letterSpacing: "3px" }}>DOYOU.TRADE</span>
         </Link>
         <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
@@ -158,7 +158,7 @@ export default function Login() {
           </div>
           <h1>ADVANCED CRYPTO TRADING TERMINAL.</h1>
           <p>
-            DoYou.trade is a premier non-custodial trading assistant that monitors global markets 24/7. 
+            DoYou.trade is a premier non-custodial trading terminal that monitors global markets 24/7. 
             Integrated with a sophisticated execution model to analyze sentiment, technical indicators, 
             and global macro trends to execute high-precision trades automatically.
           </p>
@@ -464,7 +464,7 @@ export default function Login() {
         </div>
         <div style={{ textAlign: "center", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "40px" }}>
           <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-            <img src="/Bravo.svg" alt="DoYou Trade Logo" style={{ width: "20px", opacity: 0.5 }} />
+            <img src="/Bravo.svg" alt="DoYou.trade Logo" style={{ width: "20px", opacity: 0.5 }} />
             <span style={{ opacity: 0.3 }}>&copy; 2025 DOYOU.TRADE. ALL RIGHTS RESERVED.</span>
           </div>
         </div>

@@ -89,11 +89,11 @@ export function ControlPanel({
             }}
             aria-label="Select Model"
           >
-            <option value="claude-opus-4-6">NEURAL OPUS 4.6</option>
-            <option value="claude-sonnet-4-6">NEURAL SONNET 4.6</option>
-            <option value="claude-sonnet-4-5-20250929">NEURAL SONNET 4.5</option>
-            <option value="claude-sonnet-4-20250514">NEURAL SONNET 4</option>
-            <option value="claude-3-haiku-20240307">NEURAL HAIKU 3</option>
+            <option value="claude-opus-4-6">OPUS 4.6 ENGINE</option>
+            <option value="claude-sonnet-4-6">SONNET 4.6 ENGINE</option>
+            <option value="claude-sonnet-4-5-20250929">SONNET 4.5 ENGINE</option>
+            <option value="claude-sonnet-4-20250514">SONNET 4 ENGINE</option>
+            <option value="claude-3-haiku-20240307">HAIKU 3 ENGINE</option>
           </select>
           {thinking && <span style={{ fontSize: "6px", color: "#ff9900", letterSpacing: "0.3px" }}>LCK</span>}
         </div>
@@ -185,7 +185,7 @@ export function ControlPanel({
             boxShadow: "0 0 14px rgba(192,57,43,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
             display: "flex", alignItems: "center", gap: "4px"
           }}><Square size={12} /> STOP BOT</button>}
-        <button className="btn btn-p" onClick={handleAsk} disabled={thinking} aria-label="Ask Neural Engine for analysis" style={{
+        <button className="btn btn-p" onClick={handleAsk} disabled={thinking} aria-label="Consult Analysis Engine" style={{
           padding: "4px 14px", minHeight: "28px", fontSize: "10px", borderRadius: "3px",
           boxShadow: thinking ? "none" : "0 0 12px rgba(212,175,55,0.15)",
           display: "flex", alignItems: "center", gap: "4px"

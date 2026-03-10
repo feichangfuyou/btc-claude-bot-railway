@@ -532,8 +532,8 @@ export default function Onboarding() {
             /* ── ONCHAIN: wallet address ── */
             if (keyModal === "onchain") {
               return (
-                <div style={styles.modalOverlay} onClick={closeModal}>
-                  <div style={styles.modal} onClick={e => e.stopPropagation()}>
+                <div className="glass-overlay fadein" style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={closeModal}>
+                  <div className="glass-heavy" style={{ maxWidth: "460px", width: "calc(100% - 32px)", padding: "28px", boxSizing: "border-box", animation: "fadein 0.35s ease", position: "relative" }} onClick={e => e.stopPropagation()}>
                     <h3 style={styles.modalTitle}>Add On-Chain Wallet</h3>
                     <div style={styles.keyHintBanner}>
                       <Info size={14} style={{ color: colors.gold, marginRight: 6 }} />
@@ -563,8 +563,8 @@ export default function Onboarding() {
 
             /* ── KRAKEN / BINANCE: API Keys ── */
             return (
-              <div style={styles.modalOverlay} onClick={closeModal}>
-                <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <div className="glass-overlay fadein" style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={closeModal}>
+                <div className="glass-heavy" style={{ maxWidth: "460px", width: "calc(100% - 32px)", padding: "28px", boxSizing: "border-box", animation: "fadein 0.35s ease", position: "relative" }} onClick={e => e.stopPropagation()}>
                   <h3 style={styles.modalTitle}>Add {exDef?.name || keyModal} API Key</h3>
 
                   {exDef?.keyHint && (
@@ -626,7 +626,6 @@ export default function Onboarding() {
 
 const styles = {
   container: {
-    fontFamily: typography.fontMono,
     background: colors.dark,
     color: colors.text,
     minHeight: "100dvh",

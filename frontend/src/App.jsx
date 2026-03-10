@@ -17,8 +17,8 @@ import { ChartModal } from "./components/ChartModal.jsx";
 import { PositionsPanel } from "./components/PositionsPanel.jsx";
 import { ControlPanel } from "./components/ControlPanel.jsx";
 import { ChartSection } from "./components/ChartSection.jsx";
-import { TerminalBrainPanel, MarketRegimePanel, AgentKitPanel, IndicatorsPanel, RiskMonitorPanel, RecentTradesPanel, ActivityLogPanel } from "./components/BottomPanels.jsx";
-import { AlertTriangle, Brain, Maximize2 } from "lucide-react";
+import { TerminalEnginePanel, MarketRegimePanel, AgentKitPanel, IndicatorsPanel, RiskMonitorPanel, RecentTradesPanel, ActivityLogPanel } from "./components/BottomPanels.jsx";
+import { AlertTriangle, Cpu, Maximize2 } from "lucide-react";
 
 // ─── Error Boundary ────────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -32,15 +32,16 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="error-boundary-root" style={{ fontFamily: "'Space Mono',monospace", background: "#0A0A0A", color: "#D4D4D4", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "16px", padding: "20px", textAlign: "center", width: "100%", maxWidth: "100vw", boxSizing: "border-box" }}>
+        <div className="error-boundary-root" style={{ background: "#0A0A0A", color: "#D4D4D4", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "16px", padding: "20px", textAlign: "center", width: "100%", maxWidth: "100vw", boxSizing: "border-box" }}>
           <div className="error-boundary-icon" style={{ fontSize: "48px" }}><AlertTriangle size={48} color={colors.error} /></div>
-          <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "28px", fontWeight: "700", color: colors.error, letterSpacing: "4px" }}>SYSTEM ERROR</div>
-          <div style={{ fontSize: "12px", color: colors.muted, maxWidth: "500px", lineHeight: "1.8" }}>
+          <div style={{ fontSize: "28px", fontWeight: "700", color: colors.error, letterSpacing: "4px" }}>SYSTEM ERROR</div>
+          <div className="mono-text" style={{ fontSize: "12px", color: colors.muted, maxWidth: "500px", lineHeight: "1.8" }}>
             {this.state.error?.message || "An unexpected error occurred."}
           </div>
           <button
             onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
-            style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "12px", fontWeight: "800", letterSpacing: "2px", padding: "10px 24px", border: "none", borderRadius: "3px", cursor: "pointer", background: `linear-gradient(180deg,${colors.gold},${colors.goldDark})`, color: colors.dark }}
+            className="btn"
+            style={{ fontSize: "12px", fontWeight: "800", letterSpacing: "2px", padding: "10px 24px", background: `linear-gradient(180deg,${colors.gold},${colors.goldDark})`, color: colors.dark }}
           >
             RELOAD TERMINAL
           </button>
@@ -58,9 +59,8 @@ function logId() { return `log_${Date.now()}_${++_logSeq}`; }
 // Dev-only shortcut; production uses Supabase JWT (VITE_BOT_API_SECRET is never bundled in prod builds)
 const API_SECRET = import.meta.env.DEV ? (import.meta.env.VITE_BOT_API_SECRET || "") : "";
 
-// Direct backend connection by default (no proxy). Use 127.0.0.1 to avoid IPv6 localhost issues on macOS.
-const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL
-  || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
+// Direct backend connection: in development, use relative paths to leverage Vite proxy (eliminates CORS issues)
+const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL || "";
 
 function getBackendWsUrl(accessToken) {
   // Prefer JWT when logged in so backend can resolve per-user keys (dev vs user_exchanges)
@@ -206,16 +206,16 @@ function Dashboard() {
   const [cbLive, setCbLive] = useState(false);
   const [krakenEnabled, setKrakenEnabled] = useState(false);
   const [binanceEnabled, setBinanceEnabled] = useState(false);
-  const [hasBrain, setHasBrain] = useState(false);
+  const [hasEngine, setHasEngine] = useState(false);
   const [paperMode, setPaperMode] = useState(true);
   const [agentKit, setAgentKit] = useState({ agentkit_ready: false, wallet_address: null, network: null, error: null });
   const [wsRetrying, setWsRetrying] = useState(false);
 
 
   useEffect(() => {
-    document.title = "Terminal — DoYou.trade Advanced Trading";
+    document.title = "DoYou.trade — Professional Crypto Trading Terminal | Institutional Intelligence";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Access your institutional-grade trading terminal. Professional crypto automation and strategy management.");
+    if (meta) meta.setAttribute("content", "Access your institutional-grade trading terminal. Professional crypto automation, strategy management, and real-time market systems on DoYou.trade.");
   }, []);
   const [coins, setCoins] = useState({});
   const [activeCoins, setActiveCoins] = useState(DEFAULT_COINS);
@@ -257,7 +257,7 @@ function Dashboard() {
   const [priceAge, setPriceAge] = useState(0);
 
   // ── Claude model ───────────────────────────────────────────────────────────
-  const [claudeModel, setClaudeModel] = useState("claude-opus-4-20250514");
+  const [analysisModel, setAnalysisModel] = useState("claude-opus-4-20250514");
 
   // ── Confirm dialogs ────────────────────────────────────────────────────────
   const [confirmAction, setConfirmAction] = useState(null);
@@ -295,7 +295,7 @@ function Dashboard() {
 
   useLayoutEffect(() => {
     const panels = document.querySelectorAll(`.tab-${activeTab}`);
-    if (panels.length > 0) slideUp(panels, 400);
+    if (panels.length > 0) slideUp(panels, 180); // Reduced from 400ms to 180ms for instant feel
   }, [activeTab]);
 
   // ── Trading preset (top 100 trader strategies) ────────────────────────────
@@ -305,9 +305,9 @@ function Dashboard() {
 
   // ── Profit goal (configurable target, progress bar) ────────────────────────
   const [profitGoal, setProfitGoal] = useState(() => {
-    try { const v = localStorage.getItem("claudebot_profit_goal"); return v ? Math.max(0, +v) : 4000; } catch { return 4000; }
+    try { const v = localStorage.getItem("system_profit_goal"); return v ? Math.max(0, +v) : 4000; } catch { return 4000; }
   });
-  useEffect(() => { if (profitGoal > 0) try { localStorage.setItem("claudebot_profit_goal", String(profitGoal)); } catch { } }, [profitGoal]);
+  useEffect(() => { if (profitGoal > 0) try { localStorage.setItem("system_profit_goal", String(profitGoal)); } catch { } }, [profitGoal]);
   const profitGoalSyncRef = useRef(false);
   useEffect(() => {
     if (!profitGoalSyncRef.current) { profitGoalSyncRef.current = true; return; }
@@ -322,8 +322,9 @@ function Dashboard() {
   roundTripFeeRef.current = roundTripFee;
   useEffect(() => {
     const base = window.location.origin;
+    const headers = getAuthHeaders();
     const url = `${base}/api/config${API_SECRET ? `?secret=${encodeURIComponent(API_SECRET)}` : ""}`;
-    fetch(url).then(r => r.ok ? r.json() : null).then(cfg => {
+    fetch(url, { headers }).then(r => r.ok ? r.json() : null).then(cfg => {
       if (!cfg) return;
       if (cfg.round_trip_fee) setRoundTripFee(cfg.round_trip_fee);
       if (cfg.symbol_to_coingecko) Object.assign(FALLBACK_SYMBOL_TO_COINGECKO, cfg.symbol_to_coingecko);
@@ -514,7 +515,7 @@ function Dashboard() {
               }
             }
           }
-          if (m.claude_decision) setDecision(m.claude_decision);
+          if (m.analysis_decision) setDecision(m.analysis_decision);
           if (m.last_ai_block_reason !== undefined) setLastAiBlockReason(m.last_ai_block_reason);
           if (m.pending_decision !== undefined) setPendingDecision(m.pending_decision);
           if (m.pending_expires_at != null) setPendingExpiresAt(m.pending_expires_at);
@@ -527,10 +528,10 @@ function Dashboard() {
             if (m.pending_expires_at != null) setPendingExpiresAt(m.pending_expires_at);
           }
           if (m.bot_running != null) setBotOn(m.bot_running);
-          if (m.claude_thinking != null) setThinking(m.claude_thinking);
-          if (m.last_claude_call) setLastCall(m.last_claude_call);
+          if (m.analysis_thinking != null) setThinking(m.analysis_thinking);
+          if (m.last_analysis_call) setLastCall(m.last_analysis_call);
           if (m.countdown != null) setCountdown(m.countdown);
-          if (m.has_claude_key != null) setHasBrain(m.has_claude_key);
+          if (m.has_engine_key != null) setHasEngine(m.has_engine_key);
           if (m.paper_trading != null) setPaperMode(m.paper_trading);
           if (m.coinbase_connected != null) setCbLive(m.coinbase_connected);
           if (m.kraken_enabled != null) setKrakenEnabled(m.kraken_enabled);
@@ -541,7 +542,7 @@ function Dashboard() {
           if (m.target_balance != null) setTargetBal(m.target_balance);
           if (m.profit_goal != null && m.profit_goal > 0) setProfitGoal(m.profit_goal);
           else if (m.profit_to_target != null && profitGoalRef.current === 0) setProfitGoal(m.profit_to_target);
-          if (m.claude_model) setClaudeModel(m.claude_model);
+          if (m.analysis_model) setAnalysisModel(m.analysis_model);
           if (m.logs) setLogs(m.logs.map((l, i) => ({ ...l, id: l.id || `srv_${i}` })));
           if (m.type === "wallet_status") setAgentKit(prev => ({ ...prev, ...m }));
           if (m.type === "log" && m.entry) setLogs(prev => [{ ...m.entry, id: logId() }, ...prev].slice(0, 60));
@@ -652,6 +653,8 @@ function Dashboard() {
       try {
         const ctrl = new AbortController();
         const to = setTimeout(() => ctrl.abort(), 5000);
+        const headers = getAuthHeaders();
+        if (API_SECRET) headers["x-bot-secret"] = API_SECRET;
         const r = await fetch(`${tickersUrl}?symbols=${encodeURIComponent(activeCoins.join(","))}`, { headers, signal: ctrl.signal });
         clearTimeout(to);
         if (r.ok) {
@@ -768,8 +771,8 @@ function Dashboard() {
         ws.onmessage = null;
         ws.onerror = null;
         ws.onclose = null;
-        // CONNECTING (0) or OPEN (1)
-        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        // Only close if it's already open to avoid 'closed before established' console noise
+        if (ws.readyState === WebSocket.OPEN) {
           try { ws.close(); } catch { }
         }
       }
@@ -859,11 +862,11 @@ function Dashboard() {
     return () => clearInterval(t);
   }, [log]);
 
-  const callBrain = useCallback(async () => {
+  const triggerAnalysis = useCallback(async () => {
     if (thinkingRef.current) return;
     setThinking(true);
     setLastCall(new Date().toLocaleTimeString());
-    log("Brain analyzing live market data...", "claude");
+    log("System analyzing live market data...", "system_call");
 
     try {
       const backendBase = BACKEND_BASE || `${window.location.protocol}//${window.location.hostname}:8000`;
@@ -876,13 +879,13 @@ function Dashboard() {
 
       const dec = await res.json();
       setDecision(dec);
-      log(`Brain: ${dec.action?.toUpperCase()} — ${dec.reasoning?.slice(0, 80) || ""}`, dec.action === "wait" ? "dim" : "claude");
+      log(`Decision: ${dec.action?.toUpperCase()} — ${dec.reasoning?.slice(0, 80) || ""}`, dec.action === "wait" ? "dim" : "system_call");
     } catch (e) {
       if (e.message?.toLowerCase().includes("failed to fetch") || e.message?.toLowerCase().includes("networkerror")) {
-        log("Backend offline — cannot reach the Brain. Start python backend.py", "warning");
-        setDecision({ reasoning: "Backend offline. Start backend.py for AI trading.", action: "wait", confidence: 0, market_condition: regimeRef.current });
+        log("Backend offline — cannot reach the System. Start python backend.py", "warning");
+        setDecision({ reasoning: "Backend offline. Start backend.py for systematic trading.", action: "wait", confidence: 0, market_condition: regimeRef.current });
       } else {
-        log(`Brain error: ${e.message}`, "error");
+        log(`System error: ${e.message}`, "error");
       }
     } finally {
       setThinking(false);
@@ -900,10 +903,10 @@ function Dashboard() {
   };
   const handleAsk = () => {
     if (connected) send("ask_claude", { direct: true });
-    else callBrain();  // callBrain will show "Backend offline" if unreachable
+    else triggerAnalysis();  // triggerAnalysis will show "Backend offline" if unreachable
   };
   const handleModelChange = (model) => {
-    setClaudeModel(model);
+    setAnalysisModel(model);
     if (connected) send("set_model", { model });
     log(`Model switched to ${model}`, "info");
   };
@@ -1078,7 +1081,7 @@ function Dashboard() {
     const blob = new Blob([header + rows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `claudebot_trades_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.href = url; a.download = `system_trades_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     log("Trade history exported as CSV", "info");
@@ -1094,10 +1097,10 @@ function Dashboard() {
     if (n === 0) return;
     const newCount = Math.min(Math.max(0, n - lastStaggeredLogsRef.current), 8);
     if (newCount > 0) {
-      staggerIn(container, ".logrow", { start: 0, limit: newCount, delay: 40, duration: 140 });
+      staggerIn(container, ".logrow", { start: 0, limit: newCount, delay: 20, duration: 100 }); // Faster stagger
       lastStaggeredLogsRef.current = n;
     } else if (lastStaggeredLogsRef.current === 0 && n > 0) {
-      staggerIn(container, ".logrow", { limit: 8, delay: 35, duration: 140 });
+      staggerIn(container, ".logrow", { limit: 8, delay: 20, duration: 100 }); // Faster stagger
       lastStaggeredLogsRef.current = n;
     }
   }, [logs]);
@@ -1110,10 +1113,10 @@ function Dashboard() {
     if (n === 0) return;
     const newCount = Math.min(Math.max(0, n - lastStaggeredTradesRef.current), 6);
     if (newCount > 0) {
-      staggerIn(container, ".trow", { start: 0, limit: newCount, delay: 50, duration: 150 });
+      staggerIn(container, ".trow", { start: 0, limit: newCount, delay: 25, duration: 110 }); // Faster trades
       lastStaggeredTradesRef.current = n;
     } else if (lastStaggeredTradesRef.current === 0 && n > 0) {
-      staggerIn(container, ".trow", { limit: 8, delay: 45, duration: 150 });
+      staggerIn(container, ".trow", { limit: 8, delay: 25, duration: 110 }); // Faster trades
       lastStaggeredTradesRef.current = n;
     }
   }, [trades]);
@@ -1518,7 +1521,7 @@ function Dashboard() {
           <div className="header-price" style={{ gridColumn: "1", gridRow: "1", justifySelf: "center", textAlign: "center", contain: "layout paint", minWidth: 0 }}>
             {price > 0 ? (
               <>
-                <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: "11px", color: "#D4AF37", letterSpacing: "3px", fontWeight: "600", marginBottom: "2px" }}>{selectedCoin}</div>
+                <div className="section-label" style={{ fontSize: "11px", color: "#D4AF37", letterSpacing: "3px", fontWeight: "600", marginBottom: "2px" }}>{selectedCoin}</div>
                 <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "36px", letterSpacing: "2px", color: priceUp ? "#00E676" : "#FF1744" }}>
                   $<AnimatedNumber value={price} format={(v) => priceFormat(v)} duration={50} />
                 </div>
@@ -1535,7 +1538,7 @@ function Dashboard() {
           <ControlPanel
             account={account} winRate={winRate} startBal={startBal} targetBal={targetBal}
             thinking={thinking} botOn={botOn} connected={connected}
-            claudeModel={claudeModel} handleModelChange={handleModelChange}
+            analysisModel={analysisModel} handleModelChange={handleModelChange}
             tradingPreset={tradingPreset} presets={presets} presetCategories={presetCategories} handlePresetChange={handlePresetChange}
             profitGoal={profitGoal} setProfitGoal={setProfitGoal}
             handleStart={handleStart} handleStop={handleStop} handleAsk={handleAsk} handleReset={handleReset}
@@ -1566,7 +1569,7 @@ function Dashboard() {
             {positions.length > 0 ? positions.map(pos => (
               <div key={pos.id} className="card chart-card" style={{ display: "flex", flexDirection: "column", padding: "12px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                  <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "14px", color: "#D4AF37", letterSpacing: "2px" }}>
+                  <span className="section-label" style={{ fontSize: "14px", color: "#D4AF37", letterSpacing: "2px" }}>
                     {pos.symbol} - {pos.side.toUpperCase()}
                   </span>
                   <span className="tag" style={{ background: pos.side === "buy" ? "#00E67618" : "#FF174418", color: pos.side === "buy" ? "#00E676" : "#FF1744" }}>
@@ -1596,7 +1599,7 @@ function Dashboard() {
                 <div className="chasing-light"></div>
                 <div className="chasing-content">
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", alignItems: "center" }}>
-                    <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "14px", color: "#D4AF37", letterSpacing: "2px" }}>
+                    <span className="section-label" style={{ fontSize: "14px", color: "#D4AF37", letterSpacing: "2px" }}>
                       BOT SCAN: {fastScanCoin}
                     </span>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1655,7 +1658,7 @@ function Dashboard() {
         {activeTab === "bot" && (
           <>
             <div className="col tab-bot">
-              <TerminalBrainPanel
+              <TerminalEnginePanel
                 thinking={thinking} botOn={botOn} countdown={countdown}
                 decision={decision} lastCall={lastCall} lastAiBlockReason={lastAiBlockReason}
                 pendingDecision={pendingDecision} pendingExpiresAt={pendingExpiresAt} pendingCountdown={pendingCountdown}
@@ -1686,7 +1689,7 @@ function Dashboard() {
 
       {/* ══ ANALYTICS ROW (equity + analytics + memory) ══ */}
       <AnalyticsSection connected={connected} log={log} lossToast={lossToast}
-        cbLive={cbLive} krakenEnabled={krakenEnabled} binanceEnabled={binanceEnabled} hasBrain={hasBrain}
+        cbLive={cbLive} krakenEnabled={krakenEnabled} binanceEnabled={binanceEnabled} hasEngine={hasEngine}
         isLiveMode={isLiveMode} agentKit={agentKit} paperMode={paperMode}
         directionBias={directionBias} requireTradeApproval={requireTradeApproval}
         price={price} priceAge={priceAge} wsRetrying={wsRetrying} />
@@ -1719,9 +1722,9 @@ function Dashboard() {
 
       {/* ══ CONFIRM DIALOG ══ */}
       {confirmAction && (
-        <div className="confirm-overlay" onClick={() => setConfirmAction(null)} role="dialog" aria-modal="true" aria-label="Confirmation">
-          <div className="confirm-box" ref={popIn} onClick={e => e.stopPropagation()}>
-            <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "18px", color: "#D4AF37", letterSpacing: "3px", marginBottom: "16px" }}>CONFIRM ACTION</div>
+        <div className="glass-overlay fadein" style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setConfirmAction(null)} role="dialog" aria-modal="true" aria-label="Confirmation">
+          <div className="glass-heavy" style={{ maxWidth: "420px", width: "calc(100% - 32px)", padding: "32px", boxSizing: "border-box", animation: "fadein 0.35s ease", position: "relative" }} onClick={e => e.stopPropagation()}>
+            <div className="section-label" style={{ fontSize: "18px", color: "#D4AF37", letterSpacing: "3px", marginBottom: "16px" }}>CONFIRM ACTION</div>
             <div style={{ fontSize: "11px", color: "#D4D4D4", lineHeight: "1.9", marginBottom: "22px" }}>{confirmAction.label}</div>
             <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
               <button className="btn btn-r" onClick={confirmYes} style={{ minWidth: "90px" }}>YES</button>
@@ -1749,13 +1752,13 @@ function Dashboard() {
 
       {/* ══ SUBSCRIPTION GATE ══ */}
       {profile && profile.subscription_status !== "active" && user?.email !== "feichangfuyou@gmail.com" && (
-        <div className="confirm-overlay" style={{ zIndex: 99999, position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(20px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div className="confirm-box" style={{ maxWidth: "420px", textAlign: "center", background: "rgba(17,17,17,0.72)", border: "1px solid rgba(212,175,55,0.15)", borderRadius: "24px", padding: "40px 32px", boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}>
-            <div style={{ fontSize: "48px", marginBottom: "20px" }}><Brain size={48} color={colors.gold} /></div>
-            <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "22px", color: colors.gold, letterSpacing: "4px", marginBottom: "16px", fontWeight: "700" }}>ACTIVE SUBSCRIPTION REQUIRED</h2>
+        <div className="glass-overlay fadein" style={{ zIndex: 99999, position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="glass-heavy" style={{ maxWidth: "420px", width: "calc(100% - 32px)", textAlign: "center", padding: "40px 32px", boxSizing: "border-box", animation: "fadein 0.35s ease", position: "relative" }}>
+            <div style={{ fontSize: "48px", marginBottom: "20px" }}><Cpu size={48} color={colors.gold} /></div>
+            <h2 className="section-label" style={{ fontSize: "22px", color: colors.gold, letterSpacing: "4px", marginBottom: "16px", fontWeight: "700" }}>ACTIVE SUBSCRIPTION REQUIRED</h2>
             <p style={{ fontSize: "12px", color: "#888", lineHeight: "1.9", marginBottom: "32px" }}>
-              Trading access, AI Hub scans, and automated execution are locked. 
-              To continue using the brain, please activate your subscription.
+              Trading access, Analysis Hub scans, and automated execution are locked. 
+              To continue using the system, please activate your subscription.
             </p>
             <button 
               className="btn btn-r" 

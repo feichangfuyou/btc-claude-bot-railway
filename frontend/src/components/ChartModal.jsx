@@ -37,56 +37,54 @@ export function ChartModal({ symbol, title, onClose }) {
 
   return (
     <div
+      className="glass-overlay fadein"
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(6,6,15,0.97)",
         zIndex: 9999,
         display: "flex",
         flexDirection: "column",
-        animation: "fadein 0.2s ease",
         overflow: "auto",
+        padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)",
       }}
       onClick={onClose}
     >
       <div
+        className="glass-heavy"
         style={{
           maxWidth: "min(1400px, calc(100vw - 24px))",
           width: "100%",
-          margin: "max(12px, env(safe-area-inset-top)) auto 20px",
-          padding: "0 clamp(12px, 4vw, 20px)",
+          margin: "12px auto",
+          padding: "20px",
           boxSizing: "border-box",
           flex: 1,
           display: "flex",
           flexDirection: "column",
           minHeight: 0,
+          position: "relative",
+          animation: "fadein 0.35s ease",
         }}
-        ref={popIn}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
           onClick={onClose}
+          className="btn btn-r"
           style={{
             position: "absolute",
-            top: "16px",
-            right: "16px",
-            background: "rgba(0,0,0,0.7)",
-            border: "1px solid rgba(255, 23, 68, 0.4)",
-            color: "#FF1744",
+            top: "20px",
+            right: "20px",
+            width: "36px",
+            height: "36px",
             borderRadius: "50%",
-            width: "40px",
-            height: "40px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
             zIndex: 10000,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+            padding: 0,
+            minHeight: "36px",
+            minWidth: "36px",
           }}
           title="Close Chart"
         >
-          <X size={24} />
+          <X size={18} />
         </button>
         <div
           style={{
@@ -97,8 +95,8 @@ export function ChartModal({ symbol, title, onClose }) {
           }}
         >
           <span
+            className="section-label"
             style={{
-              fontFamily: "'Montserrat', sans-serif",
               fontSize: "18px",
               color: "#D4AF37",
               letterSpacing: "3px",
@@ -112,8 +110,8 @@ export function ChartModal({ symbol, title, onClose }) {
             flex: 1,
             minHeight: "70vh",
             background: "#0a0a0a",
-            borderRadius: "8px",
-            border: "1px solid #1e1e1e",
+            borderRadius: "12px",
+            border: "1px solid rgba(255,255,255,0.05)",
             overflow: "hidden",
             position: "relative",
           }}

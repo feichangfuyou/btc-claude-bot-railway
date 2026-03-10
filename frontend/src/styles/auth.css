@@ -3,7 +3,7 @@
  * Single source of truth; no duplication.
  */
 .auth-page {
-  font-family: 'Space Mono', monospace;
+  font-family: 'Inter', sans-serif;
   background: #0A0A0A;
   color: #D4D4D4;
   min-height: 100vh;
@@ -114,7 +114,9 @@
 }
 
 .auth-oauth {
-  font-family: 'Space Mono', monospace;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  letter-spacing: 1px;
   font-size: 13px;
   padding: 10px 0;
   width: 100%;
@@ -200,7 +202,7 @@
 }
 
 .auth-forgot {
-  font-family: 'Space Mono', monospace;
+  font-family: 'Inter', sans-serif;
   font-size: 10px;
   color: #D4AF37;
   background: none;
@@ -444,7 +446,7 @@
   min-height: 100vh;
   background: #050505;
   color: #fff;
-  font-family: 'Space Mono', monospace;
+  font-family: 'Inter', sans-serif;
   position: relative;
   overflow-x: hidden;
 }
