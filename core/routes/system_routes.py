@@ -76,7 +76,7 @@ def _readiness_scale_10k() -> dict:
 
 
 @router.get("/health")
-def health(user: AuthenticatedUser = Depends(get_current_user)):
+def health():
     return {
         "status": "ok",
         "bot_running": bot.bot_running,
@@ -90,7 +90,7 @@ def health(user: AuthenticatedUser = Depends(get_current_user)):
 
 
 @router.get("/metrics", response_class=PlainTextResponse)
-def metrics(user: AuthenticatedUser = Depends(get_current_user)):
+def metrics():
     """Prometheus-style metrics for 10k scale monitoring."""
     lines = [
         "# HELP claudebot_bot_running 1 if bot is running, 0 if paused",
@@ -138,7 +138,7 @@ def get_api_config(user: AuthenticatedUser = Depends(get_current_user)):
 
 
 @router.get("/readiness")
-def get_readiness(user: AuthenticatedUser = Depends(get_current_user)):
+def get_readiness():
     """2026 Readiness Scorecard: 0-100 with grade. Tracks all dimensions toward A+.
 
     Includes the "final 15%" features:

@@ -22,7 +22,7 @@ export const FALLBACK_SYMBOL_TO_COINGECKO = {
   TON: "the-open-network", HBAR: "hedera-hashgraph", VET: "vechain", ALGO: "algorand", ICP: "internet-computer",
   XTZ: "tezos", EGLD: "elrond", ROSE: "oasis-network", FLOW: "flow", AUDIO: "audius", CHZ: "chiliz", XEC: "ecash", EOS: "eos",
   WAVES: "waves", NEO: "neo", ONT: "ontology", ICX: "icon",
-  NOT: "notcoin", W: "wormhole", BRETT: "based-brett", POPCAT: "popcat", NEIRO: "neiro", BOME: "book-of-meme",
+  NOT: "notcoin", W: "wormhole", BRETT: "based-brett", POPCAT: "popcat", BOME: "book-of-meme",
   ACE: "fusionist", ALT: "altlayer", ARKM: "arkham", COMBO: "combo",
   TRUMP: "official-trump", ONDO: "ondo-finance", VIRTUAL: "virtual-protocol", TURBO: "turbo",
   FARTCOIN: "fartcoin", KAS: "kaspa", RNDR: "render-token",
