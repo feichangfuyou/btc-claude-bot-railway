@@ -272,6 +272,9 @@ function Dashboard() {
   // ── Toast (loss notification) ──────────────────────────────────────────────
   const [lossToast, setLossToast] = useState(null);
 
+  // ── Institutional News (Pulse) ─────────────────────────────────────────────
+  const [newsData, setNewsData] = useState(null);
+
   // ── Navigation ────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("trade"); // "trade", "bot", "logs", "analytics"
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -545,6 +548,7 @@ function Dashboard() {
           if (m.analysis_model) setAnalysisModel(m.analysis_model);
           if (m.logs) setLogs(m.logs.map((l, i) => ({ ...l, id: l.id || `srv_${i}` })));
           if (m.type === "wallet_status") setAgentKit(prev => ({ ...prev, ...m }));
+          if (m.type === "news_update" && m.news) setNewsData(m.news);
           if (m.type === "log" && m.entry) setLogs(prev => [{ ...m.entry, id: logId() }, ...prev].slice(0, 60));
         } catch { /* ignore parse errors */ }
       };

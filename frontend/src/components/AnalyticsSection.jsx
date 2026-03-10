@@ -9,7 +9,7 @@ import { RefreshCcw, ArrowUp, ArrowDown } from "lucide-react";
 // Direct backend connection: empty in development to leverage the Vite proxy (fixes CORS issues)
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL || "";
 
-export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnabled, binanceEnabled, hasEngine, isLiveMode, agentKit, paperMode, directionBias, requireTradeApproval, price, priceAge, wsRetrying }) {
+export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnabled, binanceEnabled, hasEngine, isLiveMode, agentKit, paperMode, directionBias, requireTradeApproval, price, priceAge, wsRetrying, news, send }) {
   const { user, profile, signOut } = useAuth();
   const getAuthHeaders = useAuthHeaders();
   const navigate = useNavigate();
@@ -32,8 +32,11 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
     if (!connected) return;
     setLoading(true);
     try {
-      const headers = getAuthHeaders();
       const safeFetch = async (url) => {
+        const headers = {
+          ...getAuthHeaders(),
+          "Accept": "application/json",
+        };
         const resp = await fetch(url, { headers });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const type = resp.headers.get("content-type");
@@ -74,6 +77,13 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
   }, [connected, log, getAuthHeaders]);
 
   useEffect(() => { fetchData(activeTab); }, [activeTab, fetchData]);
+
+  // Sync WebSocket news to newsData
+  useEffect(() => {
+    if (news) {
+      setNewsData(news);
+    }
+  }, [news]);
 
   const runBacktest = async () => {
     setBacktestLoading(true);
@@ -333,9 +343,27 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
           {/* ── INSTITUTIONAL PULSE ── */}
           {activeTab === "news" && !loading && newsData && (
             <div>
-              <div className="section-label" style={{ marginBottom: "6px" }}>INSTITUTIONAL PULSE</div>
-              <div style={{ fontSize: "10px", color: "#5C5C5C", marginBottom: "14px" }}>
-                Real-time sentiment and headlines from our proprietary intelligence stream. Processed by institutional models for trade screening.
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
+                <div style={{ fontSize: "10px", color: "#5C5C5C", maxWidth: "80%" }}>
+                  Real-time sentiment and headlines from our proprietary intelligence stream. Processed by institutional models for trade screening.
+                </div>
+                {connected && (
+                  <button 
+                    onClick={() => send("refresh_news")}
+                    className="btn"
+                    style={{ 
+                      fontSize: "9px", 
+                      padding: "6px 12px", 
+                      background: "#121212", 
+                      border: "1px solid #D4AF3744", 
+                      color: "#D4AF37",
+                      fontWeight: "700",
+                      letterSpacing: "1px"
+                    }}
+                  >
+                    REFRESH PULSE
+                  </button>
+                )}
               </div>
               
               {newsData.error ? (
@@ -552,6 +580,25 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
               )}
             </div>
           )}
+        </div>
+
+        {/* Business Clarification & Legal Disclaimer */}
+        <div style={{ 
+          marginTop: "20px", 
+          padding: "16px", 
+          background: "rgba(212,175,55,0.03)", 
+          border: "1px solid rgba(212,175,55,0.1)",
+          borderRadius: "8px",
+          fontSize: "10px",
+          color: "#5C5C5C",
+          lineHeight: "1.6",
+          textAlign: "center",
+          fontStyle: "italic",
+          maxWidth: "100%",
+          boxSizing: "border-box"
+        }}>
+          <div style={{ color: "#D4AF37", fontWeight: "700", marginBottom: "4px", letterSpacing: "1px", fontStyle: "normal" }}>LEGAL NOTICE & DISCLOSURE</div>
+          "To clarify, our business is a technology provider offering research and execution software. We are not a cryptocurrency exchange, fund manager, or investment advisor. We sell monthly software subscriptions that provide users with analytical tools to manage their own independent trading accounts."
         </div>
       </div>
 

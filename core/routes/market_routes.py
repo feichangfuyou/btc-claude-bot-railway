@@ -1,4 +1,5 @@
 import asyncio
+from typing import Optional
 import ipaddress
 import socket
 import time
@@ -7,7 +8,7 @@ import httpx
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
-from core.auth import AuthenticatedUser, get_active_user
+from core.auth import AuthenticatedUser, get_active_user, get_optional_user
 from core.config import (
     API_PROXY_TIMEOUT,
     COINBASE_REST_TICKER,
@@ -337,7 +338,7 @@ async def proxy_alternative(path: str, request: Request, user: AuthenticatedUser
         )
 
 @router.get("/api/market/news")
-async def get_market_news(symbol: str = "all", user: AuthenticatedUser = Depends(get_active_user)):
+async def get_market_news(symbol: str = "all", user: Optional[AuthenticatedUser] = Depends(get_optional_user)):
     """Fetch latest market news from CryptoPanic."""
     news = await fetch_latest_news(symbol)
     return news

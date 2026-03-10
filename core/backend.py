@@ -85,6 +85,9 @@ from strategy.trading_presets import PRESETS
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 
+
+
+
 # ─── Broadcast helpers ───────────────────────────────────────────────────────
 async def broadcast(data: dict, user_id: str | None = None):
     """Broadcast to all connected clients. If user_id set, only to that user's WS (O(1) via _user_to_ws)."""
@@ -451,6 +454,19 @@ async def status_heartbeat():
         await asyncio.sleep(1800)
 
 
+async def news_pulse_cycle(bot, broadcast):
+    """Institutional Pulse — broadcast latest news every 5 minutes."""
+    from feeds.news_feeds import fetch_latest_news
+    while True:
+        try:
+            news = await fetch_latest_news("all")
+            if news and not news.get("error"):
+                await broadcast({"type": "news_update", "news": news})
+        except Exception as e:
+            file_log(f"News pulse error: {e}", "warning")
+        await asyncio.sleep(300) # 5 minutes
+
+
 # ─── Lifespan ────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -631,6 +647,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(status_heartbeat())
     asyncio.create_task(backup_cycle())
     asyncio.create_task(compaction_cycle())
+    asyncio.create_task(news_pulse_cycle(bot, broadcast))
 
     bot.bot_running = False
     bot.countdown = 0
@@ -655,6 +672,8 @@ app = FastAPI(
     redoc_url=None, # Disable Redoc for security
 )
 
+
+
 _DEFAULT_CORS = "https://doyou.trade,https://www.doyou.trade"
 _DEV_CORS = "http://localhost:5173,http://127.0.0.1:5173"
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", _DEFAULT_CORS).split(",") if o.strip()]
@@ -670,6 +689,25 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "x-bot-secret", "Authorization"],
 )
+
+# ─── FastAPI app handlers ───────────────────────────────────────────────────
+@app.exception_handler(Exception)
+async def global_exception_handler(request: StarletteRequest, exc: Exception):
+    """Ensure all unhandled exceptions return JSON instead of uvicorn's default HTML."""
+    from core.database import file_log
+    err_msg = str(exc)
+    file_log(f"Unhandled Exception: {err_msg}", "error")
+    # Log full traceback locally if in development
+    if os.getenv("RAILWAY_ENVIRONMENT", "development") == "development":
+        import traceback
+        traceback.print_exc()
+    
+    return JSONResponse(
+        status_code=500,
+        content={"error": "internal_server_error", "detail": err_msg[:200]}
+    )
+
+
 
 
 if API_SECRET:
@@ -960,6 +998,18 @@ async def _handle_ws_command(msg: dict):
 
     elif cmd == "reset_breaker":
         bot.circuit_breaker.reset()
+        bot.add_log("⚡ Circuit breaker reset", "success")
+        await broadcast({"type": "breaker_reset", "tripped": False})
+
+    elif cmd == "refresh_news":
+        from feeds.news_feeds import fetch_latest_news
+        bot.add_log("📡 Refreshing Institutional Pulse (on-demand)...", "info")
+        news = await fetch_latest_news("all")
+        if news and not news.get("error"):
+            await broadcast({"type": "news_update", "news": news})
+            bot.add_log("✅ Institutional Pulse updated via WebSocket", "success")
+        else:
+            await broadcast({"type": "news_error", "error": news.get("error", "Unknown error")})
         bot.semantic_kill_switch.force_clear()
         bot.add_log("✅ Circuit breaker + semantic kill switch reset — bot can trade again", "success")
         await broadcast(
@@ -1271,12 +1321,16 @@ if FRONTEND_DIST.exists():
 
     @app.exception_handler(404)
     async def spa_fallback(request, exc):
+        path = request.url.path
+        # Force JSON for anything matching API patterns or without a clear HTML preference
+        is_api = path.startswith("/api") or path.startswith("/memory") or path.startswith("/equity") or path.startswith("/trades")
         accept = request.headers.get("accept", "")
-        if "text/html" in accept:
+        
+        if "text/html" in accept and not is_api:
             return FileResponse(str(FRONTEND_DIST / "index.html"))
+            
         from starlette.responses import JSONResponse
-
-        return JSONResponse({"error": "not found"}, status_code=404)
+        return JSONResponse({"error": "not found", "path": path}, status_code=404)
 
 
 # ─── Run ─────────────────────────────────────────────────────────────────────

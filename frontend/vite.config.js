@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const backendTarget = "http://localhost:8000";
+const backendTarget = "http://127.0.0.1:8000";
 
 function silentErrorHandler(err) {
   if (["EPIPE", "ECONNRESET", "ECONNREFUSED", "ECONNABORTED", "ETIMEDOUT"].includes(err.code)) return;
@@ -49,7 +49,7 @@ export default defineConfig({
   },
   envDir: "..",  // load .env from project root (where BOT_API_SECRET / VITE_BOT_API_SECRET live)
   server: {
-    port: 5173,
+    port: 3000,
     strictPort: true,
     proxy: {
       // Demo-mode price feed — Coinbase via backend proxy
