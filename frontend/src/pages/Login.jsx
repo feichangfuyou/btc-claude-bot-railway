@@ -77,9 +77,9 @@ export default function Login() {
   const [resetSent, setResetSent] = useState(false);
 
   useEffect(() => {
-    document.title = "DoYou.trade — Professional Crypto Trading Terminal | Institutional Intelligence";
+    document.title = "DoYou.trade — Professional Market Intelligence Terminal | Strategy Research";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "DoYou.trade — The world's most advanced non-custodial trading terminal. Automate your crypto strategy with professional-grade algorithmic systems. Connect your exchange and trade like a pro.");
+    if (meta) meta.setAttribute("content", "DoYou.trade — The world's most advanced strategy execution terminal. Monitor global markets with professional-grade analytical systems. Connect your research and execute with precision.");
     
     const err = searchParams.get("error");
     if (err) {
@@ -152,29 +152,29 @@ export default function Login() {
       <header className="landing-hero">
         <div className="hero-text">
           <div className="hero-badges">
-            <span className="hero-badge">PREMIUM EXECUTION</span>
+            <span className="hero-badge">PREMIUM ANALYTICS</span>
             <span className="hero-badge">PROPRIETARY STRATEGY ENGINE</span>
-            <span className="hero-badge">24/7 AUTOMATED</span>
+            <span className="hero-badge">24/7 MARKET MONITORING</span>
           </div>
-          <h1>ADVANCED CRYPTO TRADING TERMINAL.</h1>
+          <h1>ADVANCED MARKET STRATEGY TERMINAL.</h1>
           <p>
-            DoYou.trade is a premier non-custodial trading terminal that monitors global markets 24/7. 
-            Integrated with a sophisticated execution model to analyze sentiment, technical indicators, 
-            and global macro trends to execute high-precision trades automatically.
+            DoYou.trade is a premier strategy execution terminal that monitors global markets 24/7. 
+            Integrated with a sophisticated analytical model to evaluate sentiment, technical indicators, 
+            and global macro trends to facilitate high-precision market interaction.
           </p>
           <div style={{ display: "flex", gap: "16px", marginBottom: "40px", justifyContent: "center", flexWrap: "wrap" }}>
-            <button className="btn btn-r" onClick={() => document.getElementById('login-card').scrollIntoView({ behavior: 'smooth' })} aria-label="Start Trading Now" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "16px 32px", fontSize: "14px" }}>START TRADING NOW <ArrowRight size={18} /></button>
+            <button className="btn btn-r" onClick={() => document.getElementById('login-card').scrollIntoView({ behavior: 'smooth' })} aria-label="Get Started Now" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "16px 32px", fontSize: "14px" }}>GET STARTED NOW <ArrowRight size={18} /></button>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", opacity: 0.45 }}>
             <div style={{ display: "flex", gap: "32px", justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
               {/* Coinbase */}
-              <svg aria-label="Trade Bitcoin on Coinbase" width="100" height="24" viewBox="0 0 100 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg aria-label="Monitor Bitcoin on Coinbase" width="100" height="24" viewBox="0 0 100 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="12" r="12" fill="#0052FF"/>
                 <path d="M12 6C8.69 6 6 8.69 6 12C6 15.31 8.69 18 12 18C14.97 18 17.44 15.97 17.9 13.2H15.33C14.93 14.56 13.58 15.56 12 15.56C10.03 15.56 8.44 13.97 8.44 12C8.44 10.03 10.03 8.44 12 8.44C13.58 8.44 14.93 9.44 15.33 10.8H17.9C17.44 8.03 14.97 6 12 6Z" fill="white"/>
                 <text x="28" y="17" fontFamily="'Space Mono', monospace" fontSize="12" fontWeight="700" fill="#aaa" letterSpacing="1">COINBASE</text>
               </svg>
               {/* Binance */}
-              <svg aria-label="Automate Binance Trading" width="90" height="24" viewBox="0 0 90 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg aria-label="Analyze Binance Markets" width="90" height="24" viewBox="0 0 90 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 2L14.5 4.5L9.5 9.5L7 7L12 2Z" fill="#F3BA2F"/>
                 <path d="M16.5 6.5L19 9L12 16L5 9L7.5 6.5L12 11L16.5 6.5Z" fill="#F3BA2F"/>
                 <path d="M9.5 14.5L12 17L14.5 14.5L17 17L12 22L7 17L9.5 14.5Z" fill="#F3BA2F"/>
@@ -183,14 +183,14 @@ export default function Login() {
                 <text x="28" y="17" fontFamily="'Space Mono', monospace" fontSize="12" fontWeight="700" fill="#aaa" letterSpacing="1">BINANCE</text>
               </svg>
               {/* Kraken */}
-              <svg aria-label="Kraken Trading Systems" width="80" height="24" viewBox="0 0 80 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg aria-label="Kraken Analytical Systems" width="80" height="24" viewBox="0 0 80 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="12" r="12" fill="#5741D9"/>
                 <text x="6" y="16" fontFamily="Arial" fontSize="10" fontWeight="900" fill="white">K</text>
                 <text x="26" y="17" fontFamily="'Space Mono', monospace" fontSize="12" fontWeight="700" fill="#aaa" letterSpacing="1">KRAKEN</text>
               </svg>
             </div>
             <span style={{ fontSize: "10px", letterSpacing: "2px", color: "#555", fontWeight: "600" }}>
-              + MANY MORE EXCHANGES COMING SOON
+              + MANY MORE CONNECTORS COMING SOON
             </span>
           </div>
         </div>
@@ -303,7 +303,7 @@ export default function Login() {
         <div className="stats-grid">
           <div className="stat-item">
             <h4>$2.4B</h4>
-            <p>VOLUME TRADED</p>
+            <p>DATA POINTS ANALYZED</p>
           </div>
           <div className="stat-item">
             <h4>2.4ms</h4>
@@ -357,7 +357,7 @@ export default function Login() {
       <section className="landing-how-it-works" style={{ padding: "80px 20px", background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(212,175,55,0.1)", contentVisibility: "auto", containIntrinsicSize: "0 400px" }}>
         <div className="section-header" style={{ textAlign: "center", marginBottom: "60px" }}>
           <h2 style={{ fontSize: "32px", marginBottom: "16px" }}>HOW IT WORKS</h2>
-          <p style={{ color: "#888", maxWidth: "600px", margin: "0 auto" }}>THREE STEPS TO AUTOMATED TRADING EXCELLENCE</p>
+          <p style={{ color: "#888", maxWidth: "600px", margin: "0 auto" }}>THREE STEPS TO SYSTEMATIC EXCELLENCE</p>
         </div>
         <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "32px", maxWidth: "1200px", margin: "0 auto" }}>
           <div className="feature-card" style={{ background: "rgba(255,255,255,0.03)", padding: "40px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.05)" }}>
@@ -371,9 +371,9 @@ export default function Login() {
             <p style={{ fontSize: "14px", lineHeight: "1.6", color: "#888" }}>Choose from 100+ professional trading presets or customize your risk parameters. Our systems adapt to your preferences.</p>
           </div>
           <div className="feature-card" style={{ background: "rgba(255,255,255,0.03)", padding: "40px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.05)" }}>
-            <div style={{ color: colors.gold, fontSize: "24px", fontWeight: "800", marginBottom: "20px" }}>03. AUTOMATE</div>
+            <div style={{ color: colors.gold, fontSize: "24px", fontWeight: "800", marginBottom: "20px" }}>03. MONITOR</div>
             <h3 style={{ fontSize: "18px", marginBottom: "12px" }}>EXECUTE 24/7</h3>
-            <p style={{ fontSize: "14px", lineHeight: "1.6", color: "#888" }}>Sit back while our systems monitor global markets, analyze data streams, and execute trades with millisecond precision.</p>
+            <p style={{ fontSize: "14px", lineHeight: "1.6", color: "#888" }}>Sit back while our systems monitor global markets, analyze data streams, and execute strategies with millisecond precision.</p>
           </div>
         </div>
       </section>
@@ -385,11 +385,11 @@ export default function Login() {
         </div>
         <div className="faq-list" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           {[
-            { q: "Is DoYou.trade a custodial platform?", a: "No. DoYou.trade is 100% non-custodial. Your funds always remain in your own exchange account (Coinbase, Binance, or Kraken). We only execute trades on your behalf using API keys with withdrawal permissions strictly disabled." },
-            { q: "How does the System make trading decisions?", a: "The platform utilizes advanced execution models to process millions of data points every second, including price action, technical indicators, global market sentiment, and on-chain liquidity flows. It identifies high-probability setups and executes with millisecond precision." },
-            { q: "Do I need prior trading experience?", a: "Not at all. While professional traders use our advanced tools, beginners can leverage our 100+ expert trading presets. Simply connect your exchange, pick a strategy that matches your risk profile, and let the systems handle the technical execution." },
-            { q: "Which exchanges are supported?", a: "Currently, we offer full support for Coinbase, Binance, and Kraken. You can connect multiple exchanges simultaneously and manage your entire portfolio from a single, unified dashboard." },
-            { q: "What are the fees for using the platform?", a: "We offer transparent, tier-based subscription models with no hidden performance fees. Visit our billing section after signing up to choose a plan that fits your trading volume and needs." }
+            { q: "Is DoYou.trade a custodial platform?", a: "No. DoYou.trade is 100% non-custodial. Your assets always remain in your own accounts (Coinbase, Binance, or Kraken). We only execute strategies on your behalf using API keys with withdrawal permissions strictly disabled." },
+            { q: "How does the System make strategic decisions?", a: "The platform utilizes advanced analytical models to process millions of data points every second, including price action, technical indicators, global market sentiment, and on-chain liquidity flows. It identifies high-probability setups and executes with precision." },
+            { q: "Do I need prior technical experience?", a: "Not at all. While professional analysts use our advanced tools, beginners can leverage our 100+ expert strategy presets. Simply connect your connector, pick a strategy that matches your profile, and let the systems handle the technical engagement." },
+            { q: "Which platforms are supported?", a: "Currently, we offer full support for Coinbase, Binance, and Kraken. You can connect multiple accounts simultaneously and manage your entire portfolio from a single, unified dashboard." },
+            { q: "What are the fees for using the platform?", a: "We offer transparent, tier-based subscription models for software access. Visit our billing section after signing up to choose a plan that fits your analysis volume and needs." }
           ].map((item, idx) => (
             <details key={idx} style={{ background: "rgba(255,255,255,0.03)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)", padding: "20px", cursor: "pointer" }}>
               <summary style={{ fontWeight: "700", fontSize: "16px", color: colors.gold, listStyle: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -438,10 +438,10 @@ export default function Login() {
           <div>
             <h4 style={{ fontSize: "12px", color: "#888", letterSpacing: "2px", marginBottom: "15px" }}>MARKET INDEX</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px" }}>
-              <Link to="/market/btc" title="Trade Bitcoin" aria-label="Trade Bitcoin">BTC/USD Intelligence</Link>
-              <Link to="/market/eth" title="Automate Ethereum Trading" aria-label="Automate Ethereum Trading">ETH/USD Strategy</Link>
-              <Link to="/market/sol" title="Solana Precision Execution" aria-label="Solana Precision Execution">SOL/USD Execution</Link>
-              <Link to="/market/altcoins" title="Algorithmic Altcoin Trading" aria-label="Algorithmic Altcoin Trading">Altcoin Execution Engine</Link>
+              <Link to="/market/btc" title="Bitcoin Analysis" aria-label="Bitcoin Analysis">BTC/USD Intelligence</Link>
+              <Link to="/market/eth" title="Ethereum Strategy" aria-label="Ethereum Strategy">ETH/USD Strategy</Link>
+              <Link to="/market/sol" title="Solana Strategy" aria-label="Solana Strategy">SOL/USD Execution</Link>
+              <Link to="/market/altcoins" title="Altcoin Strategy Engine" aria-label="Altcoin Strategy Engine">Altcoin Analysis Engine</Link>
             </div>
           </div>
           <div>
@@ -498,12 +498,12 @@ export default function Login() {
       >
         <div style={{ display: "none", alignItems: "center", gap: "10px" }} className="desktop-only-flex">
           <span className="dot" style={{ background: "#00E676", animation: "pulse 1.5s infinite" }} />
-          <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1px", color: colors.gold }}>SYSTEMS MONITORING GLOBAL MARKETS</span>
+          <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1px", color: colors.gold }}>SYSTEMS MONITORING GLOBAL DATA</span>
         </div>
         <div style={{ flex: 1, maxWidth: "1200px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontSize: "12px", fontWeight: "800", letterSpacing: "1px" }}>READY TO AUTOMATE?</span>
-            <span style={{ fontSize: "10px", color: "#666" }}>Join 12k+ traders using the execution engine.</span>
+            <span style={{ fontSize: "12px", fontWeight: "800", letterSpacing: "1px" }}>READY TO DEPLOY?</span>
+            <span style={{ fontSize: "10px", color: "#666" }}>Join 12k+ users leveraging our analysis engine.</span>
           </div>
           <div style={{ display: "flex", gap: "12px" }}>
             <Link to="/signup" className="btn btn-r" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 24px", fontSize: "11px", whiteSpace: "nowrap" }}>GET STARTED <ArrowRight size={14} /></Link>

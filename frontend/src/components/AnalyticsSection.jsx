@@ -110,12 +110,12 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
   };
 
   const tabs = [
-    { id: "equity", label: "EQUITY CURVE" },
-    { id: "analytics", label: "TRADE ANALYTICS" },
+    { id: "equity", label: "PERFORMANCE CURVE" },
+    { id: "analytics", label: "STRATEGY INSIGHTS" },
     { id: "memory", label: "DECISION ENGINE" },
     { id: "calibration", label: "CONFIDENCE" },
     { id: "news", label: "INSTITUTIONAL PULSE" },
-    { id: "backtest", label: "BACKTEST" },
+    { id: "backtest", label: "STRATEGY RESEARCH" },
   ];
 
   if (!connected) return null;
@@ -149,7 +149,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
           {/* ── EQUITY CURVE ── */}
           {activeTab === "equity" && !loading && equityData && (
             <div>
-              <div className="section-label" style={{ marginBottom: "12px" }}>EQUITY CURVE</div>
+              <div className="section-label" style={{ marginBottom: "12px" }}>PERFORMANCE CURVE</div>
               {equityData.curve?.length > 0 ? (
                 <div>
                   <div style={{ display: "flex", gap: "16px", marginBottom: "14px", flexWrap: "wrap" }}>
@@ -195,7 +195,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
           {/* ── TRADE ANALYTICS ── */}
           {activeTab === "analytics" && !loading && analyticsData && (
             <div>
-              <div className="section-label" style={{ marginBottom: "12px" }}>TRADE ANALYTICS</div>
+              <div className="section-label" style={{ marginBottom: "12px" }}>STRATEGY INSIGHTS</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }} className="analytics-grid">
                 {/* Regime performance */}
                 <div>
@@ -204,8 +204,8 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                     <div key={regime} className="row" style={{ fontSize: "10px" }}>
                       <span style={{ color: { trending_up: "#00E676", trending_down: "#FF1744", ranging: "#D4AF37", chaotic: "#ff9900" }[regime] || "#5C5C5C", fontWeight: "700", textTransform: "uppercase" }}>{regime}</span>
                       <span>
-                        <span style={{ color: data.win_rate >= 50 ? "#00E676" : "#FF1744", fontWeight: "700" }}>{data.win_rate}%</span>
-                        <span style={{ color: "#3a3a3a", marginLeft: "6px" }}>{data.total} trades</span>
+                        <span style={{ color: data.win_rate >= 50 ? "#00E676" : "#FF1744", fontWeight: "700" }}>{data.win_rate}% ACCURACY</span>
+                        <span style={{ color: "#3a3a3a", marginLeft: "6px" }}>{data.total} SAMPLES</span>
                         <span style={{ color: data.total_pnl >= 0 ? "#00E676" : "#FF1744", marginLeft: "6px" }}>{data.total_pnl >= 0 ? "+" : ""}${data.total_pnl}</span>
                       </span>
                     </div>
@@ -218,7 +218,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                     <div key={h.hour_of_day} className="row" style={{ fontSize: "10px" }}>
                       <span style={{ color: "#D4D4D4" }}>{String(h.hour_of_day).padStart(2, "0")}:00</span>
                       <span>
-                        <span style={{ color: h.win_rate >= 50 ? "#00E676" : "#FF1744", fontWeight: "700" }}>{h.win_rate}% WR</span>
+                        <span style={{ color: h.win_rate >= 50 ? "#00E676" : "#FF1744", fontWeight: "700" }}>{h.win_rate}% ACC</span>
                         <span style={{ color: "#3a3a3a", marginLeft: "6px" }}>avg ${h.avg_pnl}</span>
                       </span>
                     </div>
@@ -231,8 +231,8 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                     <div key={s.size_band} className="row" style={{ fontSize: "10px" }}>
                       <span style={{ color: "#D4D4D4" }}>{s.size_band.replace("_", " ")}</span>
                       <span>
-                        <span style={{ color: s.win_rate >= 50 ? "#00E676" : "#FF1744", fontWeight: "700" }}>{s.win_rate}% WR</span>
-                        <span style={{ color: "#3a3a3a", marginLeft: "6px" }}>{s.total} trades</span>
+                        <span style={{ color: s.win_rate >= 50 ? "#00E676" : "#FF1744", fontWeight: "700" }}>{s.win_rate}% ACC</span>
+                        <span style={{ color: "#3a3a3a", marginLeft: "6px" }}>{s.total} SAMPLES</span>
                       </span>
                     </div>
                   ))}
@@ -244,7 +244,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                     <div key={c.confidence_band} className="row" style={{ fontSize: "10px" }}>
                       <span style={{ color: "#D4AF37" }}>{c.confidence_band.replace("_", " ")}</span>
                       <span>
-                        <span style={{ color: c.win_rate >= 50 ? "#00E676" : "#FF1744", fontWeight: "700" }}>{c.win_rate}% WR</span>
+                        <span style={{ color: c.win_rate >= 50 ? "#00E676" : "#FF1744", fontWeight: "700" }}>{c.win_rate}% ACC</span>
                         <span style={{ color: "#3a3a3a", marginLeft: "6px" }}>avg ${c.avg_pnl}</span>
                       </span>
                     </div>
@@ -261,7 +261,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }} className="analytics-grid">
                 <div>
                   <div style={{ fontSize: "9px", color: "#5C5C5C", letterSpacing: "1px", marginBottom: "8px" }}>
-                    ACTIVE RULES ({memoryData.total_rules || 0})
+                    ACTIVE HEURISTICS ({memoryData.total_rules || 0})
                   </div>
                   {(memoryData.rules || []).length === 0 ? (
                     <div style={{ fontSize: "10px", color: "#2a2a2a", padding: "12px 0" }}>No rules learned yet — need 5+ trades</div>
@@ -273,7 +273,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                             {rule.rule_type?.toUpperCase()}
                           </span>
                           <span style={{ fontSize: "8px", color: "#3a3a3a" }}>
-                            {rule.sample_size} samples | {rule.win_rate}% WR
+                            {rule.sample_size} samples | {rule.win_rate}% ACC
                           </span>
                         </div>
                         <div style={{ fontSize: "10px", color: "#999999", lineHeight: "1.6" }}>{rule.description}</div>
@@ -283,7 +283,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                 </div>
                 <div>
                   <div style={{ fontSize: "9px", color: "#5C5C5C", letterSpacing: "1px", marginBottom: "8px" }}>
-                    PATTERN PERFORMANCE ({memoryData.total_trades || 0} trades analyzed)
+                    PATTERN PERFORMANCE ({memoryData.total_trades || 0} SAMPLES analyzed)
                   </div>
                   {(memoryData.patterns || []).length === 0 ? (
                     <div style={{ fontSize: "10px", color: "#2a2a2a", padding: "12px 0" }}>No pattern data yet</div>
@@ -311,7 +311,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
             <div>
               <div className="section-label" style={{ marginBottom: "6px" }}>CONFIDENCE CALIBRATION</div>
               <div style={{ fontSize: "10px", color: "#5C5C5C", marginBottom: "14px" }}>
-                Does signal confidence actually predict win rate? Perfect calibration = predicted matches actual.
+                Does signal confidence actually predict outcome efficiency? Perfect calibration = predicted matches actual.
               </div>
               {(calibrationData.calibration || []).length === 0 ? (
                 <div style={{ fontSize: "10px", color: "#2a2a2a", padding: "20px", textAlign: "center" }}>Need more trades with confidence data</div>
@@ -415,7 +415,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
                         <div style={{ background: "#000000", padding: "10px", borderRadius: "6px", border: "1px solid #1e1e1e" }}>
-                          <div style={{ fontSize: "8px", color: "#5C5C5C", marginBottom: "4px" }}>TRADES KILLED</div>
+                          <div style={{ fontSize: "8px", color: "#5C5C5C", marginBottom: "4px" }}>SIGNALS SUPPRESSED</div>
                           <div style={{ fontSize: "20px", fontWeight: "700", color: "#FF1744" }}>{adversaryStats.total_vetoes}</div>
                         </div>
                         <div style={{ background: "#000000", padding: "10px", borderRadius: "6px", border: "1px solid #1e1e1e" }}>
@@ -425,7 +425,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                       </div>
                       {adversaryStats.latest_vetoes?.length > 0 && (
                         <div>
-                          <div style={{ fontSize: "8px", color: "#3a3a3a", letterSpacing: "1px", marginBottom: "8px" }}>LATEST VETOED ASSETS</div>
+                          <div style={{ fontSize: "8px", color: "#3a3a3a", letterSpacing: "1px", marginBottom: "8px" }}>LATEST SUPPRESSED SIGNALS</div>
                           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                             {adversaryStats.latest_vetoes.map((v, idx) => (
                               <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "start", fontSize: "10px", borderBottom: "1px solid #1e1e1e", paddingBottom: "6px" }}>
@@ -500,7 +500,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
           {/* ── BACKTEST ── */}
           {activeTab === "backtest" && !loading && (
             <div>
-              <div className="section-label" style={{ marginBottom: "12px" }}>HISTORICAL BACKTEST</div>
+              <div className="section-label" style={{ marginBottom: "12px" }}>STRATEGY EVALUATION</div>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-end", marginBottom: "14px" }}>
                 {[
                   { label: "COIN", key: "symbol", type: "select", options: ["BTC", "ETH", "SOL", "LINK", "DOGE", "AVAX"] },
@@ -527,7 +527,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                   </div>
                 ))}
                 <button className="btn btn-p" onClick={runBacktest} disabled={backtestLoading} style={{ alignSelf: "flex-end" }}>
-                  {backtestLoading ? <span className="blink">RUNNING...</span> : "RUN BACKTEST"}
+                  {backtestLoading ? <span className="blink">PROCESSING...</span> : "EVALUATE STRATEGY"}
                 </button>
               </div>
 
@@ -537,8 +537,8 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
                     {[
                       { label: "RETURN", val: `${backtestResult.return_pct >= 0 ? "+" : ""}${backtestResult.return_pct}%`, color: backtestResult.return_pct >= 0 ? "#00E676" : "#FF1744" },
                       { label: "TOTAL P&L", val: `${backtestResult.total_pnl >= 0 ? "+" : ""}$${backtestResult.total_pnl}`, color: backtestResult.total_pnl >= 0 ? "#00E676" : "#FF1744" },
-                      { label: "TRADES", val: backtestResult.total_trades, color: "#D4D4D4" },
-                      { label: "WIN RATE", val: `${backtestResult.win_rate}%`, color: backtestResult.win_rate >= 50 ? "#00E676" : "#FF1744" },
+                      { label: "SAMPLES", val: backtestResult.total_trades, color: "#D4D4D4" },
+                      { label: "ACCURACY", val: `${backtestResult.win_rate}%`, color: backtestResult.win_rate >= 50 ? "#00E676" : "#FF1744" },
                       { label: "AVG WIN", val: `+$${backtestResult.avg_win}`, color: "#00E676" },
                       { label: "AVG LOSS", val: `$${backtestResult.avg_loss}`, color: "#FF1744" },
                       { label: "MAX DD", val: `${backtestResult.max_drawdown_pct}%`, color: backtestResult.max_drawdown_pct > 15 ? "#FF1744" : "#ff9900" },
@@ -575,7 +575,7 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
               )}
               {!backtestResult && (
                 <div style={{ textAlign: "center", padding: "30px", color: "#2a2a2a", fontSize: "11px" }}>
-                  Configure parameters and click RUN BACKTEST to test your strategy against historical data
+                  Configure parameters and click EVALUATE STRATEGY to test your logic against historical data
                 </div>
               )}
             </div>

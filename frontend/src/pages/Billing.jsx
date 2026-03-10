@@ -11,7 +11,7 @@ const TIERS = [
     name: "Starter",
     price: "$49",
     period: "/mo",
-    features: ["1 exchange", "Standard Intelligence", "Top 10 Coins", "Paper + live trading"],
+    features: ["1 connector", "Market Analytics", "Top 10 Assets", "Standard execution"],
     color: colors.muted,
   },
   {
@@ -19,7 +19,7 @@ const TIERS = [
     name: "Pro",
     price: "$99",
     period: "/mo",
-    features: ["Up to 3 exchanges", "Enhanced Strategy Engine", "50+ Coins", "Smart routing", "Priority support"],
+    features: ["Up to 3 connectors", "Enhanced Strategy Engine", "50+ Assets", "Optimized execution paths", "Priority support"],
     color: colors.gold,
     popular: true,
   },
@@ -28,7 +28,7 @@ const TIERS = [
     name: "Elite",
     price: "$199",
     period: "/mo",
-    features: ["Unlimited exchanges", "Ultra-Scale Execution", "All 100+ Coins", "Futures (10x leverage)", "On-chain + Vision"],
+    features: ["Unlimited connectors", "Ultra-Scale Data Feed", "All 100+ Assets", "Advanced execution engine", "On-chain Intelligence"],
     color: colors.success,
   },
 ];
@@ -184,7 +184,7 @@ export default function Billing() {
           <div style={styles.faq}>
             <div style={styles.faqItem}>
               <div style={styles.faqQ}>Can I cancel anytime?</div>
-              <div style={styles.faqA}>Yes. Cancel anytime from this page. Your automated systems will continue until the end of your billing period.</div>
+              <div style={styles.faqA}>Yes. Cancel anytime from this page. Your strategy execution will continue until the end of your billing period.</div>
             </div>
             <div style={styles.faqItem}>
               <div style={styles.faqQ}>What happens if my payment fails?</div>
@@ -192,22 +192,22 @@ export default function Billing() {
             </div>
             <div style={styles.faqItem}>
               <div style={styles.faqQ}>Do you touch my funds?</div>
-              <div style={styles.faqA}>Never. Your exchange API keys are encrypted with AES-256 and stored securely. We never see your private keys or enable withdrawals. Our systems execute trades through your own exchange account using restricted API keys.</div>
+              <div style={styles.faqA}>Never. Your account connectors are encrypted and stored securely. We never see your private keys or enable withdrawals. Our systems execute strategies through your own accounts using restricted permissions.</div>
             </div>
 
             {/* Capital Requirements Callout */}
             <div style={styles.faqItem}>
-              <div style={styles.faqQ} id="capital-requirements">
-                <Lightbulb size={16} /> How much capital do I need to trade live?
+              <div style={styles.faqQ}>
+                <Lightbulb size={16} /> What are the system requirements for live execution?
               </div>
               <div style={styles.faqA}>
-                The system enforces strict minimums to ensure every trade is actually profitable after fees and execution costs:
+                The system enforces minimum execution parameters to ensure tactical efficiency:
               </div>
               <div style={styles.capitalCallout}>
                 <div style={styles.capitalCalloutGrid} className="capital-callout-grid">
                   <div style={styles.calloutStat}>
                     <span style={styles.calloutVal}>$75</span>
-                    <span style={styles.calloutLbl}>Min trade size — trades below this are auto-rejected</span>
+                    <span style={styles.calloutLbl}>Min execution size — entries below this are auto-rejected</span>
                   </div>
                   <div style={styles.calloutStat}>
                     <span style={styles.calloutVal}>$750</span>
@@ -223,7 +223,7 @@ export default function Billing() {
                   </div>
                 </div>
                 <div style={styles.calloutNote}>
-                  <Zap size={14} /> The system will silently block any trade that can't clear $5 net profit at its take-profit price — protecting you from entering trades where fees eat all the gains.
+                  <Zap size={14} /> The system will bypass any entry that cannot clear efficiency thresholds after all execution costs.
                 </div>
               </div>
             </div>

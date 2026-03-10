@@ -213,9 +213,9 @@ function Dashboard() {
 
 
   useEffect(() => {
-    document.title = "DoYou.trade — Professional Crypto Trading Terminal | Institutional Intelligence";
+    document.title = "DoYou.trade — Professional Market Intelligence Terminal | Strategy Research";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Access your institutional-grade trading terminal. Professional crypto automation, strategy management, and real-time market systems on DoYou.trade.");
+    if (meta) meta.setAttribute("content", "Access your institutional-grade strategy terminal. Professional market analysis, strategy management, and real-time execution systems on DoYou.trade.");
   }, []);
   const [coins, setCoins] = useState({});
   const [activeCoins, setActiveCoins] = useState(DEFAULT_COINS);
@@ -409,7 +409,7 @@ function Dashboard() {
         if (botTimerRef.current) { clearInterval(botTimerRef.current); botTimerRef.current = null; }
         if (priceAgeRef.current) { clearInterval(priceAgeRef.current); priceAgeRef.current = null; }
         priceAgeRef.current = setInterval(() => setPriceAge(p => p + 1), 1000);
-        log("Backend connected — real-time data active", "success");
+        log("Backend connected — real-time analysis active", "success");
         if (pingTimer) clearInterval(pingTimer);
         pingTimer = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
