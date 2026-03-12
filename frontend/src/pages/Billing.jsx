@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
+import { isAdminEmail } from "../utils/adminEmails.js";
 import { colors, typography } from "../theme.js";
 import { ArrowLeft, Check, Lightbulb, Zap, Shield, Code2 } from "lucide-react";
 
@@ -35,8 +36,6 @@ const TIERS = [
 
 const BACKEND_BASE = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || (import.meta.env.DEV ? "http://localhost:8000" : "");
 
-const DEV_EMAIL = "feichangfuyou@gmail.com";
-
 export default function Billing() {
   const { user, profile, signOut, refreshProfile } = useAuth();
   const navigate = useNavigate();
@@ -52,8 +51,8 @@ export default function Billing() {
   const [cryptoAmount, setCryptoAmount] = useState(0);
   const [history, setHistory] = useState([]);
 
-  // Dev account always gets elite — overrides Supabase profile state
-  const isDevUser = user?.email?.toLowerCase() === DEV_EMAIL;
+  // Admin/dev accounts always get elite — overrides Supabase profile state
+  const isDevUser = isAdminEmail(user?.email);
   const currentTier = isDevUser
     ? "elite"
     : (profile?.subscription_status === "active" ? (profile?.subscription_tier || "none") : "none");
@@ -78,6 +77,11 @@ export default function Billing() {
       const res = await fetch(`${base}/billing/manual-payments`, {
         headers: getAuthHeaders()
       });
+      const ct = res.headers.get("content-type") || "";
+      if (!ct.includes("application/json")) {
+        console.warn("History fetch: non-JSON response (status:", res.status, ")");
+        return;
+      }
       const data = await res.json();
       if (Array.isArray(data)) setHistory(data);
     } catch (e) {
@@ -448,7 +452,7 @@ export default function Billing() {
           <span style={{ color: "#333" }}> · </span>
           <Link to="/privacy" style={styles.legalLink}>Privacy Policy</Link>
           <span style={{ color: "#333" }}> · </span>
-          <a href="mailto:support@doyou.trade" style={styles.legalLink}>Support</a>
+          <a href="mailto:feichangfuyou@doyou.trade" style={styles.legalLink}>Support</a>
         </div>
       </div>
     </>

@@ -547,6 +547,9 @@ async def lifespan(app: FastAPI):
     else:
         bot.add_log("  Security: ✅ BOT_API_SECRET set — API auth enabled", "info")
 
+    _cors_preview = ", ".join(ALLOWED_ORIGINS[:3]) + ("..." if len(ALLOWED_ORIGINS) > 3 else "")
+    bot.add_log(f"  CORS:     {len(ALLOWED_ORIGINS)} origin(s) — {_cors_preview}", "info")
+
     if REQUIRE_TRADE_APPROVAL:
         bot.add_log("  Approval:  ✅ Trade approval required — you approve each trade", "info")
     else:
@@ -676,7 +679,18 @@ app = FastAPI(
 
 _DEFAULT_CORS = "https://doyou.trade,https://www.doyou.trade"
 _DEV_CORS = "http://localhost:5173,http://127.0.0.1:5173"
-ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", _DEFAULT_CORS).split(",") if o.strip()]
+_raw = os.getenv("CORS_ORIGINS", _DEFAULT_CORS)
+ALLOWED_ORIGINS = [o.strip() for o in _raw.split(",") if o.strip()]
+if not ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS = [o.strip() for o in _DEFAULT_CORS.split(",") if o.strip()]
+
+
+def _cors_headers_for(request: StarletteRequest, response: JSONResponse) -> None:
+    """Add Access-Control-Allow-Origin when origin is allowed (for responses that bypass CORSMiddleware)."""
+    origin = request.headers.get("origin")
+    if origin and origin in ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+
 
 # Only allow localhost/dev origins if explicitly in development
 if os.getenv("RAILWAY_ENVIRONMENT", "development") == "development":
@@ -734,7 +748,9 @@ if API_SECRET:
         async def dispatch(self, request: StarletteRequest, call_next):
             path = request.url.path
             if ".." in path or "/./" in path or path.startswith("//"):
-                return JSONResponse({"error": "not found"}, status_code=404)
+                resp = JSONResponse({"error": "not found"}, status_code=404)
+                _cors_headers_for(request, resp)
+                return resp
             if request.method == "OPTIONS":
                 return await call_next(request)
             if path.startswith("/assets") or path in self.OPEN_PATHS:
@@ -808,11 +824,13 @@ class IPRateLimitMiddleware(BaseHTTPMiddleware):
 
         # Remote IPs: 300 req/min (up from 120 — supports multi-tab usage without false 429s)
         if not rate_limit_check(f"global_ip:{client_ip}", 300, 60):
-            return JSONResponse(
+            resp = JSONResponse(
                 {"error": "rate limited", "retry_after": 60},
                 status_code=429,
                 headers={"Retry-After": "60"},
             )
+            _cors_headers_for(request, resp)
+            return resp
         return await call_next(request)
 
 
