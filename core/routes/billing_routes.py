@@ -52,8 +52,10 @@ async def admin_verify_payment(
 
 @router.get("/address/{crypto_type}")
 async def get_payment_address(crypto_type: str):
-    """Retrieve the payment address for a specific crypto."""
+    """Retrieve the payment address for a specific crypto. Requires PAYWALL_*_ADDRESS in .env."""
     address = get_address_for_crypto(crypto_type)
+    if not address:
+        return {"address": None, "error": "Address not configured. Set PAYWALL_" + crypto_type.upper() + "_ADDRESS in .env."}
     return {"address": address}
 
 @router.post("/manual-payment")

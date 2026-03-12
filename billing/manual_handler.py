@@ -6,12 +6,14 @@ from core.auth import AuthenticatedUser
 
 logger = logging.getLogger(__name__)
 
-# Configurable addresses (from .env)
+# Main cold-storage addresses (from .env). Users send to these; never expose
+# alternative addresses to reduce interception risk. For per-payment unique
+# deposit addresses, use an HD wallet or payment processor (future enhancement).
 PAYWALL_ADDRESSES = {
-    "BTC": os.getenv("PAYWALL_BTC_ADDRESS"),
-    "ETH": os.getenv("PAYWALL_ETH_ADDRESS"),
-    "SOL": os.getenv("PAYWALL_SOL_ADDRESS"),
-    "USDT": os.getenv("PAYWALL_USDT_ERC20_ADDRESS")
+    "BTC": (os.getenv("PAYWALL_BTC_ADDRESS") or "").strip(),
+    "ETH": (os.getenv("PAYWALL_ETH_ADDRESS") or "").strip(),
+    "SOL": (os.getenv("PAYWALL_SOL_ADDRESS") or "").strip(),
+    "USDT": (os.getenv("PAYWALL_USDT_ERC20_ADDRESS") or "").strip(),
 }
 
 # Pricing in USD (matches frontend)
@@ -21,8 +23,10 @@ PRICES = {
     "elite": 199
 }
 
-def get_address_for_crypto(crypto_type: str) -> str:
-    return PAYWALL_ADDRESSES.get(crypto_type.upper(), "Address not configured")
+def get_address_for_crypto(crypto_type: str) -> Optional[str]:
+    """Return the payment address for the given crypto, or None if not configured."""
+    addr = PAYWALL_ADDRESSES.get(crypto_type.upper())
+    return addr if addr else None
 
 def submit_manual_payment(user: AuthenticatedUser, tier: str, crypto_type: str, amount: str, txid: str) -> Dict[str, Any]:
     """Saves a manual crypto payment submission for review."""

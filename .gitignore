@@ -6,6 +6,7 @@
 cdp_api_key.json
 cdp_wallet_secret.txt
 cdp_wallet_data.json
+wallet_backup.txt
 bot.db
 bot.db-wal
 bot.db-shm

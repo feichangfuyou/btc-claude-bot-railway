@@ -113,13 +113,18 @@ export default function Billing() {
     setLoading(true);
     setSelectedCrypto(crypto);
     try {
-      // 1. Get Address from backend
+      // 1. Get address from backend (main cold-storage address; users send here)
       const base = BACKEND_BASE || "";
       const addrRes = await fetch(`${base}/billing/address/${crypto.id}`, {
         headers: getAuthHeaders()
       });
       const addrData = await addrRes.json();
-      setCryptoAddress(addrData.address || "Address Error");
+      if (!addrData.address) {
+        setMessage({ type: "error", text: addrData.error || "Payment address not configured. Please contact support." });
+        setLoading(false);
+        return;
+      }
+      setCryptoAddress(addrData.address);
 
       // 2. Calculate Amount
       const price = await fetchCryptoPrice(crypto.id);
