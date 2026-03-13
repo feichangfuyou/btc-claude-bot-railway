@@ -22,10 +22,10 @@ export function ControlPanel({
       padding: "8px 12px",
       display: "flex", flexDirection: "column", gap: "0",
       boxShadow: "0 4px 24px rgba(0,0,0,0.5), 0 0 12px rgba(212,175,55,0.06), inset 0 1px 0 rgba(255,255,255,0.03)",
-      position: "relative", overflow: "hidden",
+      position: "relative",
     }}>
       {/* Canvas texture overlay */}
-      <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(212,175,55,0.008) 2px, rgba(212,175,55,0.008) 4px)", pointerEvents: "none", zIndex: 1 }} />
+      <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", background: "repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(212,175,55,0.008) 2px, rgba(212,175,55,0.008) 4px)", pointerEvents: "none", zIndex: 1 }} />
 
       {/* Top edge glow */}
       <div style={{ position: "absolute", top: 0, left: "10%", right: "10%", height: "1px", background: "linear-gradient(90deg, transparent, #D4AF3766, #C0392B44, #D4AF3766, transparent)", zIndex: 2 }} />

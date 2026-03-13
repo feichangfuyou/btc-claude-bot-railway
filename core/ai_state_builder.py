@@ -49,17 +49,17 @@ def build_ai_state(bot) -> dict:
     anti_overtrade: dict[str, int | float | bool | str] = {
         "recent_5_losses": recent_losses,
         "current_losing_streak": losing_streak,
-        "heightened_caution": losing_streak >= 2,
-        "extreme_caution": losing_streak >= 4,
+        "heightened_caution": losing_streak >= 3,
+        "extreme_caution": losing_streak >= 5,
     }
-    if losing_streak >= 3:
-        anti_overtrade["required_min_signals"] = 5
-        anti_overtrade["required_min_confidence"] = 0.55
-        anti_overtrade["message"] = f"LOSING STREAK ({losing_streak}): Raise bar—5+ signals, 55%+ confidence."
-    elif losing_streak >= 1:
+    if losing_streak >= 4:
+        anti_overtrade["required_min_signals"] = 4
+        anti_overtrade["required_min_confidence"] = 0.52
+        anti_overtrade["message"] = f"LOSING STREAK ({losing_streak}): Raise bar—4+ signals, 52%+ confidence."
+    elif losing_streak >= 2:
         anti_overtrade["required_min_signals"] = 3
-        anti_overtrade["required_min_confidence"] = 0.48
-        anti_overtrade["message"] = "Last trade was a loss. Require 3+ signals and 48%+ confidence."
+        anti_overtrade["required_min_confidence"] = 0.45
+        anti_overtrade["message"] = f"Recent losses ({losing_streak}). Require 3+ signals and 45%+ confidence."
 
     user_id = getattr(bot, "active_user_id", None) or "default"
     return {
@@ -80,7 +80,7 @@ def build_ai_state(bot) -> dict:
         "can_trade": ok,
         "block_reason": block_reason,
         "trading_preset": getattr(bot, "trading_preset", "turtle"),
-        "claude_model": getattr(bot, "claude_model", "claude-sonnet-4-6"),
+        "claude_model": getattr(bot, "claude_model", "claude-3-haiku-20240307"),
         "memory_briefing": memory_briefing,
         "pattern_verdicts": pattern_verdicts,
         "trade_analytics": trade_analytics,

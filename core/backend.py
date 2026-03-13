@@ -931,6 +931,14 @@ async def ws_endpoint(ws: WebSocket):
         bot.active_user_email = user_email or ""
         # Pre-register user instance so hub scan knows their tier
         await bot_manager.get_or_create(user_id)
+        # Always start on the tier-appropriate default model (Haiku for free/starter)
+        from billing.stripe_handler import TIER_LIMITS
+        from core.user_config import load_user_config
+        _cfg = load_user_config(user_id)
+        _tier = getattr(_cfg, "subscription_tier", "starter") or "starter"
+        _tier_model = TIER_LIMITS.get(_tier, TIER_LIMITS["starter"])["ai_model"]
+        bot.claude_model = _tier_model
+        db_save_state("claude_model", _tier_model)
     bot.add_log(
         f"Dashboard connected ({len(bot.clients)} client{'s' if len(bot.clients) != 1 else ''})",
         "info",

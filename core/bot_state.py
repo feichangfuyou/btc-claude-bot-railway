@@ -110,7 +110,7 @@ class BotState:
         self.last_claude_call = "--"
         self.countdown = CLAUDE_INTERVAL
         self.claude_decision = None
-        self.claude_model = db_load_state("claude_model") or "claude-sonnet-4-6"
+        self.claude_model = db_load_state("claude_model") or "claude-3-haiku-20240307"
         self.coinbase_connected = False
 
         self.last_reset_date = db_load_state("last_reset_date") or ""
@@ -1334,7 +1334,7 @@ class BotState:
         conf_strength = confluence.get("strength", 0)
         conf_direction = confluence.get("direction", "neutral")
 
-        if conf_strength >= 40 and conf_direction != "neutral" and conf_direction != action:
+        if conf_strength >= 55 and conf_direction != "neutral" and conf_direction != action:
             self.last_ai_block_reason = (
                 f"{ai_msg} — rejected: confluence strongly opposes ({conf_direction} str={conf_strength})"
             )
@@ -1342,14 +1342,14 @@ class BotState:
             return
 
         confidence = decision.get("confidence", 0)
-        min_conf = 0.45
-        if self.circuit_breaker.consecutive_losses >= 3:
-            min_conf = 0.60
-        elif self.circuit_breaker.consecutive_losses >= 1:
-            min_conf = 0.50
+        min_conf = 0.40
+        if self.circuit_breaker.consecutive_losses >= 4:
+            min_conf = 0.55
+        elif self.circuit_breaker.consecutive_losses >= 2:
+            min_conf = 0.48
         regime = cs.market_cond
         if regime == "chaotic":
-            min_conf = max(min_conf, 0.55)
+            min_conf = max(min_conf, 0.50)
         if confidence < min_conf:
             self.last_ai_block_reason = (
                 f"{ai_msg} — rejected: confidence {confidence * 100:.0f}% < {min_conf * 100:.0f}% required"
@@ -1359,8 +1359,8 @@ class BotState:
 
         pa_quality = cs.indicators.get("price_action_quality", {})
         qual = pa_quality.get("quality", "")
-        if qual == "choppy" and confidence < 0.70:
-            self.last_ai_block_reason = f"{ai_msg} — rejected: price action choppy (conf {confidence * 100:.0f}% < 70%)"
+        if qual == "choppy" and confidence < 0.55:
+            self.last_ai_block_reason = f"{ai_msg} — rejected: price action choppy (conf {confidence * 100:.0f}% < 55%)"
             self.add_log(self.last_ai_block_reason, "warning")
             return
 

@@ -28,7 +28,7 @@ PROFIT_TO_TARGET = TARGET_BALANCE - START_BALANCE
 # Dual-track: separate live exchange capital from paper
 LIVE_START_BALANCE = float(os.getenv("LIVE_START_BALANCE", "1000"))
 LIVE_MIN_BALANCE = float(os.getenv("LIVE_MIN_BALANCE", "750"))
-CLAUDE_INTERVAL = int(os.getenv("CLAUDE_INTERVAL", "90"))
+CLAUDE_INTERVAL = int(os.getenv("CLAUDE_INTERVAL", "60"))
 MAX_DAILY_LOSS_PCT = float(os.getenv("MAX_DAILY_LOSS_PCT", "0.05"))
 MAX_POSITION_SIZE = float(os.getenv("MAX_POSITION_SIZE", "0.25"))
 MIN_POSITION_SIZE = float(os.getenv("MIN_POSITION_SIZE", "0.10"))
@@ -74,7 +74,7 @@ WAIT_CALLS_PER_TRADE = 4  # avg "wait" decisions between trades
 AI_COST_PER_TRADE = round(SCOUT_COST_PER_CALL * WAIT_CALLS_PER_TRADE + TRADE_COST_PER_CALL, 4)
 
 MIN_TRADE_USD = float(os.getenv("MIN_TRADE_USD", "60"))
-MIN_PROFIT_AFTER_COSTS = float(os.getenv("MIN_PROFIT_AFTER_COSTS", "5.0"))
+MIN_PROFIT_AFTER_COSTS = float(os.getenv("MIN_PROFIT_AFTER_COSTS", "2.0"))
 
 TEST_MODE = os.getenv("TEST_MODE", "true").lower() == "true"
 COINBASE_WS_URL = "wss://advanced-trade-ws.coinbase.com"
@@ -84,9 +84,9 @@ CLAUDE_COOLDOWN_SEC = 5
 PRICE_MAX_AGE_SEC = 180
 TRAILING_STOP_PCT = float(os.getenv("TRAILING_STOP_PCT", "1.5"))
 # Widen stop loss (multiply preset SL ATR by this). 1.0=default, 1.3=30% wider, 1.5=50% wider.
-SL_ATR_WIDEN = float(os.getenv("SL_ATR_WIDEN", "1.3"))
+SL_ATR_WIDEN = float(os.getenv("SL_ATR_WIDEN", "1.0"))
 MAX_CONSEC_LOSSES = int(os.getenv("MAX_CONSEC_LOSSES", "4"))
-TRADE_COOLDOWN_SEC = int(os.getenv("TRADE_COOLDOWN_SEC", "60"))
+TRADE_COOLDOWN_SEC = int(os.getenv("TRADE_COOLDOWN_SEC", "30"))
 STALE_POSITION_MIN = int(os.getenv("STALE_POSITION_MIN", "90"))
 BREAKEVEN_TRIGGER_PCT = float(os.getenv("BREAKEVEN_TRIGGER_PCT", "1.0"))
 API_SECRET = os.getenv("BOT_API_SECRET", "")

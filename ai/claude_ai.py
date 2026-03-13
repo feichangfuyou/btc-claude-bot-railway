@@ -239,13 +239,13 @@ CLAUDE_SYSTEM_BASE = (
     "STEP 6 — DECISION: If trade reasons outweigh wait reasons, TRADE. Don't seek perfection. "
     "This is a trading bot—its job is to trade when edge exists, not to wait forever.\n"
     "\n"
-    "═══ SNIPER MODE REQUIREMENTS (High-Accuracy Calibration) ═══\n"
-    "1. 5+ confirming signals in one direction (A+ setups only)\n"
-    "2. Perfect alignment: 1H and 15m regimes MUST match direction\n"
-    "3. Confidence >= 65% (We only want the most obvious 'layup' trades)\n"
-    "4. R:R >= 1.6:1 (Ensures the move has room to run)\n"
-    "5. NO trade if market_condition is 'chaotic' or 'choppy' - STAY OUT.\n"
-    "6. size_percent: 10-15 (Lower size to handle the higher bar for entries)\n"
+    "═══ TRADE ENTRY STANDARDS ═══\n"
+    "1. 3+ confirming signals in one direction (solid setups)\n"
+    "2. Regime should support direction (trending with trend, ranging at extremes)\n"
+    "3. Confidence >= 45% — trade when edge exists, don't wait for perfection\n"
+    "4. R:R >= 1.3:1 (Ensure risk/reward is favorable)\n"
+    "5. In 'chaotic' — reduce size, require 4+ signals. In choppy — trade if confidence >= 55%.\n"
+    "6. size_percent: 15-25 (Scale with conviction — higher confidence = bigger size)\n"
     "\n"
     "═══ INDICATORS ═══\n"
     "EMA(9,21), MTF EMA alignment, RSI(14), Stochastic RSI, MACD histogram,\n"
@@ -1359,17 +1359,18 @@ def _validate_decision(dec: dict, bot, coins_snapshot: dict, anti_overtrade: dic
     coin_data = coins_snapshot.get(symbol, {})
 
     pa_quality = coin_data.get("quality", {}).get("price_action", "low")
-    if pa_quality == "choppy":
+    confidence = dec.get("confidence", 0)
+    if pa_quality == "choppy" and confidence < 0.50:
         dec["action"] = "wait"
-        dec["reasoning"] = f"[BLOCKED] Price action choppy for {symbol}. " + dec.get("reasoning", "")
-        bot.last_ai_block_reason = f"{ai_msg} — rejected: choppy price action"
+        dec["reasoning"] = f"[BLOCKED] Price action choppy for {symbol} (conf {confidence*100:.0f}% < 50%). " + dec.get("reasoning", "")
+        bot.last_ai_block_reason = f"{ai_msg} — rejected: choppy price action + low confidence"
         bot.add_log(bot.last_ai_block_reason, "warning")
         return dec
 
     conf_data = coin_data.get("confluence", {})
     conf_direction = conf_data.get("direction", "neutral")
     conf_strength = conf_data.get("strength", 0)
-    if conf_direction != "neutral" and conf_direction != action and conf_strength >= 30:
+    if conf_direction != "neutral" and conf_direction != action and conf_strength >= 45:
         dec["action"] = "wait"
         dec["reasoning"] = f"[BLOCKED] Strong confluence ({conf_strength}) opposes {action} on {symbol}. " + dec.get(
             "reasoning", ""
@@ -1380,7 +1381,7 @@ def _validate_decision(dec: dict, bot, coins_snapshot: dict, anti_overtrade: dic
 
     if anti_overtrade.get("extreme_caution"):
         confidence = dec.get("confidence", 0)
-        if confidence < 0.60:
+        if confidence < 0.52:
             dec["action"] = "wait"
             dec["reasoning"] = (
                 f"[BLOCKED] Losing streak — need 60%+ confidence. Got {confidence * 100:.0f}%. "

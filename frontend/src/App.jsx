@@ -259,7 +259,7 @@ function Dashboard() {
   const [priceAge, setPriceAge] = useState(0);
 
   // ── Claude model ───────────────────────────────────────────────────────────
-  const [analysisModel, setAnalysisModel] = useState("claude-opus-4-20250514");
+  const [analysisModel, setAnalysisModel] = useState("claude-3-haiku-20240307");
 
   // ── Confirm dialogs ────────────────────────────────────────────────────────
   const [confirmAction, setConfirmAction] = useState(null);
