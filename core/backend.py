@@ -704,7 +704,7 @@ app = FastAPI(
 
 
 _DEFAULT_CORS = "https://doyou.trade,https://www.doyou.trade"
-_DEV_CORS = "http://localhost:5173,http://127.0.0.1:5173"
+_DEV_CORS = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
 _raw = os.getenv("CORS_ORIGINS", _DEFAULT_CORS)
 ALLOWED_ORIGINS = [o.strip() for o in _raw.split(",") if o.strip()]
 if not ALLOWED_ORIGINS:
@@ -1439,16 +1439,22 @@ if FRONTEND_DIST.exists():
         if _path.exists():
             app.add_api_route(f"/{_name}", _serve_file(_path), methods=["GET"])
 
+    _API_PREFIXES = (
+        "/api", "/memory", "/equity", "/trades", "/stats", "/costs",
+        "/account", "/wallet", "/billing", "/auth", "/health", "/readiness",
+        "/metrics", "/ws", "/ask_claude", "/emergency", "/snapshots",
+        "/backtest", "/solver", "/adversary", "/audit",
+    )
+
     @app.exception_handler(404)
     async def spa_fallback(request, exc):
         path = request.url.path
-        # Force JSON for anything matching API patterns or without a clear HTML preference
-        is_api = path.startswith("/api") or path.startswith("/memory") or path.startswith("/equity") or path.startswith("/trades")
         accept = request.headers.get("accept", "")
-        
-        if "text/html" in accept and not is_api:
+        is_api = any(path.startswith(p) for p in _API_PREFIXES)
+
+        if not is_api and "text/html" in accept:
             return FileResponse(str(FRONTEND_DIST / "index.html"))
-            
+
         from starlette.responses import JSONResponse
         return JSONResponse({"error": "not found", "path": path}, status_code=404)
 

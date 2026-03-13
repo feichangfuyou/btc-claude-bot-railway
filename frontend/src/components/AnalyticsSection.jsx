@@ -37,10 +37,17 @@ export function AnalyticsSection({ connected, log, lossToast, cbLive, krakenEnab
           "Accept": "application/json",
         };
         const resp = await fetch(url, { headers });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const type = resp.headers.get("content-type");
-        if (!type || !type.includes("application/json")) {
-          throw new Error("Backend returned HTML instead of JSON. Check if server is running on port 8000.");
+        const type = resp.headers.get("content-type") || "";
+        if (!type.includes("application/json")) {
+          throw new Error(
+            resp.ok
+              ? `Expected JSON from ${url} but got ${type || "no content-type"} (status ${resp.status}). Backend may be returning the SPA fallback.`
+              : `Backend unreachable or returned non-JSON (status ${resp.status}, type ${type || "none"}). Is the server running on port 8000?`
+          );
+        }
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${resp.status}`);
         }
         return await resp.json();
       };
