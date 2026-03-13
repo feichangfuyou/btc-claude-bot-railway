@@ -192,7 +192,7 @@ async def _celery_ask_claude(skip_scout: bool = False):
     bot.claude_thinking = True
     bot._last_claude_ts = time.time()
     bot.last_claude_call = time.strftime("%H:%M:%S")
-    await broadcast({"type": "claude_thinking", "claude_thinking": True, "last_claude_call": bot.last_claude_call})
+    await broadcast({"type": "claude_thinking", "claude_thinking": True, "analysis_thinking": True, "last_claude_call": bot.last_claude_call, "last_analysis_call": bot.last_claude_call})
 
     fut = asyncio.get_running_loop().create_future()
     _pending_ai_tasks[task_id] = fut
@@ -209,7 +209,7 @@ async def _celery_ask_claude(skip_scout: bool = False):
         bot.add_log(f"Celery AI error: {str(e)[:60]}", "error")
     finally:
         bot.claude_thinking = False
-        await broadcast({"type": "claude_thinking", "claude_thinking": False})
+        await broadcast({"type": "claude_thinking", "claude_thinking": False, "analysis_thinking": False})
 
 
 def _adaptive_interval() -> int:
@@ -254,7 +254,9 @@ def _apply_celery_decision(data: dict):
             {
                 "type": "claude_decision",
                 "claude_decision": dec,
+                "analysis_decision": dec,
                 "last_claude_call": bot.last_claude_call,
+                "last_analysis_call": bot.last_claude_call,
                 "cost_tracker": cost_info,
                 "last_ai_block_reason": bot.last_ai_block_reason,
             }
@@ -1198,7 +1200,7 @@ async def _handle_ws_command(msg: dict):
         db_save_state("claude_model", new_model)
         label = _model_display_name(new_model)
         bot.add_log(f"🔄 Model switched to {label}", "info")
-        await broadcast({"type": "model_update", "claude_model": new_model})
+        await broadcast({"type": "model_update", "claude_model": new_model, "analysis_model": new_model})
 
     elif cmd == "wallet_status":
         status = agentkit.status_snapshot()

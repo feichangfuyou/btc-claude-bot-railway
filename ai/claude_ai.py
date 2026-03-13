@@ -833,7 +833,9 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
             {
                 "type": "claude_thinking",
                 "claude_thinking": True,
+                "analysis_thinking": True,
                 "last_claude_call": bot.last_claude_call,
+                "last_analysis_call": bot.last_claude_call,
             }
         )
 
@@ -902,7 +904,9 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
                         {
                             "type": "claude_decision",
                             "claude_decision": wait_dec,
+                            "analysis_decision": wait_dec,
                             "last_claude_call": bot.last_claude_call,
+                            "last_analysis_call": bot.last_claude_call,
                             "cost_tracker": cost_info,
                         }
                     )
@@ -919,7 +923,7 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
 
         if not escalate:
             bot.claude_thinking = False
-            await bot._broadcast({"type": "claude_thinking", "claude_thinking": False})
+            await bot._broadcast({"type": "claude_thinking", "claude_thinking": False, "analysis_thinking": False})
             await broadcast_price_fn()
             return
 
@@ -1296,7 +1300,9 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
                 {
                     "type": "claude_decision",
                     "claude_decision": dec,
+                    "analysis_decision": dec,
                     "last_claude_call": bot.last_claude_call,
+                    "last_analysis_call": bot.last_claude_call,
                     "cost_tracker": cost_info,
                     "last_ai_block_reason": bot.last_ai_block_reason,
                 }
@@ -1321,7 +1327,7 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
             bot.add_log(f"{trade_model_short} error: {str(e)[:80]}", "error")
         finally:
             bot.claude_thinking = False
-            await bot._broadcast({"type": "claude_thinking", "claude_thinking": False})
+            await bot._broadcast({"type": "claude_thinking", "claude_thinking": False, "analysis_thinking": False})
             await broadcast_price_fn()
 
 
