@@ -79,6 +79,7 @@ def health():
     return {
         "status": "ok",
         "bot_running": bot.bot_running,
+        "brain_enabled": bot_manager.brain_enabled,
         "coinbase_connected": bot.coinbase_connected,
         "kraken_enabled": getattr(bot, "kraken_enabled", False),
         "paper_trading": PAPER_TRADING,
@@ -310,6 +311,18 @@ async def test_brain(user: AuthenticatedUser = Depends(get_verified_admin)):
     return result
 
 
+@router.post("/api/admin/brain-toggle")
+def toggle_brain(enabled: bool, user: AuthenticatedUser = Depends(get_verified_admin)):
+    """Master switch for the AI brain (hub scan cycles). When off, no AI API calls are made
+    and no new signals are generated — but existing positions and safety systems stay active.
+    Users who hit START will see the bot as 'started' but it won't receive new signals."""
+    bot_manager.set_brain_enabled(enabled)
+    status = "ONLINE" if enabled else "OFFLINE"
+    _log_admin_action(user.email, f"Brain toggled {status}")
+    bot.add_log(f"🧠 ADMIN ACTION: Brain {status}", "warning" if not enabled else "success")
+    return {"status": "ok", "brain_enabled": bot_manager.brain_enabled}
+
+
 @router.post("/api/admin/global-pause")
 def set_global_pause(pause: bool, user: AuthenticatedUser = Depends(get_verified_admin)):
     """Point 3: God Mode — Emergency halt for all 10,000 users."""
@@ -350,11 +363,12 @@ def get_admin_stats(user: AuthenticatedUser = Depends(get_verified_admin)):
     return {
         "active_users": bot_manager.active_count(),
         "total_users": bot_manager.total_count(),
+        "brain_enabled": bot_manager.brain_enabled,
         "global_pause": bot_manager.global_pause,
         "global_daily_pnl": sum(i.daily_pnl for i in bot_manager._instances.values()),
         "global_total_pnl": sum(i.total_pnl for i in bot_manager._instances.values()),
         "global_max_loss": bot_manager.global_max_loss_usd,
-        "memory_usage_mb": "calc", # example
+        "memory_usage_mb": "calc",
     }
 
 
@@ -536,6 +550,7 @@ def get_circuit_breaker_status(user: AuthenticatedUser = Depends(get_verified_ad
         "total_daily_pnl": round(total_daily_pnl, 2),
         "threshold": threshold,
         "global_max_loss_usd": bot_manager.global_max_loss_usd,
+        "brain_enabled": bot_manager.brain_enabled,
         "global_pause": bot_manager.global_pause,
         "global_risk_off": getattr(bot_manager, "global_risk_off", False),
     }

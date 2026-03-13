@@ -161,8 +161,10 @@ signal.signal(signal.SIGTERM, _shutdown_handler)
 async def _safe_claude_call(skip_scout: bool = False):
     """Wrapper so create_task exceptions are logged instead of silently lost.
     skip_scout=True: skip scout, go straight to trade model (manual Ask Claude)."""
+    if not bot_manager.brain_enabled:
+        bot.add_log("🧠 Brain is offline — Ask Claude blocked by admin", "warning")
+        return
     try:
-        # Manual/Ask Claude: Use the user's specific tier limits
         user_tier = getattr(bot, "subscription_tier", "starter")
         await call_claude(bot, broadcast_price, skip_scout=skip_scout, tier=user_tier)
     except Exception as e:
@@ -175,6 +177,9 @@ async def _celery_ask_claude(skip_scout: bool = False):
 
     from workers.ai_tasks import run_ai_analysis
 
+    if not bot_manager.brain_enabled:
+        bot.add_log("🧠 Brain is offline — Ask Claude blocked by admin", "warning")
+        return
     if bot.claude_thinking:
         return
     user_id = getattr(bot, "active_user_id", None) or "default"
@@ -282,27 +287,29 @@ async def hub_scan_cycle(tier: str):
 
     while True:
         try:
+            # Admin brain kill-switch — skip AI calls entirely when brain is off
+            if not bot_manager.brain_enabled:
+                await asyncio.sleep(5)
+                continue
+
+            # Global pause — don't waste AI credits if platform is halted
+            if bot_manager.global_pause:
+                await asyncio.sleep(5)
+                continue
+
             # Only scan if there are active users in this tier
             active_users = sum(1 for i in bot_manager._instances.values()
                              if i.running and i.config.subscription_tier == tier)
 
             if active_users > 0:
-                # Master Scan for this tier
-                # ELITE optimization: Use Sonnet scouting instead of direct Opus
-                # to maintain high quality while cutting scan costs by 80%.
                 skip_scout = False
-
-                # Perform analysis
                 bot.claude_model = model
 
-                # Point 1 & 2: Adaptive interval (slow down in ranging/choppy, speed up in volatile)
                 adaptive_int = _adaptive_interval()
                 final_interval = max(interval, adaptive_int)
 
-                # This call will populate bot.claude_decision
                 await call_claude(bot, broadcast_price, skip_scout=skip_scout, coin_limit=coin_limit, tier=tier)
 
-                # Point 3: Broadcast to all eligible users
                 if bot.claude_decision:
                     await bot_manager.broadcast_managed_signal(
                         bot.claude_decision,
@@ -311,7 +318,7 @@ async def hub_scan_cycle(tier: str):
 
                 await asyncio.sleep(final_interval)
             else:
-                await asyncio.sleep(10) # Wait for users to join
+                await asyncio.sleep(10)
 
         except Exception as e:
             bot.add_log(f"{tier.upper()} Hub error: {str(e)[:80]}", "error")
@@ -906,7 +913,9 @@ async def ws_endpoint(ws: WebSocket):
         "info",
     )
     try:
-        await ws.send_text(json.dumps(bot.snapshot(), default=str))
+        snap = bot.snapshot()
+        snap["brain_enabled"] = bot_manager.brain_enabled
+        await ws.send_text(json.dumps(snap, default=str))
     except Exception:
         bot.clients.discard(ws)
         return
@@ -965,7 +974,9 @@ async def _handle_ws_command(msg: dict):
         bot.bot_running = True
         bot.countdown = 5
         bot.add_log("🟢 Bot started", "success")
-        await broadcast({"type": "bot_status", "bot_running": True})
+        if not bot_manager.brain_enabled:
+            bot.add_log("⚠️ Brain is currently offline — bot is queued and will trade when admin re-enables the brain", "warning")
+        await broadcast({"type": "bot_status", "bot_running": True, "brain_enabled": bot_manager.brain_enabled})
 
     elif cmd == "stop_bot":
         bot.bot_running = False

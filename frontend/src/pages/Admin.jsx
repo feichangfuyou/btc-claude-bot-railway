@@ -290,6 +290,18 @@ export default function Admin() {
   }, [liveLogs]);
 
   // Actions
+  const toggleBrain = async () => {
+    if (!stats || actionLoading) return;
+    const next = !stats.brain_enabled;
+    if (!next && !window.confirm("Turn off the AI brain? No new signals will be generated (existing positions stay open).")) return;
+    setActionLoading(true);
+    try {
+      const d = await api(`/api/admin/brain-toggle?enabled=${next}`, { method: "POST" });
+      setStats(p => ({ ...p, brain_enabled: d.brain_enabled }));
+    } catch (e) { alert(e.message); }
+    finally { setActionLoading(false); }
+  };
+
   const togglePause = async () => {
     if (!stats || actionLoading) return;
     setActionLoading(true);
@@ -466,7 +478,17 @@ export default function Admin() {
         {/* ── OVERVIEW ── */}
         {activeTab === "overview" && (<>
           {/* Emergency Controls */}
-          <Section title="GLOBAL CONTROLS" icon={Shield} accent={stats?.global_pause ? colors.error : null}>
+          <Section title="GLOBAL CONTROLS" icon={Shield} accent={stats?.global_pause ? colors.error : !stats?.brain_enabled ? colors.gold : null}>
+            {/* Brain status banner */}
+            {stats && !stats.brain_enabled && (
+              <div style={{ marginBottom: 16, padding: "10px 16px", background: "rgba(212,175,55,0.12)", borderRadius: 10, border: "1px solid rgba(212,175,55,0.3)", display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 18 }}>🧠</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: colors.gold }}>BRAIN IS OFFLINE</div>
+                  <div style={{ fontSize: 11, color: colors.muted }}>AI hub scan cycles are paused. No API spend. Users who start bots are queued — they'll receive signals when you turn the brain back on.</div>
+                </div>
+              </div>
+            )}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: stats?.global_pause ? colors.error : colors.success }}>
@@ -478,6 +500,10 @@ export default function Admin() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
+                <button style={{ padding: "14px 24px", borderRadius: 12, border: `1px solid ${stats?.brain_enabled ? "#00e676" : colors.gold}44`, background: stats?.brain_enabled ? "rgba(0,230,118,0.12)" : "rgba(212,175,55,0.15)", color: stats?.brain_enabled ? "#00e676" : colors.gold, fontSize: 12, fontWeight: 800, cursor: "pointer", transition: "all 0.3s ease" }}
+                  onClick={toggleBrain} disabled={actionLoading} className="admin-action-btn">
+                  🧠 {actionLoading ? "..." : stats?.brain_enabled ? "BRAIN ON" : "BRAIN OFF"}
+                </button>
                 <button style={{ padding: "14px 24px", borderRadius: 12, border:`1px solid ${breaker?.global_risk_off ? colors.gold : colors.muted}44`, background: breaker?.global_risk_off ? "rgba(212,175,55,0.15)" : "transparent", color: breaker?.global_risk_off ? colors.gold : colors.muted, fontSize: 12, fontWeight: 800, cursor: "pointer", transition: "all 0.3s ease" }}
                   onClick={toggleRiskOff} disabled={actionLoading} className="admin-action-btn">
                   🛡️ {breaker?.global_risk_off ? "DISABLE RISK-OFF" : "ENABLE RISK-OFF"}
@@ -496,11 +522,11 @@ export default function Admin() {
           {/* Platform Metrics */}
           <Section title="PLATFORM METRICS" icon={Activity}>
             <div style={s.statsGrid} className="stats-grid">
+              <StatCard label="AI BRAIN" value={stats?.brain_enabled ? "ONLINE" : "OFFLINE"} color={stats?.brain_enabled ? colors.success : colors.gold} />
               <StatCard label="ACTIVE BOTS" value={stats?.active_users ?? "—"} />
               <StatCard label="TOTAL USERS" value={stats?.total_users ?? "—"} />
               <StatCard label="DAILY P&L" value={stats?.global_daily_pnl != null ? fmt2(stats.global_daily_pnl) : "—"} color={pnlColor(stats?.global_daily_pnl || 0)} />
               <StatCard label="TOTAL P&L" value={stats?.global_total_pnl != null ? fmt2(stats.global_total_pnl) : "—"} color={pnlColor(stats?.global_total_pnl || 0)} />
-              <StatCard label="MEMORY" value={stats?.memory_usage_mb ? `${stats.memory_usage_mb} MB` : "—"} />
               <StatCard label="MAX LOSS LIMIT" value={`$${(stats?.global_max_loss || 0).toLocaleString()}`} color={colors.error} />
             </div>
           </Section>

@@ -255,8 +255,32 @@ class BotManager:
         self.global_risk_off = False
         self.global_max_loss_usd = 1000000.0  # $1M platform limit
 
+        # Brain master switch — when False, hub_scan_cycle AI loops are idle (no API spend).
+        # Persisted to Redis so it survives restarts.
+        self.brain_enabled = True
+        self._load_brain_state()
+
         # Concurrency limit for broadcast signals to prevent rate limit bans (e.g. Coinbase 429 errors)
         self._broadcast_semaphore = asyncio.Semaphore(50)  # Max 50 concurrent outgoing orders
+
+    def _load_brain_state(self):
+        """Restore brain_enabled from Redis (survives restarts). 30-day TTL."""
+        try:
+            from core.redis_client import cache_get
+            val = cache_get("admin:brain_enabled", ttl_sec=30 * 86400)
+            if val is not None:
+                self.brain_enabled = bool(val)
+        except Exception:
+            pass
+
+    def set_brain_enabled(self, enabled: bool):
+        """Toggle the AI brain and persist to Redis."""
+        self.brain_enabled = enabled
+        try:
+            from core.redis_client import cache_set
+            cache_set("admin:brain_enabled", enabled, ttl_sec=30 * 86400)
+        except Exception:
+            pass
 
     async def get_or_create(self, user_id: str) -> UserBotInstance:
         """Get an existing bot instance or create a new one."""
