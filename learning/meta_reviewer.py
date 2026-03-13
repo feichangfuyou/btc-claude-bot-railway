@@ -25,10 +25,10 @@ DAILY_GUIDANCE_PATH = os.path.join(GUIDANCE_DIR, "DAILY.md")
 WEEKLY_GUIDANCE_PATH = os.path.join(GUIDANCE_DIR, "WEEKLY.md")
 MONTHLY_GUIDANCE_PATH = os.path.join(GUIDANCE_DIR, "MONTHLY.md")
 
-# Models for different levels of depth
-DAILY_MODEL = "claude-3-5-sonnet-20240620"
-WEEKLY_MODEL = "claude-3-5-opus-20240229"
-MONTHLY_MODEL = "claude-3-5-opus-20240229"
+# Models for different levels of depth (must match ALLOWED_MODELS in claude_ai.py)
+DAILY_MODEL = "claude-haiku-4-5-20251001"
+WEEKLY_MODEL = "claude-sonnet-4-6"
+MONTHLY_MODEL = "claude-opus-4-6"
 
 REVIEW_TIMEOUT = 120
 

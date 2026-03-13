@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [mfaChallenge, setMfaChallenge] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -20,8 +21,10 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) fetchProfile(s.user.id);
-      else {
+      if (s?.user) {
+        setMfaChallenge(null);
+        fetchProfile(s.user.id);
+      } else {
         setProfile(null);
         setLoading(false);
       }
@@ -54,7 +57,55 @@ export function AuthProvider({ children }) {
   async function signIn(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+
+    // Supabase returns a session if no MFA, or an empty session with mfa metadata if MFA is required
+    if (data?.session) {
+      return data;
+    }
+
+    // MFA required — get the TOTP factor and create a challenge
+    const factors = data?.user?.factors ?? [];
+    const totpFactor = factors.find((f) => f.factor_type === "totp" && f.status === "verified");
+
+    if (!totpFactor) {
+      // Fallback: check via the MFA API
+      const { data: assuranceData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (assuranceData?.nextLevel === "aal2" && assuranceData?.currentLevel === "aal1") {
+        const { data: factorsList } = await supabase.auth.mfa.listFactors();
+        const totp = factorsList?.totp?.find((f) => f.status === "verified");
+        if (totp) {
+          const { data: challenge, error: challengeErr } = await supabase.auth.mfa.challenge({ factorId: totp.id });
+          if (challengeErr) throw challengeErr;
+          setMfaChallenge({ factorId: totp.id, challengeId: challenge.id });
+          return { mfaRequired: true };
+        }
+      }
+      throw new Error("MFA factor not found. Please contact support.");
+    }
+
+    const { data: challenge, error: challengeErr } = await supabase.auth.mfa.challenge({ factorId: totpFactor.id });
+    if (challengeErr) throw challengeErr;
+
+    setMfaChallenge({ factorId: totpFactor.id, challengeId: challenge.id });
+    return { mfaRequired: true };
+  }
+
+  async function verifyMfa(code) {
+    if (!mfaChallenge) throw new Error("No MFA challenge in progress");
+
+    const { data, error } = await supabase.auth.mfa.verify({
+      factorId: mfaChallenge.factorId,
+      challengeId: mfaChallenge.challengeId,
+      code,
+    });
+    if (error) throw error;
+
+    setMfaChallenge(null);
     return data;
+  }
+
+  function cancelMfa() {
+    setMfaChallenge(null);
   }
 
   async function signInWithGoogle() {
@@ -84,6 +135,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setSession(null);
     setProfile(null);
+    setMfaChallenge(null);
   }
 
   async function refreshProfile() {
@@ -95,8 +147,11 @@ export function AuthProvider({ children }) {
     session,
     profile,
     loading,
+    mfaChallenge,
     signUp,
     signIn,
+    verifyMfa,
+    cancelMfa,
     signInWithGoogle,
     signInWithApple,
     signOut,

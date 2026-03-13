@@ -65,7 +65,7 @@ function LandingTicker() {
 }
 
 export default function Login() {
-  const { user, signIn, signInWithGoogle, signInWithApple } = useAuth();
+  const { user, signIn, signInWithGoogle, signInWithApple, mfaChallenge, verifyMfa, cancelMfa } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [email, setEmail] = useState("");
@@ -75,6 +75,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(null);
   const [resetSent, setResetSent] = useState(false);
+  const [totpCode, setTotpCode] = useState("");
+  const [mfaLoading, setMfaLoading] = useState(false);
 
   useEffect(() => {
     document.title = "DoYou.trade — Professional Market Intelligence Terminal | Strategy Research";
@@ -93,13 +95,38 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      await signIn(email, password);
+      const result = await signIn(email, password);
+      if (result?.mfaRequired) {
+        setLoading(false);
+        return;
+      }
       navigate("/dashboard");
     } catch (err) {
       setError(err.message || "Invalid credentials");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleMfaVerify(e) {
+    e.preventDefault();
+    setError("");
+    setMfaLoading(true);
+    try {
+      await verifyMfa(totpCode);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.message || "Invalid 2FA code. Please try again.");
+      setTotpCode("");
+    } finally {
+      setMfaLoading(false);
+    }
+  }
+
+  function handleMfaCancel() {
+    cancelMfa();
+    setTotpCode("");
+    setError("");
   }
 
   async function handleOAuth(provider) {
@@ -218,6 +245,52 @@ export default function Login() {
                     GO TO DASHBOARD <ArrowRight size={18} />
                   </button>
               </div>
+            ) : mfaChallenge ? (
+              <>
+                {error && <div className="auth-alert auth-alert--error">{error}</div>}
+
+                <div style={{ textAlign: "center", marginBottom: "20px" }}>
+                  <Shield size={40} style={{ color: colors.gold, marginBottom: "12px" }} />
+                  <div style={{ fontSize: "18px", fontWeight: "700", letterSpacing: "2px", marginBottom: "8px" }}>TWO-FACTOR AUTHENTICATION</div>
+                  <p style={{ fontSize: "13px", color: "#888", lineHeight: "1.5" }}>
+                    Enter the 6-digit code from your authenticator app
+                  </p>
+                </div>
+
+                <form onSubmit={handleMfaVerify} className="auth-form">
+                  <div className="auth-field">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      placeholder="000000"
+                      value={totpCode}
+                      onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      required
+                      autoFocus
+                      className="auth-input"
+                      aria-label="2FA verification code"
+                      style={{ textAlign: "center", fontSize: "24px", letterSpacing: "12px", fontWeight: "700", fontFamily: "'Space Mono', monospace" }}
+                    />
+                  </div>
+
+                  <button type="submit" disabled={mfaLoading || totpCode.length !== 6} className="auth-submit" aria-label="Verify 2FA Code">
+                    {mfaLoading ? "VERIFYING..." : "VERIFY & SIGN IN"}
+                  </button>
+                </form>
+
+                <div style={{ textAlign: "center", marginTop: "16px" }}>
+                  <button
+                    type="button"
+                    onClick={handleMfaCancel}
+                    className="auth-link"
+                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.85rem", padding: 0 }}
+                  >
+                    Back to login
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 {error && <div className="auth-alert auth-alert--error">{error}</div>}

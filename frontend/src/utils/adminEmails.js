@@ -3,7 +3,7 @@
  * Must match ADMIN_EMAILS on backend. Set in .env:
  *   VITE_ADMIN_EMAILS=feichangfuyou@gmail.com,feichangfuyou@doyou.trade
  */
-const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS || "feichangfuyou@gmail.com,feichangfuyou@doyou.trade")
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS || "feichangfuyou@gmail.com,feichangfuyou@doyou.trade,feichangfuyou@killswitch.works")
   .split(",")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
