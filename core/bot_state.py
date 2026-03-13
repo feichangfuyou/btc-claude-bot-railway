@@ -26,6 +26,8 @@ from core.config import (
     FUTURES_LEVERAGE,
     FUTURES_LIVE,
     GAS_COST_USD,
+    LIVE_MIN_BALANCE,
+    LIVE_START_BALANCE,
     MAX_CONCURRENT_POSITIONS,
     MAX_DAILY_LOSS_PCT,
     MAX_DRAWDOWN_PCT,
@@ -81,6 +83,13 @@ class BotState:
         saved_account = db_load_state("account")
         self.account = saved_account or {
             "balance": START_BALANCE,
+            "daily_pnl": 0.0,
+            "total_pnl": 0.0,
+        }
+
+        saved_live = db_load_state("live_account")
+        self.live_account = saved_live or {
+            "balance": LIVE_START_BALANCE,
             "daily_pnl": 0.0,
             "total_pnl": 0.0,
         }
@@ -297,6 +306,7 @@ class BotState:
 
     def persist_account(self):
         db_save_state("account", self.account)
+        db_save_state("live_account", self.live_account)
 
     def persist_position(self):
         db_save_state("open_positions", self.open_positions)
@@ -354,28 +364,23 @@ class BotState:
                 asyncio.create_task(close_onchain(self, pos, reason=reason))
                 continue
 
-            if not PAPER_TRADING and pos.get("exchange") == "binance":
-                from executors.binance_executor import BinanceExecutor
-
-                ex = BinanceExecutor()
-                self.add_log(f"{reason} [{pos_symbol}] — closing Binance position...", "warning")
-                asyncio.create_task(ex.execute_trade(pos_symbol, "sell" if pos["side"] == "buy" else "buy", pos["usd_size"]))
-                self._finalize_close(pos, pos_symbol, coin_size, pnl, reason)
-                continue
-
-            if not PAPER_TRADING and pos.get("exchange") == "kraken":
-                from executors.kraken_executor import close_kraken
-
-                self.add_log(f"{reason} [{pos_symbol}] — closing Kraken position...", "warning")
-                asyncio.create_task(close_kraken(self, pos, reason=reason))
-                continue
-
-            if not PAPER_TRADING and pos.get("exchange") == "coinbase":
-                from executors.coinbase_spot_executor import close_coinbase_spot
-
-                self.add_log(f"{reason} [{pos_symbol}] — closing Coinbase position...", "warning")
-                asyncio.create_task(close_coinbase_spot(self, pos, reason=reason))
-                continue
+            # Close the live exchange mirror if it exists
+            if pos.get("live_mirrored"):
+                exchange = pos.get("exchange", "")
+                close_side = "sell" if pos["side"] == "buy" else "buy"
+                if exchange == "binance":
+                    from executors.binance_executor import BinanceExecutor
+                    ex = BinanceExecutor()
+                    self.add_log(f"{reason} [{pos_symbol}] — closing Binance mirror...", "warning")
+                    asyncio.create_task(ex.execute_trade(pos_symbol, close_side, pos["usd_size"]))
+                elif exchange == "kraken":
+                    from executors.kraken_executor import close_kraken
+                    self.add_log(f"{reason} [{pos_symbol}] — closing Kraken mirror...", "warning")
+                    asyncio.create_task(close_kraken(self, pos, reason=reason))
+                elif exchange == "coinbase":
+                    from executors.coinbase_spot_executor import close_coinbase_spot
+                    self.add_log(f"{reason} [{pos_symbol}] — closing Coinbase mirror...", "warning")
+                    asyncio.create_task(close_coinbase_spot(self, pos, reason=reason))
 
             self._finalize_close(pos, pos_symbol, coin_size, pnl, reason)
 
@@ -475,7 +480,6 @@ class BotState:
         trading_fee = pos["usd_size"] * ROUND_TRIP_FEE
         onchain_cost = (pos["usd_size"] * ONCHAIN_SLIPPAGE + GAS_COST_USD * 2) if pos.get("onchain") else 0
 
-        # Simulated slippage helps bridge the paper-to-live performance gap
         paper_slippage = (pos["usd_size"] * PAPER_SLIPPAGE_PCT * 2) if (PAPER_TRADING and not pos.get("onchain")) else 0
         total_cost = trading_fee + onchain_cost + AI_COST_PER_TRADE + paper_slippage
 
@@ -483,6 +487,9 @@ class BotState:
         self.account["balance"] = round(self.account["balance"] + pos["usd_size"] + net, 2)
         self.account["daily_pnl"] = round(self.account["daily_pnl"] + net, 2)
         self.account["total_pnl"] = round(self.account["total_pnl"] + net, 2)
+
+        if pos.get("exchange") in ("coinbase", "kraken", "binance"):
+            self._mirror_live_close(net, pos["usd_size"])
 
         exit_price = pos["tp"] if "TP" in reason else pos["sl"]
         trade = {
@@ -588,6 +595,10 @@ class BotState:
         self.account["daily_pnl"] = round(self.account["daily_pnl"] + net, 2)
         self.account["total_pnl"] = round(self.account["total_pnl"] + net, 2)
 
+        actual_exchange = exchange or pos.get("exchange")
+        if actual_exchange in ("coinbase", "kraken", "binance"):
+            self._mirror_live_close(net, pos["usd_size"])
+
         trade = {
             "id": int(time.time() * 1000),
             "symbol": pos_symbol,
@@ -602,7 +613,7 @@ class BotState:
             "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "win": net > 0,
             "product_type": pos.get("product_type", "spot"),
-            "exchange": exchange or pos.get("exchange"),
+            "exchange": actual_exchange,
         }
         self.trades = [trade] + self.trades[:29]
         db_save_trade(trade)
@@ -1080,26 +1091,20 @@ class BotState:
             asyncio.create_task(close_onchain(self, pos))
             return
 
-        if not PAPER_TRADING and pos.get("exchange") == "binance":
-            from executors.binance_executor import BinanceExecutor
-
-            ex = BinanceExecutor()
-            asyncio.create_task(ex.execute_trade(pos_symbol, "sell" if pos["side"] == "buy" else "buy", pos["usd_size"]))
-            # we finalize locally for paper compatibility and safety in this bot
-            self._finalize_close(pos, pos_symbol, coin_size, current_price, reason)
-            return
-
-        if not PAPER_TRADING and pos.get("exchange") == "kraken":
-            from executors.kraken_executor import close_kraken
-
-            asyncio.create_task(close_kraken(self, pos, reason))
-            return
-
-        if not PAPER_TRADING and pos.get("exchange") == "coinbase":
-            from executors.coinbase_spot_executor import close_coinbase_spot
-
-            asyncio.create_task(close_coinbase_spot(self, pos, reason))
-            return
+        # Close the live exchange mirror if it exists
+        if pos.get("live_mirrored"):
+            exchange = pos.get("exchange", "")
+            close_side = "sell" if pos["side"] == "buy" else "buy"
+            if exchange == "binance":
+                from executors.binance_executor import BinanceExecutor
+                ex = BinanceExecutor()
+                asyncio.create_task(ex.execute_trade(pos_symbol, close_side, pos["usd_size"]))
+            elif exchange == "kraken":
+                from executors.kraken_executor import close_kraken
+                asyncio.create_task(close_kraken(self, pos, reason))
+            elif exchange == "coinbase":
+                from executors.coinbase_spot_executor import close_coinbase_spot
+                asyncio.create_task(close_coinbase_spot(self, pos, reason))
 
         if pos["side"] == "buy":
             pnl = (current_price - pos["entry"]) * coin_size
@@ -1108,7 +1113,6 @@ class BotState:
         trading_fee = pos["usd_size"] * ROUND_TRIP_FEE
         onchain_cost = (pos["usd_size"] * ONCHAIN_SLIPPAGE + GAS_COST_USD * 2) if pos.get("onchain") else 0
 
-        # Simulated slippage helps bridge the paper-to-live performance gap
         paper_slippage = (pos["usd_size"] * PAPER_SLIPPAGE_PCT * 2) if (PAPER_TRADING and not pos.get("onchain")) else 0
         total_cost = trading_fee + onchain_cost + AI_COST_PER_TRADE + paper_slippage
 
@@ -1116,6 +1120,10 @@ class BotState:
         self.account["balance"] = round(self.account["balance"] + pos["usd_size"] + net, 2)
         self.account["daily_pnl"] = round(self.account["daily_pnl"] + net, 2)
         self.account["total_pnl"] = round(self.account["total_pnl"] + net, 2)
+
+        if pos.get("exchange") in ("coinbase", "kraken", "binance"):
+            self._mirror_live_close(net, pos["usd_size"])
+
         trade = {
             "id": int(time.time() * 1000),
             "symbol": pos_symbol,
@@ -1231,6 +1239,25 @@ class BotState:
         onchain_cost = (usd_sz * ONCHAIN_SLIPPAGE + GAS_COST_USD * 2) if is_onchain else 0
         paper_slippage = (usd_sz * PAPER_SLIPPAGE_PCT * 2) if (PAPER_TRADING and not is_onchain) else 0
         return trading_fee + onchain_cost + AI_COST_PER_TRADE + paper_slippage
+
+    def _live_can_afford(self, usd_sz: float) -> tuple[bool, str]:
+        """Check if the live exchange account has enough balance and won't drop below the floor."""
+        live_bal = self.live_account.get("balance", LIVE_START_BALANCE)
+        if live_bal - usd_sz < LIVE_MIN_BALANCE:
+            return False, f"live balance ${live_bal:.2f} - ${usd_sz:.2f} would breach ${LIVE_MIN_BALANCE:.0f} floor"
+        return True, "ok"
+
+    def _mirror_live_open(self, usd_sz: float, symbol: str, action: str, entry: float, exchange: str):
+        """Debit the live exchange account when a real exchange order is placed."""
+        self.live_account["balance"] = round(self.live_account["balance"] - usd_sz, 2)
+        db_save_state("live_account", self.live_account)
+
+    def _mirror_live_close(self, net: float, usd_sz: float):
+        """Credit the live exchange account when a real exchange position closes."""
+        self.live_account["balance"] = round(self.live_account["balance"] + usd_sz + net, 2)
+        self.live_account["daily_pnl"] = round(self.live_account["daily_pnl"] + net, 2)
+        self.live_account["total_pnl"] = round(self.live_account["total_pnl"] + net, 2)
+        db_save_state("live_account", self.live_account)
 
     def _handle_open_trade(self, action: str, decision: dict):
         order = decision.get("order", {})
@@ -1414,75 +1441,11 @@ class BotState:
                 self.add_log(f"Futures at capacity ({n_futures}/{MAX_FUTURES_POSITIONS}) — skip", "dim")
                 return
 
-        # ── Spot routing: round-robin across Coinbase + Kraken ──────────────
-        # Live mode: execute real orders on the chosen exchange
-        # Paper mode: create paper positions tagged with the exchange for tracking
+        # ── Dual-track: Paper position ALWAYS + Live exchange mirror ─────────
+        # 1. Paper position always created (tracks against $1k paper account)
+        # 2. If live exchange is available and affordable, mirror the same trade
         spot_exchange = self._next_spot_exchange()
 
-        if not PAPER_TRADING and spot_exchange == "binance":
-            from executors.binance_executor import BinanceExecutor
-
-            self.last_ai_block_reason = None
-            ex = BinanceExecutor()
-            asyncio.create_task(ex.execute_trade(symbol, action, usd_sz))
-            # Paper-ish tracking for the bot's state
-            self.account["balance"] = round(self.account["balance"] - usd_sz, 2)
-            new_pos = {
-                "id": int(time.time() * 1000),
-                "symbol": symbol,
-                "side": action,
-                "entry": entry,
-                "tp": tp,
-                "sl": sl,
-                "coin_size": coin_sz,
-                "btc_size": coin_sz,
-                "usd_size": usd_sz,
-                "open_ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "confidence": decision.get("confidence", 0),
-                "patterns": decision.get("patterns_detected", []),
-                "exchange": "binance",
-            }
-            self.open_positions.append(new_pos)
-            self.persist_position()
-            self.persist_account()
-            self.add_log(f"🟢 {action.upper()} {symbol} [BINANCE] @ ${entry:,.2f}", "success")
-            return
-
-        if not PAPER_TRADING and spot_exchange == "kraken":
-            from executors.kraken_executor import execute_kraken
-
-            self.last_ai_block_reason = None
-            asyncio.create_task(execute_kraken(self, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision))
-            return
-
-        if not PAPER_TRADING and spot_exchange == "coinbase":
-            if not is_onchain:
-                try:
-                    from executors.coinbase_spot_executor import execute_coinbase_spot
-
-                    self.last_ai_block_reason = None
-                    asyncio.create_task(
-                        execute_coinbase_spot(self, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision)
-                    )
-                    return
-                except Exception:
-                    pass
-
-        # Solver network: intent-based execution (UniswapX/CoW Swap) — preferred over direct DEX
-        use_solver = os.getenv("SOLVER_NETWORK", "").strip() or (is_onchain and not PAPER_TRADING)
-        if use_solver and is_onchain:
-            self.last_ai_block_reason = None
-            asyncio.create_task(self._execute_via_solver(action, symbol, entry, tp, sl, coin_sz, usd_sz, decision))
-            return
-
-        if is_onchain:
-            from executors.onchain_executor import execute_onchain
-
-            self.last_ai_block_reason = None
-            asyncio.create_task(execute_onchain(self, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision))
-            return
-
-        # Paper mode (or no live exchange available) — tag with exchange for dashboard
         self.last_ai_block_reason = None
         self.account["balance"] = round(self.account["balance"] - usd_sz, 2)
         new_pos = {
@@ -1499,16 +1462,55 @@ class BotState:
             "confidence": decision.get("confidence", 0),
             "patterns": decision.get("patterns_detected", []),
             "exchange": spot_exchange if spot_exchange != "paper" else None,
+            "paper": True,
         }
+
+        # Mirror on live exchange if we can afford it
+        live_mirrored = False
+        if spot_exchange in ("binance", "kraken", "coinbase"):
+            live_ok, live_reason = self._live_can_afford(usd_sz)
+            if live_ok:
+                new_pos["live_mirrored"] = True
+                self._mirror_live_open(usd_sz, symbol, action, entry, spot_exchange)
+
+                if spot_exchange == "binance":
+                    from executors.binance_executor import BinanceExecutor
+                    ex = BinanceExecutor()
+                    asyncio.create_task(ex.execute_trade(symbol, action, usd_sz))
+                    live_mirrored = True
+
+                elif spot_exchange == "kraken":
+                    from executors.kraken_executor import execute_kraken
+                    asyncio.create_task(execute_kraken(self, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision))
+                    live_mirrored = True
+
+                elif spot_exchange == "coinbase":
+                    try:
+                        from executors.coinbase_spot_executor import execute_coinbase_spot
+                        asyncio.create_task(
+                            execute_coinbase_spot(self, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision)
+                        )
+                        live_mirrored = True
+                    except Exception:
+                        pass
+
+                if not live_mirrored:
+                    new_pos.pop("live_mirrored", None)
+                    self.live_account["balance"] = round(self.live_account["balance"] + usd_sz, 2)
+                    db_save_state("live_account", self.live_account)
+            else:
+                self.add_log(f"Live mirror skipped: {live_reason}", "dim")
+
         self.open_positions.append(new_pos)
         self.persist_position()
         self.persist_account()
         emoji = "🟢" if action == "buy" else "🔴"
         ex_tag = f" [{spot_exchange.upper()}]" if spot_exchange != "paper" else ""
+        live_tag = " +LIVE" if live_mirrored else ""
         patterns_str = ", ".join(decision.get("patterns_detected", [])[:3])
         pos_count = len(self.open_positions)
         self.add_log(
-            f"{emoji} {action.upper()} {symbol} @ ${entry:,.2f}{ex_tag} | "
+            f"{emoji} {action.upper()} {symbol} @ ${entry:,.2f}{ex_tag}{live_tag} | "
             f"TP ${tp:,.2f} | SL ${sl:,.2f} | "
             f"${usd_sz:.2f} ({pct * 100:.0f}%) | Conf {decision.get('confidence', 0) * 100:.0f}% | "
             f"Pos {pos_count}/{MAX_CONCURRENT_POSITIONS}" + (f" | {patterns_str}" if patterns_str else ""),
@@ -1622,6 +1624,7 @@ class BotState:
 
             self.last_reset_date = today
             self.account["daily_pnl"] = 0.0
+            self.live_account["daily_pnl"] = 0.0
             self._daily_profit_alert_sent = False
             self._daily_loss_alert_sent = False
             db_save_state("last_reset_date", today)
@@ -1734,6 +1737,9 @@ class BotState:
             "claude_model": self.claude_model,
             "analysis_model": self.claude_model,
             "paper_trading": PAPER_TRADING,
+            "live_account": self.live_account,
+            "live_start_balance": LIVE_START_BALANCE,
+            "live_min_balance": LIVE_MIN_BALANCE,
             "test_mode": TEST_MODE,
             "coinbase_connected": self.coinbase_connected,
             "binance_enabled": ENABLE_BINANCE,

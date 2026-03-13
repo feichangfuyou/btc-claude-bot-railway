@@ -40,6 +40,8 @@ from core.config import (
     ENABLE_FUTURES,
     ENABLE_KRAKEN,
     FUTURES_LIVE,
+    LIVE_MIN_BALANCE,
+    LIVE_START_BALANCE,
     PAPER_TRADING,
     PERPETUALS_PORTFOLIO_UUID,
     REQUIRE_TRADE_APPROVAL,
@@ -651,7 +653,8 @@ async def _deferred_startup():
     _coins = bot.active_coin_list
     bot.add_log(
         f"⏸️ Bot ready — scanning {len(_coins)} pairs ({', '.join(_coins)}). "
-        f"Select a strategy and hit START. ${START_BALANCE:.0f} → ${TARGET_BALANCE:.0f} target",
+        f"Paper: ${START_BALANCE:.0f} → ${TARGET_BALANCE:.0f} | "
+        f"Live: ${LIVE_START_BALANCE:.0f} (floor ${LIVE_MIN_BALANCE:.0f}). Hit START.",
         "info",
     )
 

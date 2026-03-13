@@ -21,9 +21,13 @@ COINBASE_API_KEY = os.getenv("COINBASE_API_KEY", "")
 COINBASE_API_SECRET = os.getenv("COINBASE_API_SECRET", "")
 CRYPTOPANIC_API_KEY = os.getenv("CRYPTOPANIC_API_KEY", "")
 PAPER_TRADING = os.getenv("PAPER_TRADING", "true").lower() == "true"
-START_BALANCE = float(os.getenv("START_BALANCE", "1000"))  # Paper wallet starting capital ($1k realistic seed)
-TARGET_BALANCE = float(os.getenv("TARGET_BALANCE", "5000"))  # Goal: grow 1k → 5k
-PROFIT_TO_TARGET = TARGET_BALANCE - START_BALANCE  # $4k profit needed
+START_BALANCE = float(os.getenv("START_BALANCE", "1000"))
+TARGET_BALANCE = float(os.getenv("TARGET_BALANCE", "2000"))
+PROFIT_TO_TARGET = TARGET_BALANCE - START_BALANCE
+
+# Dual-track: separate live exchange capital from paper
+LIVE_START_BALANCE = float(os.getenv("LIVE_START_BALANCE", "1000"))
+LIVE_MIN_BALANCE = float(os.getenv("LIVE_MIN_BALANCE", "750"))
 CLAUDE_INTERVAL = int(os.getenv("CLAUDE_INTERVAL", "90"))
 MAX_DAILY_LOSS_PCT = float(os.getenv("MAX_DAILY_LOSS_PCT", "0.05"))
 MAX_POSITION_SIZE = float(os.getenv("MAX_POSITION_SIZE", "0.25"))
@@ -69,7 +73,7 @@ WAIT_CALLS_PER_TRADE = 4  # avg "wait" decisions between trades
 # Hybrid cost: most calls are scout (cheap), only ~20% escalate to trade model
 AI_COST_PER_TRADE = round(SCOUT_COST_PER_CALL * WAIT_CALLS_PER_TRADE + TRADE_COST_PER_CALL, 4)
 
-MIN_TRADE_USD = float(os.getenv("MIN_TRADE_USD", "75"))  # $75+ to cover ~1.2% fees + AI cost and leave profit
+MIN_TRADE_USD = float(os.getenv("MIN_TRADE_USD", "60"))
 MIN_PROFIT_AFTER_COSTS = float(os.getenv("MIN_PROFIT_AFTER_COSTS", "5.0"))
 
 TEST_MODE = os.getenv("TEST_MODE", "true").lower() == "true"
