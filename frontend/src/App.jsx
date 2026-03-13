@@ -220,6 +220,7 @@ function Dashboard() {
   }, []);
   const [coins, setCoins] = useState({});
   const [activeCoins, setActiveCoins] = useState(DEFAULT_COINS);
+  const backendCoinsRef = useRef(DEFAULT_COINS);
   const [selectedCoin, setSelectedCoin] = useState("BTC");
   const selectedCoinRef = useRef("BTC");
   const [chartSymbol, setChartSymbol] = useState("BTC");  // What's shown on the main chart (can be any ticker/exchange)
@@ -453,7 +454,7 @@ function Dashboard() {
             }
             if (cd?.price_change24h != null) setChange24h(cd.price_change24h);
           }
-          if (m.active_coins) setActiveCoins(m.active_coins);
+          if (m.active_coins) { backendCoinsRef.current = m.active_coins; setActiveCoins(m.active_coins); }
           if (m.type === "full_state" && Array.isArray(m.market_tickers) && m.market_tickers.length > 0) {
             setMarketTickers(m.market_tickers.map((c) => ({
               sym: (c.sym || c.symbol || "").toUpperCase(),
@@ -1168,9 +1169,10 @@ function Dashboard() {
     return () => clearInterval(interval);
   }, [positions.length, botOn]);
 
-  const fastScanCoin = activeCoins.length > 0 ? activeCoins[fastScanIdx % activeCoins.length] : selectedCoin;
+  const scanCoins = backendCoinsRef.current;
+  const fastScanCoin = scanCoins.length > 0 ? scanCoins[fastScanIdx % scanCoins.length] : selectedCoin;
   // Chart updates every ~2400ms (every 6th tick) to allow TV to render, while text updates faster
-  const chartScanCoin = activeCoins.length > 0 ? activeCoins[Math.floor(fastScanIdx / 6) % activeCoins.length] : selectedCoin;
+  const chartScanCoin = scanCoins.length > 0 ? scanCoins[Math.floor(fastScanIdx / 6) % scanCoins.length] : selectedCoin;
 
   const priceFormat = useCallback((v) => {
     if (v < 10) return v.toFixed(4);

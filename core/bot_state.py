@@ -1231,7 +1231,9 @@ class BotState:
             sl_mult, tp_mult = sl_mult * 0.9, tp_mult * 0.9
 
         # User config: loosen SL (default 1.3 = 30% wider stops to avoid premature stop-outs)
+        # Proportionally widen TP to preserve the preset's target R:R
         sl_mult = sl_mult * SL_ATR_WIDEN
+        tp_mult = tp_mult * SL_ATR_WIDEN
 
         min_sl_dist = effective_atr * sl_mult
         min_tp_dist = effective_atr * tp_mult
@@ -1316,10 +1318,14 @@ class BotState:
         pct = pct * vol_adj
         usd_sz = round(self.account["balance"] * pct, 2)
 
+        # Bump to MIN_TRADE_USD if under-sized but balance allows it
         if usd_sz < MIN_TRADE_USD:
-            self.last_ai_block_reason = f"{ai_msg} — rejected: trade size ${usd_sz:.2f} < ${MIN_TRADE_USD:.2f} minimum"
-            self.add_log(self.last_ai_block_reason, "warning")
-            return
+            if self.account["balance"] >= MIN_TRADE_USD * 1.5:
+                usd_sz = MIN_TRADE_USD
+            else:
+                self.last_ai_block_reason = f"{ai_msg} — rejected: trade size ${usd_sz:.2f} < ${MIN_TRADE_USD:.2f} minimum"
+                self.add_log(self.last_ai_block_reason, "warning")
+                return
 
         if usd_sz > MAX_POSITION_USD:
             usd_sz = MAX_POSITION_USD
@@ -1336,10 +1342,11 @@ class BotState:
         net_tp_profit = expected_tp_profit - total_cost
 
         # CRITICAL: Reject trades where TP profit cannot cover costs — prevents "TP HIT but LOSS"
-        # Applies to BOTH spot and futures — no point entering any trade that can't be profitable at TP
-        if net_tp_profit < MIN_PROFIT_AFTER_COSTS:
+        # Scale min profit with position size: max of env setting or 1% of position, floor $0.50
+        effective_min_profit = max(0.50, min(MIN_PROFIT_AFTER_COSTS, usd_sz * 0.01))
+        if net_tp_profit < effective_min_profit:
             self.last_ai_block_reason = (
-                f"{ai_msg} — rejected: TP profit ${net_tp_profit:.2f} < ${MIN_PROFIT_AFTER_COSTS} min "
+                f"{ai_msg} — rejected: TP profit ${net_tp_profit:.2f} < ${effective_min_profit:.2f} min "
                 f"(need wider TP or larger size)"
             )
             self.add_log(self.last_ai_block_reason, "warning")
