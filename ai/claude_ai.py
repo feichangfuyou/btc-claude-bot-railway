@@ -827,7 +827,7 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
         if skip_scout:
             bot.add_log(f"🧠 {trade_model_short} direct analysis (manual)...", "claude")
         else:
-            bot.add_log(f"🔍 {scout_short} scouting {len(ACTIVE_COINS)} coins...", "claude")
+            bot.add_log(f"🔍 {scout_short} scouting {len(coins_snapshot)} coins...", "claude")
 
         await bot._broadcast(
             {
@@ -855,7 +855,7 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
                     bot.add_log(f"Scout schema error: {e} — escalating to trade model", "warning")
                     scout_result = {
                         "verdict": "escalate",
-                        "symbol": ACTIVE_COINS[0] if ACTIVE_COINS else "BTC",
+                        "symbol": next(iter(bot.coins), "BTC"),
                         "direction": "none",
                         "signal_count": 0,
                         "reasoning": str(e),
@@ -1004,7 +1004,7 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
 
         snap = {
             "coins": coins_snapshot,
-            "active_coins": ACTIVE_COINS,
+            "active_coins": list(bot.coins.keys()),
             "fear_greed": bot.fear_greed,
             "account": {
                 **bot.account,

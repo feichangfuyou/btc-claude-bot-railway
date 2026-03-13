@@ -484,8 +484,9 @@ async def _deferred_startup():
     """Heavy startup work that runs AFTER the HTTP server is accepting requests.
     This ensures /health responds immediately so Railway healthchecks pass."""
 
+    _active = bot.active_coin_list
     bot.add_log(
-        f"🚀 Institutional Trading v7 starting... ({len(ACTIVE_COINS)} coins: {', '.join(ACTIVE_COINS)})",
+        f"🚀 Institutional Trading v7 starting... ({len(_active)} coins: {', '.join(_active)})",
         "info",
     )
     from core.anthropic_keys import pool_size
@@ -645,8 +646,10 @@ async def _deferred_startup():
 
     bot.bot_running = False
     bot.countdown = 0
+    _coins = bot.active_coin_list
     bot.add_log(
-        f"⏸️ Bot ready — select a strategy and hit START. ${START_BALANCE:.0f} → ${TARGET_BALANCE:.0f} target",
+        f"⏸️ Bot ready — scanning {len(_coins)} pairs ({', '.join(_coins)}). "
+        f"Select a strategy and hit START. ${START_BALANCE:.0f} → ${TARGET_BALANCE:.0f} target",
         "info",
     )
 
@@ -1037,6 +1040,23 @@ async def _handle_ws_command(msg: dict):
         bot.profit_goal = goal
         db_save_state("profit_goal", goal)
         await broadcast({"type": "profit_goal", "profit_goal": goal})
+
+    elif cmd == "set_scan_coins":
+        count = msg.get("count", 5)
+        try:
+            count = max(1, min(int(count), len(bot._all_coins_list)))
+        except (TypeError, ValueError):
+            count = 5
+        new_active = bot.set_scan_coin_count(count)
+        bot.add_log(f"🔄 Scanning {count} coins: {', '.join(new_active)}", "info")
+        await broadcast({
+            "type": "scan_coins_changed",
+            "scan_coin_count": count,
+            "active_coins": new_active,
+            "max_available_coins": len(bot._all_coins_list),
+        })
+        # Trigger price bootstrap for newly added coins
+        await bootstrap_prices_async(bot, broadcast_price)
 
     elif cmd == "set_preset":
         pid = (msg.get("preset") or "").strip().lower()

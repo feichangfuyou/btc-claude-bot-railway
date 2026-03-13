@@ -1,14 +1,17 @@
+import { useState } from "react";
 import AnimatedNumber from "../AnimatedNumber.jsx";
 import { StrategyDropdown } from "./StrategyDropdown.jsx";
-import { Play, Square, Activity, RotateCcw } from "lucide-react";
+import { Play, Square, Activity, RotateCcw, ChevronDown } from "lucide-react";
 
 export function ControlPanel({
   account, winRate, startBal, targetBal, thinking, botOn, connected,
   claudeModel, handleModelChange,
   tradingPreset, presets, presetCategories, handlePresetChange,
   profitGoal, setProfitGoal,
+  scanCoinCount, setScanCoinCount, maxAvailableCoins, allAvailableCoins, activeCoins,
   handleStart, handleStop, handleAsk, handleReset,
 }) {
+  const [pairsOpen, setPairsOpen] = useState(false);
   return (
     <div className="card control-panel" style={{
       gridColumn: "1 / -1", gridRow: "2", justifySelf: "center",
@@ -108,6 +111,76 @@ export function ControlPanel({
             presetCategories={presetCategories}
             onPresetChange={handlePresetChange}
           />
+        )}
+
+        {connected && <div style={{ width: "1px", height: "18px", background: "linear-gradient(180deg, transparent, #D4AF3733, transparent)", flexShrink: 0 }} />}
+
+        {/* Pairs selector */}
+        {connected && (
+          <div style={{ display: "flex", alignItems: "center", gap: "4px", position: "relative" }}>
+            <span style={{ fontSize: "7px", color: "#5C5C5C", letterSpacing: "1px", fontFamily: "'Space Mono',monospace" }}>PAIRS</span>
+            <button
+              onClick={() => setPairsOpen(v => !v)}
+              style={{
+                fontFamily: "'Space Mono',monospace", fontSize: "9px", fontWeight: "700",
+                padding: "3px 8px", borderRadius: "4px",
+                backgroundColor: "rgba(0,0,0,0.4)",
+                color: "#D4AF37",
+                border: pairsOpen ? "1px solid #D4AF37" : "1px solid #D4AF3722",
+                cursor: "pointer", display: "flex", alignItems: "center", gap: "3px",
+              }}
+            >
+              {scanCoinCount || 5}
+              <ChevronDown size={8} style={{ opacity: 0.6, transform: pairsOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+            </button>
+            {pairsOpen && (
+              <div style={{
+                position: "absolute", top: "100%", left: 0, marginTop: "4px", zIndex: 100,
+                background: "#141414", border: "1px solid #2a2a2a", borderRadius: "6px",
+                padding: "6px", boxShadow: "0 8px 32px rgba(0,0,0,0.8)",
+                minWidth: "200px",
+              }}>
+                <div style={{ fontSize: "8px", color: "#5C5C5C", letterSpacing: "1px", marginBottom: "6px", fontFamily: "'Space Mono',monospace" }}>
+                  SCAN {scanCoinCount} OF {maxAvailableCoins || 20} PAIRS
+                </div>
+                <input
+                  type="range" min={1} max={maxAvailableCoins || 20} value={scanCoinCount || 5}
+                  onChange={e => setScanCoinCount(Math.max(1, +e.target.value))}
+                  style={{ width: "100%", accentColor: "#D4AF37", cursor: "pointer" }}
+                />
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2px", marginBottom: "6px" }}>
+                  {[1, 3, 5, 10, maxAvailableCoins || 20].map(n => (
+                    <button key={n} onClick={() => setScanCoinCount(n)} style={{
+                      fontFamily: "'Space Mono',monospace", fontSize: "8px", padding: "2px 5px", borderRadius: "3px",
+                      border: scanCoinCount === n ? "1px solid #D4AF37" : "1px solid #2a2a2a",
+                      background: scanCoinCount === n ? "#D4AF3718" : "rgba(0,0,0,0.25)",
+                      color: scanCoinCount === n ? "#D4AF37" : "#5C5C5C",
+                      cursor: "pointer", fontWeight: "600",
+                    }}>{n}</button>
+                  ))}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", maxHeight: "100px", overflowY: "auto" }}>
+                  {(allAvailableCoins || []).slice(0, scanCoinCount).map((sym, i) => (
+                    <span key={sym} style={{
+                      fontFamily: "'Space Mono',monospace", fontSize: "8px", padding: "1px 5px", borderRadius: "3px",
+                      background: "#D4AF3712", border: "1px solid #D4AF3722", color: "#D4AF37",
+                    }}>{sym}</span>
+                  ))}
+                  {(allAvailableCoins || []).length > scanCoinCount && (
+                    <span style={{ fontSize: "8px", color: "#3a3a3a", padding: "1px 4px" }}>
+                      +{(allAvailableCoins || []).length - scanCoinCount} more
+                    </span>
+                  )}
+                </div>
+                <button onClick={() => setPairsOpen(false)} style={{
+                  marginTop: "6px", width: "100%", padding: "4px", borderRadius: "3px",
+                  background: "#D4AF3715", border: "1px solid #D4AF3733", color: "#D4AF37",
+                  fontSize: "8px", fontFamily: "'Space Mono',monospace", cursor: "pointer", fontWeight: "700",
+                  letterSpacing: "1px",
+                }}>DONE</button>
+              </div>
+            )}
+          </div>
         )}
 
         {connected && <div style={{ width: "1px", height: "18px", background: "linear-gradient(180deg, transparent, #D4AF3733, transparent)", flexShrink: 0 }} />}

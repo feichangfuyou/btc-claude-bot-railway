@@ -136,7 +136,7 @@ async def run_ai_analysis_from_state(state: dict, skip_scout: bool = False) -> d
 
     snap = {
         "coins": coins_snapshot,
-        "active_coins": ACTIVE_COINS,
+        "active_coins": list(bot.coins.keys()),
         "fear_greed": bot.fear_greed,
         "account": state.get("account", {}),
         "open_positions": bot.open_positions,

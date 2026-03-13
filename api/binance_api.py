@@ -33,7 +33,8 @@ async def fetch_binance_prices(bot, only_fill_missing: bool = False) -> bool:
     """Fetch all active coin prices from Binance 24hr ticker. Returns True if any updated.
     No API keys needed. May return False in restricted regions (e.g. US 451).
     When only_fill_missing=True, only update symbols that have no price (preserves Coinbase data for chart match)."""
-    symbols = [_binance_symbol(s) for s in ACTIVE_COINS]
+    active = list(bot.coins.keys()) if bot else ACTIVE_COINS
+    symbols = [_binance_symbol(s) for s in active]
     params = {"symbols": json.dumps(symbols)}
     try:
         async with httpx.AsyncClient(timeout=PRICE_FETCH_TIMEOUT) as client:
@@ -47,12 +48,13 @@ async def fetch_binance_prices(bot, only_fill_missing: bool = False) -> bool:
         return False
 
     updated = False
+    active_set = set(active)
     for item in data:
         sym_raw = item.get("symbol", "")
         if not sym_raw.endswith("USDT"):
             continue
         symbol = sym_raw.replace("USDT", "").upper()
-        if symbol not in ACTIVE_COINS:
+        if symbol not in active_set:
             continue
         if only_fill_missing:
             cs = bot.coins.get(symbol)

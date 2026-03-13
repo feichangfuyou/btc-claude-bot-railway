@@ -31,6 +31,7 @@ from core.config import (
     MAX_DRAWDOWN_PCT,
     MAX_FUTURES_POSITIONS,
     MAX_POSITION_USD,
+    MAX_SCAN_COINS,
     MIN_PROFIT_AFTER_COSTS,
     MIN_TRADE_USD,
     ONCHAIN_SLIPPAGE,
@@ -49,6 +50,7 @@ from core.config import (
     TRADE_MODE,
     TRADING_PRESET,
     TRAILING_STOP_PCT,
+    _ALL_COINS_LIST,
 )
 from core.database import (
     db_load_state,
@@ -70,6 +72,9 @@ class BotState:
         self.coins: dict[str, CoinState] = {}
         for sym in ACTIVE_COINS:
             self.coins[sym] = CoinState(sym)
+
+        self._all_coins_list = list(_ALL_COINS_LIST)
+        self._scan_coin_count = db_load_state("scan_coin_count") or MAX_SCAN_COINS
 
         self.fear_greed: dict[str, Any] = {"value": 50, "label": "Neutral"}
 
@@ -225,6 +230,42 @@ class BotState:
         if sym not in self.coins:
             self.coins[sym] = CoinState(sym)
         return self.coins[sym]
+
+    @property
+    def scan_coin_count(self) -> int:
+        return self._scan_coin_count
+
+    @property
+    def active_coin_list(self) -> list[str]:
+        return self._all_coins_list[: self._scan_coin_count]
+
+    def set_scan_coin_count(self, count: int) -> list[str]:
+        """Change the number of coins being scanned. Returns the new active list.
+        Adds/removes CoinState entries dynamically and persists the choice."""
+        count = max(1, min(count, len(self._all_coins_list)))
+        self._scan_coin_count = count
+        db_save_state("scan_coin_count", count)
+
+        new_active = set(self._all_coins_list[:count])
+
+        # Add any new coins
+        for sym in new_active:
+            if sym not in self.coins:
+                self.coins[sym] = CoinState(sym)
+
+        # Remove coins no longer active (keep if they have open positions)
+        open_syms = {p.get("symbol", "").upper() for p in self.open_positions}
+        for sym in list(self.coins.keys()):
+            if sym not in new_active and sym not in open_syms:
+                del self.coins[sym]
+
+        ordered = [s for s in self._all_coins_list[:count]]
+
+        import core.config as _cfg
+        _cfg.ACTIVE_COINS = ordered
+        _cfg.MAX_SCAN_COINS = count
+
+        return ordered
 
     def price_for(self, symbol: str) -> float:
         cs = self.coins.get(symbol.upper())
@@ -1670,7 +1711,10 @@ class BotState:
             "indicators": btc.indicators if btc else {},
             "market_condition": btc.market_cond if btc else "ranging",
             "coins": coins_data,
-            "active_coins": ACTIVE_COINS,
+            "active_coins": self.active_coin_list,
+            "scan_coin_count": self._scan_coin_count,
+            "max_available_coins": len(self._all_coins_list),
+            "all_available_coins": self._all_coins_list,
             "account": self.account,
             "open_position": self.open_position,
             "open_positions": self.open_positions,

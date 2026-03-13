@@ -106,7 +106,7 @@ def metrics():
         "# TYPE claudebot_bot_manager_instances gauge",
         f"claudebot_bot_manager_instances {bot_manager.total_count()}",
     ]
-    for sym in ACTIVE_COINS:
+    for sym in bot.active_coin_list:
         cs = bot.coins.get(sym)
         if cs and cs.price > 0:
             lines.append(f"# HELP claudebot_price_usd Price in USD for {sym}")
@@ -124,12 +124,16 @@ def get_api_config():
         MIN_PROFIT_AFTER_COSTS,
         MIN_TRADE_USD,
         ROUND_TRIP_FEE,
+        _ALL_COINS_LIST,
     )
 
     return {
         "round_trip_fee": ROUND_TRIP_FEE,
         "symbol_to_coingecko": SYMBOL_TO_COINGECKO,
-        "active_coins": ACTIVE_COINS,
+        "active_coins": bot.active_coin_list,
+        "scan_coin_count": bot.scan_coin_count,
+        "max_available_coins": len(_ALL_COINS_LIST),
+        "all_available_coins": _ALL_COINS_LIST,
         "min_trade_usd": MIN_TRADE_USD,
         "min_profit_after_costs": MIN_PROFIT_AFTER_COSTS,
         "max_position_size": MAX_POSITION_SIZE,

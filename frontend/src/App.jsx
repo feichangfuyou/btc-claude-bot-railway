@@ -321,6 +321,18 @@ function Dashboard() {
     }
   }, [profitGoal]);
 
+  // ── Scan coin count (user picks how many pairs to scan) ──────────────────
+  const [scanCoinCount, setScanCoinCount] = useState(5);
+  const [maxAvailableCoins, setMaxAvailableCoins] = useState(20);
+  const [allAvailableCoins, setAllAvailableCoins] = useState([]);
+  const scanCoinSyncRef = useRef(false);
+  useEffect(() => {
+    if (!scanCoinSyncRef.current) { scanCoinSyncRef.current = true; return; }
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ cmd: "set_scan_coins", count: scanCoinCount }));
+    }
+  }, [scanCoinCount]);
+
   // ── Backend config (fetched on mount, hardcoded fallbacks) ─────────────────
   const [roundTripFee, setRoundTripFee] = useState(DEFAULT_ROUND_TRIP_FEE);
   const roundTripFeeRef = useRef(DEFAULT_ROUND_TRIP_FEE);
@@ -333,6 +345,9 @@ function Dashboard() {
       if (!cfg) return;
       if (cfg.round_trip_fee) setRoundTripFee(cfg.round_trip_fee);
       if (cfg.symbol_to_coingecko) Object.assign(FALLBACK_SYMBOL_TO_COINGECKO, cfg.symbol_to_coingecko);
+      if (cfg.scan_coin_count) { setScanCoinCount(cfg.scan_coin_count); scanCoinSyncRef.current = false; }
+      if (cfg.max_available_coins) setMaxAvailableCoins(cfg.max_available_coins);
+      if (cfg.all_available_coins) setAllAvailableCoins(cfg.all_available_coins);
     }).catch(() => { });
   }, []);
 
@@ -455,6 +470,9 @@ function Dashboard() {
             if (cd?.price_change24h != null) setChange24h(cd.price_change24h);
           }
           if (m.active_coins) { backendCoinsRef.current = m.active_coins; setActiveCoins(m.active_coins); }
+          if (m.scan_coin_count != null) { setScanCoinCount(m.scan_coin_count); scanCoinSyncRef.current = false; }
+          if (m.max_available_coins != null) setMaxAvailableCoins(m.max_available_coins);
+          if (m.all_available_coins) setAllAvailableCoins(m.all_available_coins);
           if (m.type === "full_state" && Array.isArray(m.market_tickers) && m.market_tickers.length > 0) {
             setMarketTickers(m.market_tickers.map((c) => ({
               sym: (c.sym || c.symbol || "").toUpperCase(),
@@ -1549,6 +1567,9 @@ function Dashboard() {
             analysisModel={analysisModel} handleModelChange={handleModelChange}
             tradingPreset={tradingPreset} presets={presets} presetCategories={presetCategories} handlePresetChange={handlePresetChange}
             profitGoal={profitGoal} setProfitGoal={setProfitGoal}
+            scanCoinCount={scanCoinCount} setScanCoinCount={setScanCoinCount}
+            maxAvailableCoins={maxAvailableCoins} allAvailableCoins={allAvailableCoins}
+            activeCoins={activeCoins}
             handleStart={handleStart} handleStop={handleStop} handleAsk={handleAsk} handleReset={handleReset}
           />
         </div>

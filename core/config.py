@@ -95,11 +95,14 @@ COINS_RAW = os.getenv("COINS", "BTC,ETH,SOL,LINK").strip()
 if COINS_RAW.lower() == "all":
     from strategy.symbol_registry import SYMBOL_TO_COINGECKO
 
-    # Exclude stablecoins and low-leverage symbols from auto-list if desired,
-    # but for now we follow the registry.
-    ACTIVE_COINS = [s for s in SYMBOL_TO_COINGECKO.keys() if s != "USDC"]
+    _ALL_COINS_LIST = [s for s in SYMBOL_TO_COINGECKO.keys() if s != "USDC"]
 else:
-    ACTIVE_COINS = [c.strip().upper() for c in COINS_RAW.split(",") if c.strip()]
+    _ALL_COINS_LIST = [c.strip().upper() for c in COINS_RAW.split(",") if c.strip()]
+
+MAX_SCAN_COINS = int(os.getenv("MAX_SCAN_COINS", "5"))
+MAX_SCAN_COINS = max(1, min(MAX_SCAN_COINS, len(_ALL_COINS_LIST)))
+
+ACTIVE_COINS = _ALL_COINS_LIST[:MAX_SCAN_COINS]
 
 # ─── Trade approval & direction bias ────────────────────────────────────────
 # Require user approval before executing trades (reduces risk, builds trust)
