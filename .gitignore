@@ -25,3 +25,5 @@ assets/*.csv
 docker-compose.override.yml
 .railway/
 *.log
+.coverage
+htmlcov/
