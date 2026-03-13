@@ -24,7 +24,9 @@ docker compose up -d
 → Coinbase WS may be disconnected. Check `COINBASE_API_KEY`/`COINBASE_API_SECRET` or network.
 
 ### "Claude API paused"
-→ Credits exhausted or repeated API failures. Add credits at Anthropic, then restart the bot.
+→ Credits exhausted or repeated API failures. Add credits at Anthropic, then either:
+  - **Admin → Readiness → Test Brain** (resets defensive mode and verifies API)
+  - Or restart the bot: `python run.py`
 
 ### Circuit breaker active
 → `MAX_CONSEC_LOSSES` hit. Reset via dashboard "Reset Breaker" or set `loss_breaker_active=false` in DB.
@@ -89,6 +91,9 @@ Copy from `.env.10k.example` and fill in secrets.
 \i supabase/migrations/20260305200000_user_learning_tables.sql
 \i supabase/migrations/20260305300000_app_tables.sql
 \i supabase/migrations/20260305400000_profiles_stripe_columns.sql
+\i supabase/migrations/20260307000000_api_passphrase.sql
+\i supabase/migrations/20260308000001_envelope_encryption.sql
+\i supabase/migrations/20260310600000_manual_payments.sql
 ```
 
 Or: `supabase db push` if using Supabase CLI.

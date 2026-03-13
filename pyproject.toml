@@ -10,14 +10,17 @@ target-version = "py311"
 exclude = ["frontend", "node_modules", "__pycache__", ".git", "backups"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I"]
-ignore = ["E501"]
+select = ["E", "F", "W", "I", "B", "C90", "UP", "SIM"]
+ignore = ["E501", "UP007"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 25
 
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false
+disallow_untyped_defs = true
 check_untyped_defs = true
 ignore_missing_imports = true
 exclude = ["frontend", "node_modules", "__pycache__", "backups", "tests"]
@@ -26,4 +29,19 @@ exclude = ["frontend", "node_modules", "__pycache__", "backups", "tests"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "--tb=short -q"
+
+[tool.coverage.run]
+source = ["core", "ai", "safety", "strategy"]
+omit = [
+    "core/routes/*",
+    "core/backend.py",
+    "core/database_postgres.py",
+    "core/supabase_client.py",
+    "*/test_*",
+]
+
+[tool.coverage.report]
+fail_under = 60
+show_missing = true
+skip_empty = true
 

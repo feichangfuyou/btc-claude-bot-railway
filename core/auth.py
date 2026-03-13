@@ -3,6 +3,7 @@ Authentication middleware and helpers using Supabase Auth.
 Replaces the old shared-secret AuthMiddleware with JWT-based per-user auth.
 """
 
+import hmac
 import logging
 from typing import Optional
 
@@ -47,7 +48,8 @@ async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> AuthenticatedUser:
     """Extract and verify the Supabase JWT from the Authorization header.
-    Returns an AuthenticatedUser or raises 401."""
+    Returns an AuthenticatedUser or raises 401.
+    When x-bot-secret is valid from localhost/testclient, returns a dev user (single-user mode)."""
     token = None
 
     if credentials:
@@ -55,9 +57,21 @@ async def get_current_user(
     else:
         token = request.query_params.get("token")
 
+    # Fallback: x-bot-secret from localhost/testclient (single-user dev or pytest)
     if not token:
-        # Fallback to x-bot-secret ONLY if explicitly allowed for certain system paths
-        # For now, we enforce token-based auth for everything in this dependency
+        from core.config import API_SECRET, DEV_USER_EMAIL
+        secret = (request.headers.get("x-bot-secret") or request.query_params.get("secret") or "").strip()
+        if secret and hmac.compare_digest(secret, API_SECRET):
+            client_ip = (request.client.host if request.client else "unknown") or "unknown"
+            if client_ip in ("127.0.0.1", "::1", "localhost", "testclient"):
+                email = (DEV_USER_EMAIL or "dev@localhost").strip()
+                return AuthenticatedUser(
+                    user_id="dev",
+                    email=email or "dev@localhost",
+                    role="admin",
+                    tier="pro",
+                    status="active",
+                )
         raise HTTPException(status_code=401, detail="Missing authentication token")
 
     try:

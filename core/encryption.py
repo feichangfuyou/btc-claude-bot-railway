@@ -37,13 +37,17 @@ def _get_fernet_key() -> bytes | None:
     # Fallback: derive from BOT_API_SECRET (weaker but better than plaintext)
     secret = os.getenv("BOT_API_SECRET", "").strip()
     if secret and len(secret) >= 16:
+        # Use first 16 bytes of the secret itself as a deployment-unique salt,
+        # so different BOT_API_SECRET values produce entirely different keys.
+        deployment_salt = secret[:16].encode()
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
-            salt=b"claudebot_exchange_keys_v1",
+            salt=deployment_salt,
             iterations=100000,
         )
         key = base64.urlsafe_b64encode(kdf.derive(secret.encode()))
+        logger.warning("Using derived encryption key from BOT_API_SECRET — set EXCHANGE_KEYS_ENCRYPTION_KEY for production")
         _ENCRYPTION_KEY = key
         return _ENCRYPTION_KEY
 

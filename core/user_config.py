@@ -150,6 +150,17 @@ def _dict_to_config(d: dict) -> UserConfig:
 
 def load_user_config(user_id: str) -> UserConfig:
     """Load full user config from Supabase (profile + preferences + exchanges) in parallel."""
+    # Dev user: x-bot-secret from localhost/testclient (single-user mode, no Supabase)
+    if user_id == "dev":
+        return UserConfig(
+            user_id="dev",
+            email="dev@localhost",
+            role="admin",
+            subscription_tier="pro",
+            subscription_status="active",
+            onboarding_complete=True,
+        )
+
     now = time.time()
 
     # Redis cache (distributed)
@@ -281,7 +292,7 @@ def _get_or_create_user_dek(user_id: str) -> Optional[str]:
         if dek:
             return dek
 
-    # Generat new DEK
+    # Generate new DEK
     new_dek = generate_dek()
     new_enc_dek = encrypt_plaintext(new_dek)
     if not new_enc_dek:
@@ -319,7 +330,7 @@ def get_user_exchange_keys(user_id: str, exchange: str) -> Optional[dict]:
     except Exception as e:
         if "0 rows" in str(e) or "contains no rows" in str(e) or "PGRST116" in str(e):
             return None
-        raise e
+        raise
 
     # Decrypt all fields ending in _enc
     user_dek = _get_or_create_user_dek(user_id)

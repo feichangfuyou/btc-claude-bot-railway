@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
 const EFFECTIVE_DATE = "March 5, 2026";
-const COMPANY = "DoYou.Trade";
-const CONTACT_EMAIL = "support@doyou.trade";
+const CONTACT_EMAIL = "feichangfuyou@doyou.trade";
 
 export default function Privacy() {
     const navigate = useNavigate();

@@ -66,6 +66,9 @@ Add or verify in `.env`:
 -- 4. supabase/migrations/20260305200000_user_learning_tables.sql
 -- 5. supabase/migrations/20260305300000_app_tables.sql
 -- 6. supabase/migrations/20260305400000_profiles_stripe_columns.sql
+-- 7. supabase/migrations/20260307000000_api_passphrase.sql
+-- 8. supabase/migrations/20260308000001_envelope_encryption.sql
+-- 9. supabase/migrations/20260310600000_manual_payments.sql
 ```
 
 Or: `supabase db push` if using Supabase CLI.

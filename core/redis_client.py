@@ -110,12 +110,11 @@ def cache_delete(key: str) -> None:
 _rate_limit_memory: dict[str, tuple[float, int]] = {}
 
 
-def rate_limit_check(key: str, max_per_window: int, window_sec: int) -> bool:
+def rate_limit_check(key: str, max_per_window: int, window_sec: int, fail_closed: bool = False) -> bool:
     """
     Increment counter for key. Return True if under limit, False if rate limited.
-    Uses Redis INCR + EXPIRE (fixed window). Note: TTL resets on each request,
-    so burst traffic may allow slightly more than max_per_window in edge cases.
-    For strict sliding window, use Redis ZADD/ZRANGEBYSCORE.
+    Uses Redis INCR + EXPIRE (fixed window).
+    fail_closed=True: deny on Redis error (use for auth/sensitive endpoints).
     """
     r = _get_redis()
     if r:
@@ -128,7 +127,7 @@ def rate_limit_check(key: str, max_per_window: int, window_sec: int) -> bool:
             return bool(count <= max_per_window)
         except Exception as e:
             logger.debug(f"Redis rate limit error: {e}")
-            return True  # Fail open
+            return not fail_closed
     # In-memory fallback
     now = time.time()
     if key not in _rate_limit_memory:

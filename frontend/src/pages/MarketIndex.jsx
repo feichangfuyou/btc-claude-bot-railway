@@ -527,8 +527,9 @@ export default function MarketIndex() {
           <Link to="/" style={{ color: "#333", textDecoration: "none" }}>Home</Link>
           <Link to="/terms" style={{ color: "#333", textDecoration: "none" }}>Terms</Link>
           <Link to="/privacy" style={{ color: "#333", textDecoration: "none" }}>Privacy</Link>
+          <a href="mailto:feichangfuyou@doyou.trade" style={{ color: "#D4AF37", textDecoration: "none" }}>Contact</a>
         </div>
-        <div style={{ marginTop: "12px" }}>© 2025 DOYOU.TRADE. ALL RIGHTS RESERVED.</div>
+        <div style={{ marginTop: "12px" }}>© 2026 DOYOU.TRADE. ALL RIGHTS RESERVED.</div>
       </div>
 
       <style>{`

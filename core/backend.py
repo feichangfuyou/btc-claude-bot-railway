@@ -8,6 +8,7 @@ See core/config.py for all environment variables.
 """
 
 import asyncio
+import hmac
 import json
 import os
 import signal
@@ -22,7 +23,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 from ai.claude_ai import call_claude
 from api.agentkit_provider import agentkit
@@ -327,7 +328,7 @@ async def bot_cycle():
 
 
 async def snapshot_cycle():
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     while True:
         try:
             await asyncio.sleep(3600)
@@ -358,7 +359,7 @@ async def meta_review_cycle():
 
 
 async def learning_cycle():
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     await asyncio.sleep(30)
     try:
         await loop.run_in_executor(None, run_learning_cycle)
@@ -377,7 +378,7 @@ async def learning_cycle():
 
 async def backup_cycle():
     """Backup database every 6 hours."""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     await asyncio.sleep(60)
     await loop.run_in_executor(None, backup_database)
     while True:
@@ -704,6 +705,31 @@ app.add_middleware(
     allow_headers=["Content-Type", "x-bot-secret", "Authorization"],
 )
 
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Injects browser security headers on every response."""
+
+    async def dispatch(self, request: StarletteRequest, call_next) -> Response:
+        response: Response = await call_next(request)
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' wss: https:; "
+            "font-src 'self' https:; "
+            "frame-ancestors 'none'"
+        )
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
 # ─── FastAPI app handlers ───────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: StarletteRequest, exc: Exception):
@@ -716,9 +742,11 @@ async def global_exception_handler(request: StarletteRequest, exc: Exception):
         import traceback
         traceback.print_exc()
     
+    is_dev = os.getenv("RAILWAY_ENVIRONMENT", "development") == "development"
+    detail = err_msg[:200] if is_dev else "An unexpected error occurred"
     return JSONResponse(
         status_code=500,
-        content={"error": "internal_server_error", "detail": err_msg[:200]}
+        content={"error": "internal_server_error", "detail": detail}
     )
 
 
@@ -767,11 +795,11 @@ if API_SECRET:
             jwt_token = (request.query_params.get("token") or "").strip()
             auth_header = request.headers.get("authorization", "")
             secret_ok = False
-            if token == API_SECRET:
+            if token and hmac.compare_digest(token, API_SECRET):
                 client_ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
                             or (request.client.host if request.client else "unknown") or "unknown")
-                # Only allow BOT_API_SECRET for localhost (service-to-service)
-                if client_ip in ("127.0.0.1", "::1", "localhost"):
+                # Only allow BOT_API_SECRET for localhost (service-to-service) or TestClient (testclient)
+                if client_ip in ("127.0.0.1", "::1", "localhost", "testclient"):
                     secret_ok = True
 
             bearer_ok = False
@@ -818,7 +846,8 @@ class IPRateLimitMiddleware(BaseHTTPMiddleware):
         # Localhost check - only trust if it's the actual loopback interface
         # and NOT a spoofed header. Note: In production behind a proxy,
         # we should only trust headers from known proxy IPs.
-        is_local = client_ip in ("127.0.0.1", "::1")
+        # "testclient" = Starlette TestClient (pytest only)
+        is_local = client_ip in ("127.0.0.1", "::1", "testclient")
         if is_local and not request.headers.get("x-forwarded-for"):
             return await call_next(request)
 
@@ -849,7 +878,7 @@ async def ws_endpoint(ws: WebSocket):
     if API_SECRET:
         secret = (ws.query_params.get("secret") or "").strip()
         token = (ws.query_params.get("token") or "").strip()
-        if secret == API_SECRET:
+        if secret and API_SECRET and hmac.compare_digest(secret, API_SECRET):
             pass
         elif token and verify_token(token):
             user_info = get_user_from_token(token)
@@ -868,13 +897,10 @@ async def ws_endpoint(ws: WebSocket):
     await ws.accept()
     bot.clients.add(ws)
     if user_id is not None:
-        bot.active_user_id = user_id
-        bot.active_user_email = user_email or ""
         _ws_to_user[ws] = user_id
         _user_to_ws.setdefault(user_id, set()).add(ws)
-    else:
-        bot.active_user_id = None
-        bot.active_user_email = None
+        bot.active_user_id = user_id
+        bot.active_user_email = user_email or ""
     bot.add_log(
         f"Dashboard connected ({len(bot.clients)} client{'s' if len(bot.clients) != 1 else ''})",
         "info",
@@ -925,9 +951,10 @@ async def ws_endpoint(ws: WebSocket):
             _user_to_ws[uid].discard(ws)
             if not _user_to_ws[uid]:
                 del _user_to_ws[uid]
-        if bot.active_user_id and user_id == bot.active_user_id:
-            bot.active_user_id = None
-            bot.active_user_email = None
+                if bot.active_user_id == uid:
+                    remaining = next(iter(_user_to_ws), None)
+                    bot.active_user_id = remaining
+                    bot.active_user_email = "" if remaining else None
         bot.add_log(f"Dashboard disconnected ({len(bot.clients)} remaining)", "dim")
 
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { colors } from "../theme.js";
@@ -290,6 +290,17 @@ export default function Login() {
                   </button>
                 </form>
 
+                <div style={{ textAlign: "right", marginTop: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="auth-link"
+                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.85rem", padding: 0 }}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+
                 <div className="auth-footer" style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "16px", marginTop: "16px" }}>
                   New here? <Link to="/signup" className="auth-link">Create account</Link>
                 </div>
@@ -450,7 +461,7 @@ export default function Login() {
               <a href="#features" title="System Capabilities" aria-label="Features">Features</a>
               <Link to="/signup" title="Create your trading account" aria-label="Get Started">Get Started</Link>
               <Link to="/login" title="Sign in to your terminal" aria-label="Terminal Login">Terminal Login</Link>
-              <a href="mailto:support@doyou.trade" title="Contact Support" aria-label="Support">Support</a>
+              <a href="mailto:feichangfuyou@doyou.trade" title="Contact Support" aria-label="Support">Support</a>
             </div>
           </div>
           <div>
@@ -463,6 +474,9 @@ export default function Login() {
           </div>
         </div>
         <div style={{ textAlign: "center", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "40px" }}>
+          <div style={{ marginBottom: "8px", fontSize: "13px", color: "#888" }}>
+            Questions? Contact <a href="mailto:feichangfuyou@doyou.trade" style={{ color: "#D4AF37", textDecoration: "none" }}>feichangfuyou@doyou.trade</a>
+          </div>
           <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
             <img src="/Bravo.svg" alt="DoYou.trade Logo" style={{ width: "20px", opacity: 0.5 }} />
             <span style={{ opacity: 0.3 }}>&copy; 2025 DOYOU.TRADE. ALL RIGHTS RESERVED.</span>

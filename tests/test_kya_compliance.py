@@ -34,6 +34,7 @@ def _sample_decision(**overrides):
         "patterns_detected": ["bull_flag", "double_bottom"],
         "market_condition": "trending",
         "confluence_score": 22,
+        "timestamp": "2026-01-01 00:00:00",
         "order": {
             "side": "buy",
             "entry_price": 95000,
@@ -125,6 +126,8 @@ class TestSignedReasoningTrace:
         trace1 = kya.sign_reasoning_trace(decision)
         trace2 = kya.sign_reasoning_trace(decision)
         assert trace1["bot_did"] == trace2["bot_did"]
+        assert trace1["reasoning_hash"] == trace2["reasoning_hash"]
+        assert trace1["signature"] == trace2["signature"]
 
 
 # ── Audit Entry ──────────────────────────────────────────────────────────────
@@ -213,3 +216,13 @@ class TestMultiModelFallback:
         assert "primary_failures" in snap
         assert "defensive_mode" in snap
         assert snap["defensive_mode"] is False
+
+    def test_reset_clears_defensive_mode(self):
+        fb = kya.MultiModelFallback()
+        for i in range(len(fb.FALLBACK_CHAIN) + 1):
+            fb.record_failure(f"model-{i}", f"error {i}")
+        assert fb.is_defensive() is True
+        fb.reset()
+        assert fb.is_defensive() is False
+        assert fb.primary_failures == 0
+        assert fb.current_model_idx == 0

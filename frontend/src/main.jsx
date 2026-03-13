@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
+import { isAdminEmail } from "./utils/adminEmails.js";
 
 // Eagerly loaded — these are public pages visited on first load
 import Login from "./pages/Login.jsx";
@@ -20,6 +21,7 @@ const Billing = lazy(() => import("./pages/Billing.jsx"));
 const Admin = lazy(() => import("./pages/Admin.jsx"));
 
 import "./suppress-warnings.js";
+import "./fetchWithAuth.js";
 import "./capacitor-init.js";
 import "./global.css";
 import "./styles/auth.css";
@@ -52,7 +54,7 @@ function ProtectedRoute({ children }) {
 
   const isActive = profile?.subscription_status === "active";
   const isBilling = location.pathname === "/billing";
-  const isAdmin = user?.email === "feichangfuyou@gmail.com";
+  const isAdmin = isAdminEmail(user?.email);
 
   if (!isActive && !isBilling && !isAdmin) {
     return <Navigate to="/billing" replace />;
@@ -81,7 +83,7 @@ function AdminRoute({ children }) {
   const { user, profile, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.email !== "feichangfuyou@gmail.com") {
+  if (!isAdminEmail(user.email)) {
     return <Navigate to="/dashboard" replace />;
   }
   return children;
@@ -105,7 +107,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/market/:coin" element={<MarketIndex />} />
-            <Route path="/" element={<Login />} />
+            <Route path="/" element={<PublicRoute><Login /></PublicRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

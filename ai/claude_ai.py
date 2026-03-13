@@ -594,8 +594,9 @@ async def _api_call(model: str, system: Any, user_msg: Any, max_tokens: int = 80
     if isinstance(system, str):
         sys_blocks = [{"type": "text", "text": system}]
     
-    msg_blocks = user_msg
     if isinstance(user_msg, str):
+        msg_blocks = [{"role": "user", "content": user_msg}]
+    else:
         msg_blocks = [{"role": "user", "content": user_msg}]
 
     for attempt in range(max_retries + 1):
@@ -648,6 +649,23 @@ async def _api_call(model: str, system: Any, user_msg: Any, max_tokens: int = 80
             raise
 
     raise Exception("API call failed — all retries exhausted.")
+
+
+async def verify_brain() -> dict:
+    """Minimal API call to verify Anthropic credits and brain connectivity.
+    Returns {"ok": True, "model": "..."} or {"ok": False, "error": "..."}."""
+    if not get_next_key():
+        return {"ok": False, "error": "No Anthropic API key configured"}
+    try:
+        resp = await _api_call(
+            "claude-3-haiku-20240307",
+            "You are a health check. Reply with exactly: OK",
+            "Reply with exactly: OK",
+            max_tokens=10,
+        )
+        return {"ok": True, "model": "claude-3-haiku-20240307", "response": (resp or "").strip()[:20]}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 def _extract_json(raw: str) -> dict:
@@ -914,7 +932,6 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
 
         ok, block_reason = bot.can_trade()
         open_symbols = [p.get("symbol", "BTC") for p in bot.open_positions]
-        trade_analytics = _build_trade_analytics(bot.trades[:30])
         memory_briefing = build_memory_briefing()
 
         pattern_verdicts = {}

@@ -13,7 +13,11 @@ repos:
         pass_filenames: false
       - id: no-env-files
         name: block .env commits
-        entry: bash -c 'for f in "$@"; do case "$f" in .env|.env.*) [[ "$f" == ".env.example" ]] && continue; echo "BLOCKED: $f — never commit secrets"; exit 1;; esac; done' --
+        entry: bash -c 'for f in "$@"; do case "$f" in .env|.env.*) [[ "$f" == ".env.example" || "$f" == ".env.10k.example" ]] && continue; echo "BLOCKED: $f — never commit secrets"; exit 1;; esac; done' --
         language: system
         always_run: false
         types: [file]
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks

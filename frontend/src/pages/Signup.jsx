@@ -253,7 +253,7 @@ export default function Signup() {
         </div>
       </header>
 
-      <section className="landing-stats">
+      <section id="features" className="landing-stats">
         <div className="stats-grid">
           <div className="stat-item">
             <h4>$2.4B</h4>
@@ -287,7 +287,7 @@ export default function Signup() {
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px" }}>
               <Link to="/login" title="Already have an account? Sign in">Sign In</Link>
               <Link to="/" title="Go back to home">Home</Link>
-              <a href="mailto:support@doyou.trade" title="Contact Support">Support</a>
+              <a href="mailto:feichangfuyou@doyou.trade" title="Contact Support">Support</a>
             </div>
           </div>
           <div>
@@ -299,9 +299,12 @@ export default function Signup() {
           </div>
         </div>
         <div style={{ textAlign: "center", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "40px" }}>
+          <div style={{ marginBottom: "8px", fontSize: "13px", color: "#888" }}>
+            Questions? Contact <a href="mailto:feichangfuyou@doyou.trade" style={{ color: "#D4AF37", textDecoration: "none" }}>feichangfuyou@doyou.trade</a>
+          </div>
           <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
             <img src="/Bravo.svg" alt="DoYou.trade Logo" style={{ width: "20px", opacity: 0.5 }} />
-            <span style={{ opacity: 0.3 }}>&copy; 2025 DOYOU.TRADE. ALL RIGHTS RESERVED.</span>
+            <span style={{ opacity: 0.3 }}>&copy; 2026 DOYOU.TRADE. ALL RIGHTS RESERVED.</span>
           </div>
         </div>
       </footer>

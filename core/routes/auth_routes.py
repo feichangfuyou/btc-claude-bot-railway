@@ -21,7 +21,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def _check_exchange_validate_ratelimit(user_id: str) -> bool:
     """Return True if under limit, False if rate limited."""
     if is_redis_available():
-        return rate_limit_check(f"exchange_validate:{user_id}", max_per_window=10, window_sec=60)
+        return rate_limit_check(f"exchange_validate:{user_id}", max_per_window=10, window_sec=60, fail_closed=True)
     now = time.time()
     window = 60.0
     max_per_window = 10

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
+import { isAdminEmail } from "../utils/adminEmails.js";
 import { supabase } from "../supabaseClient.js";
 import { colors, typography } from "../theme.js";
 import { ArrowLeft, Check, ArrowRight, Lightbulb, Zap, X, Info } from "lucide-react";
@@ -454,7 +455,7 @@ export default function Settings() {
               <span style={styles.rowLabel}>Plan</span>
               <span style={{ color: colors.gold, textTransform: "capitalize" }}>{profile?.subscription_tier || "None"}</span>
             </div>
-            {user?.email === "feichangfuyou@gmail.com" && (
+            {isAdminEmail(user?.email) && (
               <div style={styles.row}>
                 <span style={styles.rowLabel}>Administration</span>
                 <button 
@@ -634,7 +635,7 @@ export default function Settings() {
                   placeholder="+ Symbol"
                   value={customCoin}
                   onChange={e => setCustomCoin(e.target.value.toUpperCase())}
-                  onKeyPress={e => {
+                  onKeyDown={e => {
                     if (e.key === "Enter" && customCoin.trim()) {
                       const c = customCoin.trim().toUpperCase();
                       if (!ALL_COINS.includes(c) && !(prefs.coins || []).includes(c)) {
@@ -782,10 +783,10 @@ export default function Settings() {
             </div>
             <div style={styles.row}>
               <span style={styles.rowLabel}>Support</span>
-              <button style={styles.legalBtn} onClick={() => window.location.href = "mailto:support@doyou.trade"}>Email Support</button>
+              <button style={styles.legalBtn} onClick={() => window.location.href = "mailto:feichangfuyou@doyou.trade"}>Email Support</button>
             </div>
             <div style={{ marginTop: 16, textAlign: "center", color: "#3a3a3a", fontSize: 9, letterSpacing: 1, fontFamily: "'Montserrat', sans-serif" }}>
-              © 2025 DOYOU.TRADE
+              © 2026 DOYOU.TRADE
             </div>
           </section>
 

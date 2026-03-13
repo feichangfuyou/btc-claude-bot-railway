@@ -34,7 +34,7 @@ logger = logging.getLogger("claudebot.kya")
 
 ENABLE_AUDIT_LOG = os.getenv("ENABLE_AUDIT_LOG", "true").lower() == "true"
 BOT_DID_SEED = os.getenv("BOT_DID_SEED", "")
-AUDIT_RETENTION_DAYS = int(os.getenv("AUDIT_RETENTION_DAYS", "365"))
+
 
 _bot_did: str | None = None
 _bot_did_key_hash: str | None = None
@@ -113,7 +113,10 @@ def hash_reasoning(decision: dict) -> str:
         canonical["adversary_verdict"] = adversary.get("verdict", "pass")
         canonical["adversary_risk_score"] = adversary.get("risk_score", 0)
 
-    canonical["timestamp"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    canonical["timestamp"] = decision.get(
+        "timestamp",
+        datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+    )
 
     raw = json.dumps(canonical, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode()).hexdigest()
@@ -244,9 +247,9 @@ class MultiModelFallback:
         self._defensive_threshold = len(self.FALLBACK_CHAIN)
 
     def record_success(self, model: str):
-        """Record a successful API call — reset failure counters."""
+        """Record a successful API call — reset failure counters.
+        Keeps current_model_idx so we don't immediately retry a broken primary."""
         self.primary_failures = 0
-        self.current_model_idx = 0
         self.defensive_mode = False
 
     def record_failure(self, model: str, error: str) -> str | None:
@@ -283,6 +286,14 @@ class MultiModelFallback:
     def is_defensive(self) -> bool:
         """True if all models have failed and bot should enter defensive mode."""
         return self.defensive_mode
+
+    def reset(self) -> None:
+        """Clear defensive mode and failure counters. Use after adding Anthropic credits."""
+        self.primary_failures = 0
+        self.current_model_idx = 0
+        self.defensive_mode = False
+        self.last_failure_ts = 0
+        logger.info("Model fallback reset — brain ready for new API calls")
 
     def snapshot(self) -> dict:
         return {

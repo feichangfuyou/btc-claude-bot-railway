@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, Com
 import { useNavigate } from "react-router-dom";
 import confetti from "canvas-confetti";
 import { useAuth } from "./contexts/AuthContext.jsx";
+import { isAdminEmail } from "./utils/adminEmails.js";
 import AnimatedNumber from "./AnimatedNumber.jsx";
 import FetchingPrice from "./FetchingPrice.jsx";
 import TradingViewChart from "./TradingViewChart.jsx";
@@ -1429,7 +1430,7 @@ function Dashboard() {
             <div style={{ padding: "8px 20px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: "8px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
                 <span style={{ fontSize: "10px", color: "#5C5C5C", letterSpacing: "1px" }}>ACCOUNT</span>
-                {user?.email === "feichangfuyou@gmail.com" ? (
+                {isAdminEmail(user?.email) ? (
                   <span style={{ fontSize: "9px", color: colors.success, background: "rgba(0,230,118,0.1)", padding: "2px 6px", borderRadius: "4px", letterSpacing: "1px" }}>DEV · ELITE</span>
                 ) : (
                   <span style={{ fontSize: "9px", color: colors.gold, background: "rgba(212,175,55,0.1)", padding: "2px 6px", borderRadius: "4px" }}>{(profile?.subscription_status === "active" ? (profile?.subscription_tier || "NONE") : "NONE").toUpperCase()}</span>
@@ -1472,6 +1473,7 @@ function Dashboard() {
             <button className="nav-drawer-btn" onClick={() => { navigate("/history"); setMobileNavOpen(false); }}>HISTORY</button>
             <button className="nav-drawer-btn" onClick={() => { navigate("/billing"); setMobileNavOpen(false); }}>BILLING</button>
             <button className="nav-drawer-btn" onClick={() => { navigate("/settings"); setMobileNavOpen(false); }}>SETTINGS</button>
+            <a href="mailto:feichangfuyou@doyou.trade" className="nav-drawer-btn" style={{ textAlign: "center", textDecoration: "none" }} onClick={() => setMobileNavOpen(false)}>CONTACT</a>
             <button className="nav-drawer-btn" style={{ color: "#5C5C5C", borderColor: "rgba(255,255,255,0.08)" }} onClick={() => { signOut(); setMobileNavOpen(false); }}>SIGN OUT</button>
           </div>
         </>
@@ -1755,7 +1757,7 @@ function Dashboard() {
       </div>
 
       {/* ══ SUBSCRIPTION GATE ══ */}
-      {profile && profile.subscription_status !== "active" && user?.email !== "feichangfuyou@gmail.com" && (
+      {profile && profile.subscription_status !== "active" && !isAdminEmail(user?.email) && (
         <div className="glass-overlay fadein" style={{ zIndex: 99999, position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div className="glass-heavy" style={{ maxWidth: "420px", width: "calc(100% - 32px)", textAlign: "center", padding: "40px 32px", boxSizing: "border-box", animation: "fadein 0.35s ease", position: "relative" }}>
             <div style={{ fontSize: "48px", marginBottom: "20px" }}><Cpu size={48} color={colors.gold} /></div>

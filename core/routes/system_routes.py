@@ -1,6 +1,5 @@
 import os
 from collections import deque
-from datetime import datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
@@ -116,8 +115,8 @@ def metrics():
 
 
 @router.get("/api/config")
-def get_api_config(user: AuthenticatedUser = Depends(get_current_user)):
-    """Expose runtime config for frontend: fees, symbols, active coins, and risk limits."""
+def get_api_config():
+    """Expose runtime config for frontend: fees, symbols, active coins, and risk limits. Public (no auth)."""
     from core.config import (
         MAX_DAILY_LOSS_PCT,
         MAX_POSITION_SIZE,
@@ -283,11 +282,37 @@ def get_readiness():
     }
 
 
+@router.post("/api/admin/reset-model-fallback")
+def reset_model_fallback(user: AuthenticatedUser = Depends(get_verified_admin)):
+    """Clear defensive mode after adding Anthropic credits. No restart needed."""
+    from safety.kya_compliance import model_fallback
+
+    model_fallback.reset()
+    bot.add_log("🧠 Model fallback reset — brain ready for new API calls", "info")
+    return {"status": "ok", "defensive_mode": False}
+
+
+@router.post("/api/admin/test-brain")
+async def test_brain(user: AuthenticatedUser = Depends(get_verified_admin)):
+    """Verify Claude API and credits work. Resets defensive mode first if needed."""
+    from safety.kya_compliance import model_fallback
+    from ai.claude_ai import verify_brain
+
+    if model_fallback.is_defensive():
+        model_fallback.reset()
+        bot.add_log("🧠 Reset defensive mode before brain test", "info")
+
+    result = await verify_brain()
+    if result.get("ok"):
+        bot.add_log("🧠 Brain test OK — Claude API and credits working", "success")
+    else:
+        bot.add_log(f"🧠 Brain test failed: {result.get('error', 'unknown')}", "warning")
+    return result
+
+
 @router.post("/api/admin/global-pause")
 def set_global_pause(pause: bool, user: AuthenticatedUser = Depends(get_verified_admin)):
     """Point 3: God Mode — Emergency halt for all 10,000 users."""
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
     bot_manager.global_pause = pause
     status = "HALTED" if pause else "RESUMED"
     bot.add_log(f"🚨 ADMIN ACTION: Platform {status}", "warning")
@@ -297,8 +322,6 @@ def set_global_pause(pause: bool, user: AuthenticatedUser = Depends(get_verified
 @router.post("/api/admin/risk-off")
 def set_global_risk_off(risk_off: bool, user: AuthenticatedUser = Depends(get_verified_admin)):
     """Toggle Capital Preservation Mode (reduces sizes, tightens risk limits)."""
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
     # Store this on bot_manager
     bot_manager.global_risk_off = risk_off
     status = "ENABLED" if risk_off else "DISABLED"
@@ -312,9 +335,6 @@ def set_global_max_loss(
     user: AuthenticatedUser = Depends(get_verified_admin)
 ):
     """Dynamically adjust the platform's global max loss circuit breaker threshold."""
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
-
     new_limit = float(body.get("limit", 1000000.0))
     if new_limit <= 0:
         raise HTTPException(status_code=400, detail="Limit must be positive")
@@ -327,8 +347,6 @@ def set_global_max_loss(
 @router.get("/api/admin/stats")
 def get_admin_stats(user: AuthenticatedUser = Depends(get_verified_admin)):
     """Point 4: Aggregate Risk — Platform-wide performance monitor."""
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
     return {
         "active_users": bot_manager.active_count(),
         "total_users": bot_manager.total_count(),
@@ -395,9 +413,6 @@ def get_admin_2fa_qr(user: AuthenticatedUser = Depends(get_current_user)):
 @router.get("/api/admin/users")
 def get_admin_users(user: AuthenticatedUser = Depends(get_verified_admin)):
     """Return all users from Supabase profiles with live bot instance state."""
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
-
     try:
         from core.supabase_client import get_supabase
         sb = get_supabase()
@@ -432,8 +447,6 @@ def get_admin_users(user: AuthenticatedUser = Depends(get_verified_admin)):
 # ─── Admin: Per-User Bot Control ─────────────────────────────────────────────
 @router.post("/api/admin/users/{target_user_id}/stop")
 async def admin_stop_user_bot(target_user_id: str, user: AuthenticatedUser = Depends(get_verified_admin)):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
     instance = bot_manager.get(target_user_id)
     if not instance:
         raise HTTPException(status_code=404, detail="No active bot instance for this user")
@@ -445,8 +458,6 @@ async def admin_stop_user_bot(target_user_id: str, user: AuthenticatedUser = Dep
 
 @router.post("/api/admin/users/{target_user_id}/start")
 async def admin_start_user_bot(target_user_id: str, user: AuthenticatedUser = Depends(get_verified_admin)):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
     instance = await bot_manager.get_or_create(target_user_id)
     instance.running = True
     _log_admin_action(user.email, f"Started bot for user {target_user_id[:8]}")
@@ -459,8 +470,6 @@ async def admin_set_user_tier(
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(get_verified_admin),
 ):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
     new_tier = body.get("tier", "none")
     allowed_tiers = {"none", "starter", "pro", "elite"}
     if new_tier not in allowed_tiers:
@@ -487,8 +496,6 @@ async def admin_broadcast_signal(
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(get_verified_admin),
 ):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
     signal = {
         "action": body.get("action", "wait"),
         "symbol": body.get("symbol", "BTC").upper(),
@@ -506,16 +513,12 @@ async def admin_broadcast_signal(
 # ─── Admin: Readiness Scorecard ───────────────────────────────────────────────
 @router.get("/api/admin/readiness")
 def get_admin_readiness(user: AuthenticatedUser = Depends(get_verified_admin)):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
     return get_readiness()
 
 
 # ─── Admin: AI Cost Summary ───────────────────────────────────────────────────
 @router.get("/api/admin/ai-costs")
 def get_ai_costs(user: AuthenticatedUser = Depends(get_verified_admin)):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
     try:
         from ai.claude_ai import get_cost_tracker
         return get_cost_tracker()
@@ -526,8 +529,6 @@ def get_ai_costs(user: AuthenticatedUser = Depends(get_verified_admin)):
 # ─── Admin: Circuit Breaker Status ────────────────────────────────────────────
 @router.get("/api/admin/circuit-breaker")
 def get_circuit_breaker_status(user: AuthenticatedUser = Depends(get_verified_admin)):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
     total_daily_pnl = sum(i.daily_pnl for i in bot_manager._instances.values())
     threshold = -bot_manager.global_max_loss_usd
     return {
@@ -543,16 +544,12 @@ def get_circuit_breaker_status(user: AuthenticatedUser = Depends(get_verified_ad
 # ─── Admin: Session Audit Log ─────────────────────────────────────────────────
 @router.get("/api/admin/audit-log")
 def get_admin_audit_log(user: AuthenticatedUser = Depends(get_verified_admin)):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
     return {"entries": db_get_admin_logs(limit=200)}
 
 
 # ─── Admin: Live Platform Logs ────────────────────────────────────────────────
 @router.get("/api/admin/logs")
 def get_admin_logs(limit: int = 100, user: AuthenticatedUser = Depends(get_verified_admin)):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
     try:
         logs = list(bot.logs[:min(limit, 200)])
         return {"logs": logs}

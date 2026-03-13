@@ -18,6 +18,11 @@ function httpProxy() {
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    globals: true,
+    environment: "jsdom",
+    setupFiles: "./src/test/setup.js",
+  },
   build: {
     rollupOptions: {
       output: {

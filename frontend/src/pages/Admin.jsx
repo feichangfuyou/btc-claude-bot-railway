@@ -221,6 +221,7 @@ export default function Admin() {
   // Tier modal
   const [tierModal, setTierModal] = useState(null); // { userId, email, currentTier }
   const [tierValue, setTierValue] = useState("none");
+  const [brainTest, setBrainTest] = useState(null); // { ok, error?, model? }
 
   const logsEndRef = useRef(null);
 
@@ -263,7 +264,7 @@ export default function Admin() {
       setLastRefresh(new Date());
     } catch { /* continue */ }
     finally { setLoading(false); }
-  }, [api]);
+  }, [api, paymentsFilter]);
 
   useEffect(() => {
     if (!verified) return;
@@ -686,6 +687,54 @@ export default function Admin() {
                     <span className="mono-text" style={{ fontSize: 11, color: v === true ? colors.success : v === false ? colors.error : colors.gold }}>{typeof v === "boolean" ? (v ? "✓" : "✗") : String(v)}</span>
                   </div>
                 ))}
+              </div>
+              {/* Alert when brain is paused */}
+              {readiness.checks?.multi_model_fallback === false && (
+                <div style={{ marginTop: 20, padding: 12, background: "rgba(255,23,68,0.12)", borderRadius: 10, border: "1px solid rgba(255,23,68,0.3)", color: colors.error, fontSize: 12 }}>
+                  Brain is paused (credits exhausted or API failures). Add credits at{" "}
+                  <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" style={{ color: colors.gold, textDecoration: "underline" }}>console.anthropic.com</a>
+                  , then click Test Brain below.
+                </div>
+              )}
+              {/* Brain test — verify Claude API & credits after top-up */}
+              <div style={{ marginTop: 20, padding: 16, background: "rgba(255,255,255,0.02)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.04)" }}>
+                <div style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>Verify brain (Claude API + credits)</div>
+                <div style={{ fontSize: 11, color: colors.muted, opacity: 0.9, marginBottom: 10, lineHeight: 1.4 }}>
+                  If the brain is paused (credits exhausted): add credits at{" "}
+                  <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" style={{ color: colors.gold, textDecoration: "underline" }}>console.anthropic.com</a>
+                  , then click Test Brain to un-pause and verify.
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <button
+                    onClick={async () => {
+                      setBrainTest(null);
+                      try {
+                        const r = await api("/api/admin/test-brain", { method: "POST" });
+                        setBrainTest(r);
+                        fetchAll();
+                      } catch (e) {
+                        setBrainTest({ ok: false, error: e.message });
+                      }
+                    }}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      border: "none",
+                      cursor: "pointer",
+                      background: colors.gold,
+                      color: colors.dark,
+                    }}
+                  >
+                    Test Brain
+                  </button>
+                  {brainTest && (
+                    <span style={{ fontSize: 12, color: brainTest.ok ? colors.success : colors.error }}>
+                      {brainTest.ok ? `✓ OK (${brainTest.model || "Claude"})` : `✗ ${brainTest.error || "Failed"}`}
+                    </span>
+                  )}
+                </div>
               </div>
             </>) : <div style={{ color: colors.muted, fontSize: 12 }}>Loading readiness data…</div>}
           </Section>
