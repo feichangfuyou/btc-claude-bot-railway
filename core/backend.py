@@ -480,29 +480,9 @@ async def news_pulse_cycle(bot, broadcast):
 
 
 # ─── Lifespan ────────────────────────────────────────────────────────────────
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    _sentry_dsn = os.getenv("SENTRY_DSN", "").strip()
-    if _sentry_dsn:
-        try:
-            import sentry_sdk
-            from sentry_sdk.integrations.fastapi import FastApiIntegration
-
-            sentry_sdk.init(
-                dsn=_sentry_dsn,
-                integrations=[FastApiIntegration()],
-                traces_sample_rate=0.1,
-                profiles_sample_rate=0.1,
-                environment=os.getenv("RAILWAY_ENVIRONMENT", "development"),
-            )
-            bot.add_log("  Sentry: ✅ APM enabled", "info")
-        except Exception as e:
-            bot.add_log(f"  Sentry: ❌ init failed: {str(e)[:60]}", "warning")
-
-    # Clear presets cache on startup so deploy picks up preset changes immediately
-    import core.shared as _shared
-
-    _shared._PRESETS_CACHE = None
+async def _deferred_startup():
+    """Heavy startup work that runs AFTER the HTTP server is accepting requests.
+    This ensures /health responds immediately so Railway healthchecks pass."""
 
     bot.add_log(
         f"🚀 Institutional Trading v7 starting... ({len(ACTIVE_COINS)} coins: {', '.join(ACTIVE_COINS)})",
@@ -622,7 +602,6 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(coinbase_ws_loop(bot, broadcast, broadcast_price))
     asyncio.create_task(stats_refresh_cycle(bot, broadcast_price))
 
-    # Tiered Hub Cycles
     asyncio.create_task(hub_scan_cycle("starter"))
     asyncio.create_task(hub_scan_cycle("pro"))
     asyncio.create_task(hub_scan_cycle("elite"))
@@ -671,6 +650,33 @@ async def lifespan(app: FastAPI):
         "info",
     )
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _sentry_dsn = os.getenv("SENTRY_DSN", "").strip()
+    if _sentry_dsn:
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+            sentry_sdk.init(
+                dsn=_sentry_dsn,
+                integrations=[FastApiIntegration()],
+                traces_sample_rate=0.1,
+                profiles_sample_rate=0.1,
+                environment=os.getenv("RAILWAY_ENVIRONMENT", "development"),
+            )
+            bot.add_log("  Sentry: ✅ APM enabled", "info")
+        except Exception as e:
+            bot.add_log(f"  Sentry: ❌ init failed: {str(e)[:60]}", "warning")
+
+    import core.shared as _shared
+    _shared._PRESETS_CACHE = None
+
+    # Yield immediately so the HTTP server starts and /health responds.
+    # All heavy bootstrap (price feeds, WS, AI cycles) runs in background.
+    asyncio.create_task(_deferred_startup())
+
     try:
         yield
     finally:
@@ -695,6 +701,9 @@ _raw = os.getenv("CORS_ORIGINS", _DEFAULT_CORS)
 ALLOWED_ORIGINS = [o.strip() for o in _raw.split(",") if o.strip()]
 if not ALLOWED_ORIGINS:
     ALLOWED_ORIGINS = [o.strip() for o in _DEFAULT_CORS.split(",") if o.strip()]
+# Railway sends healthchecks from this hostname
+if "https://healthcheck.railway.app" not in ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS.append("https://healthcheck.railway.app")
 
 
 def _cors_headers_for(request: StarletteRequest, response: JSONResponse) -> None:

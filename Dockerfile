@@ -43,6 +43,7 @@ COPY learning/ ./learning/
 COPY feeds/ ./feeds/
 COPY tools/ ./tools/
 COPY utils/ ./utils/
+COPY workers/ ./workers/
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
 RUN mkdir -p logs backups data
