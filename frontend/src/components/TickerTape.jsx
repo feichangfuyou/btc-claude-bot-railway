@@ -35,29 +35,20 @@ export const FALLBACK_SYMBOL_TO_COINGECKO = {
   DOGS: "dogs-2", WEN: "wen", TOSHI: "toshi", NEIRO: "neiro-3",
 };
 
-export const COINCAP_CDN = "https://assets.coincap.io/assets/icons";
-export const LLAMA_ICONS_CDN = "https://icons.llama.fi";
+export const JSDELIVR_CDN = "https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color";
+export const JSDELIVR_CDN_PNG = "https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/128/color";
 export const CRYPTO_ICONS_CDN = "https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color";
-export const COINCAP_SYM_MAP = {
-  POL: "matic", MATIC: "matic", APT: "apt", "1000PEPE": "pepe", "1000SATS": "sats", "1000BONK": "bonk",
-  RNDR: "render", RENDER: "render", DOGE: "dogecoin", SHIB: "shiba-inu", PEPE: "pepe",
-  REKT: "rekt", COQ: "coq", APU: "apu", MEW: "mew", TOSHI: "toshi", TURBO: "turbo",
-  SOL: "solana", ETH: "ethereum", BTC: "bitcoin", AVAX: "avalanche", LINK: "chainlink"
-};
 
 export function getTickerLogoUrl(sym) {
-  const capId = COINCAP_SYM_MAP[sym] || sym?.toLowerCase?.();
-  return `${COINCAP_CDN}/${capId}@2x.png`;
+  return `${JSDELIVR_CDN}/${sym?.toLowerCase?.()}.svg`;
 }
 
 export function getTickerLogoFallback1(sym) {
-  // Llama.fi icons are very reliable for almost any DeFi/Crypto token
-  return `${LLAMA_ICONS_CDN}/${sym?.toLowerCase()}`;
+  return `${JSDELIVR_CDN_PNG}/${sym?.toLowerCase?.()}.png`;
 }
 
 export function getTickerLogoFallback2(sym) {
-  // CryptoIcons is a massive high-quality repository
-  return `${CRYPTO_ICONS_CDN}/${sym?.toLowerCase()}.png`;
+  return `${CRYPTO_ICONS_CDN}/${sym?.toLowerCase?.()}.png`;
 }
 
 export function getTickerLogoPlaceholder(sym) {
