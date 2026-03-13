@@ -864,19 +864,20 @@ class BotState:
                 total += (entry - p) * coin_size
         return total
 
-    def _on_breaker_tripped(self):
+    async def _on_breaker_tripped(self):
         """Called when circuit breaker trips — stop bot and notify."""
         self.bot_running = False
         self.add_log(
             f"🛑 CIRCUIT BREAKER: {self.circuit_breaker.consecutive_losses} consecutive losses — bot paused",
             "error",
         )
-        asyncio.create_task(
-            send_notification(
+        try:
+            await send_notification(
                 f"🛑 CIRCUIT BREAKER: {self.circuit_breaker.consecutive_losses} consecutive losses — bot auto-paused!",
                 "alert",
             )
-        )
+        except Exception:
+            pass
 
     def _track_consecutive(self, net: float):
         if net < 0:

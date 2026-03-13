@@ -275,7 +275,9 @@ def _apply_celery_decision(data: dict):
 
 
 async def hub_scan_cycle(tier: str):
-    """Point 1: Managed Intelligence — a single AI loop for all users in a tier."""
+    """Point 1: Managed Intelligence — a single AI loop for all users in a tier.
+    The shared bot singleton runs the AI analysis. Signals are broadcast to per-user
+    instances that have live exchange connections."""
     from billing.stripe_handler import TIER_LIMITS
 
     limits = TIER_LIMITS.get(tier, TIER_LIMITS["starter"])
@@ -287,21 +289,20 @@ async def hub_scan_cycle(tier: str):
 
     while True:
         try:
-            # Admin brain kill-switch — skip AI calls entirely when brain is off
             if not bot_manager.brain_enabled:
                 await asyncio.sleep(5)
                 continue
 
-            # Global pause — don't waste AI credits if platform is halted
             if bot_manager.global_pause:
                 await asyncio.sleep(5)
                 continue
 
-            # Only scan if there are active users in this tier
+            # Check for active users in this tier OR the shared bot running (for admin/dev)
             active_users = sum(1 for i in bot_manager._instances.values()
                              if i.running and i.config.subscription_tier == tier)
+            shared_bot_active = bot.bot_running
 
-            if active_users > 0:
+            if active_users > 0 or (tier == "starter" and shared_bot_active):
                 skip_scout = False
                 bot.claude_model = model
 
@@ -310,7 +311,7 @@ async def hub_scan_cycle(tier: str):
 
                 await call_claude(bot, broadcast_price, skip_scout=skip_scout, coin_limit=coin_limit, tier=tier)
 
-                if bot.claude_decision:
+                if bot.claude_decision and bot.claude_decision.get("action") != "wait":
                     await bot_manager.broadcast_managed_signal(
                         bot.claude_decision,
                         tier=tier
@@ -325,13 +326,16 @@ async def hub_scan_cycle(tier: str):
             await asyncio.sleep(interval or 60)
 
 async def bot_cycle():
-    """Service-level maintenance (replaces the old individual bot_cycle)."""
+    """Service-level maintenance — daily/hourly bookkeeping that was previously missing."""
+    await asyncio.sleep(10)
     while True:
         try:
-            await asyncio.sleep(1)
+            bot.daily_reset_check()
+            bot.hourly_snapshot_check()
+            await asyncio.sleep(30)
         except Exception as e:
             bot.add_log(f"Bot cycle error (recovering): {str(e)[:80]}", "error")
-            await asyncio.sleep(2)
+            await asyncio.sleep(5)
 
 
 async def snapshot_cycle():
@@ -908,6 +912,8 @@ async def ws_endpoint(ws: WebSocket):
         _user_to_ws.setdefault(user_id, set()).add(ws)
         bot.active_user_id = user_id
         bot.active_user_email = user_email or ""
+        # Pre-register user instance so hub scan knows their tier
+        await bot_manager.get_or_create(user_id)
     bot.add_log(
         f"Dashboard connected ({len(bot.clients)} client{'s' if len(bot.clients) != 1 else ''})",
         "info",
@@ -945,6 +951,8 @@ async def ws_endpoint(ws: WebSocket):
                     break
                 continue
             try:
+                if user_id and "user_id" not in msg:
+                    msg["user_id"] = user_id
                 await _handle_ws_command(msg)
             except Exception as e:
                 bot.add_log(f"WS command error: {str(e)[:60]}", "error")
@@ -960,6 +968,11 @@ async def ws_endpoint(ws: WebSocket):
             _user_to_ws[uid].discard(ws)
             if not _user_to_ws[uid]:
                 del _user_to_ws[uid]
+                # No more WS connections for this user — stop their bot instance
+                instance = bot_manager.get(uid)
+                if instance and instance.running:
+                    instance.running = False
+                    instance.persist_state()
                 if bot.active_user_id == uid:
                     remaining = next(iter(_user_to_ws), None)
                     bot.active_user_id = remaining
@@ -973,13 +986,30 @@ async def _handle_ws_command(msg: dict):
     if cmd == "start_bot":
         bot.bot_running = True
         bot.countdown = 5
-        bot.add_log("🟢 Bot started", "success")
+
+        # Register this user with bot_manager so the hub scan cycle sees them as active
+        ws_user_id = msg.get("user_id") or bot.active_user_id
+        if ws_user_id:
+            instance = await bot_manager.get_or_create(ws_user_id)
+            instance.running = True
+            bot.add_log(f"🟢 Bot started (user registered in {instance.config.subscription_tier} tier hub)", "success")
+        else:
+            bot.add_log("🟢 Bot started", "success")
+
         if not bot_manager.brain_enabled:
             bot.add_log("⚠️ Brain is currently offline — bot is queued and will trade when admin re-enables the brain", "warning")
         await broadcast({"type": "bot_status", "bot_running": True, "brain_enabled": bot_manager.brain_enabled})
 
     elif cmd == "stop_bot":
         bot.bot_running = False
+
+        ws_user_id = msg.get("user_id") or bot.active_user_id
+        if ws_user_id:
+            instance = bot_manager.get(ws_user_id)
+            if instance:
+                instance.running = False
+                instance.persist_state()
+
         bot.add_log("🔴 Bot stopped", "warning")
         await broadcast({"type": "bot_status", "bot_running": False})
 
