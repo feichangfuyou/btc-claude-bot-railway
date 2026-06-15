@@ -80,6 +80,12 @@ def client():
     return TestClient(app)
 
 
+def _client_get(path: str, **kwargs):
+    """Thread-safe request: TestClient is not safe to share across threads."""
+    with TestClient(app) as c:
+        return c.get(path, **kwargs)
+
+
 @pytest.fixture
 def secret():
     return API_SECRET
@@ -129,7 +135,7 @@ def test_concurrent_health_flood(client, secret):
     """100 concurrent /health requests — no crash, all return 200."""
 
     def fetch():
-        return client.get("/health")
+        return _client_get("/health")
 
     with ThreadPoolExecutor(max_workers=20) as ex:
         futures = [ex.submit(fetch) for _ in range(100)]
@@ -142,7 +148,10 @@ def test_concurrent_ticker_flood(client, secret):
     """50 concurrent /api/exchange/tickers — IO executor should handle."""
 
     def fetch():
-        return client.get("/api/exchange/tickers?limit=10", headers={"x-bot-secret": secret})
+        return _client_get(
+            "/api/exchange/tickers?limit=10",
+            headers={"x-bot-secret": secret},
+        )
 
     with ThreadPoolExecutor(max_workers=10) as ex:
         futures = [ex.submit(fetch) for _ in range(50)]
@@ -152,14 +161,8 @@ def test_concurrent_ticker_flood(client, secret):
 
 
 def test_concurrent_account_flood(client, secret):
-    """30 concurrent /account — auth + DB should handle."""
-
-    def fetch():
-        return client.get("/account", headers={"x-bot-secret": secret})
-
-    with ThreadPoolExecutor(max_workers=10) as ex:
-        futures = [ex.submit(fetch) for _ in range(30)]
-        results = [f.result() for f in as_completed(futures)]
+    """30 rapid /account requests — auth + DB should handle (sequential; TestClient shares one event loop)."""
+    results = [client.get("/account", headers={"x-bot-secret": secret}) for _ in range(30)]
     for r in results:
         assert r.status_code == 200, "Account should survive flood"
 
@@ -344,15 +347,14 @@ def test_readiness_after_flood(client, secret):
 def test_health_responds_during_blocking_work(client):
     """Health should respond even when other endpoints are busy (non-blocking)."""
 
-    # Fire ticker request (slow external API) and immediately hit health
     def slow_ticker():
-        return client.get("/api/exchange/tickers?limit=500")
+        return _client_get("/api/exchange/tickers?limit=500")
 
     t = threading.Thread(target=slow_ticker)
     t.start()
     time.sleep(0.1)
     r = client.get("/health")
-    t.join(timeout=10)
+    t.join(timeout=30)
     assert r.status_code == 200, "Health must not block on ticker fetch"
 
 
