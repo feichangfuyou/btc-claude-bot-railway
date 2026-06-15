@@ -137,8 +137,6 @@ class TestCreateSignalFromDecision:
         assert sig.leverage == 1
 
     def test_futures_signal(self):
-        sig = create_signal_from_decision(
-            {"action": "buy", "product_type": "futures", "leverage": 5}
-        )
+        sig = create_signal_from_decision({"action": "buy", "product_type": "futures", "leverage": 5})
         assert sig.product_type == "futures"
         assert sig.leverage == 5

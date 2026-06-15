@@ -115,6 +115,7 @@ async def validate_coinbase_keys(api_key: str, api_secret: str) -> tuple[bool, s
         return False, "API key and secret are required"
 
     from api.coinbase_api import _get_client_with_keys
+
     client = _get_client_with_keys(api_key.strip(), api_secret.strip())
     if not client:
         return False, "Could not initialize Coinbase client. Invalid key configuration."
@@ -131,6 +132,7 @@ async def validate_coinbase_keys(api_key: str, api_secret: str) -> tuple[bool, s
             return (False, f"Coinbase error: {msg}")
 
     import asyncio
+
     try:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, _sync)
@@ -138,7 +140,9 @@ async def validate_coinbase_keys(api_key: str, api_secret: str) -> tuple[bool, s
         return False, f"Connection error: {e}"
 
 
-async def validate_exchange_keys(exchange: str, api_key: str, api_secret: str, api_passphrase: str = "") -> tuple[bool, str]:
+async def validate_exchange_keys(
+    exchange: str, api_key: str, api_secret: str, api_passphrase: str = ""
+) -> tuple[bool, str]:
     """
     Validate API keys for the given exchange using custom endpoints or ccxt.
     Returns (valid, error_message).
@@ -162,11 +166,9 @@ async def validate_exchange_keys(exchange: str, api_key: str, api_secret: str, a
 
     try:
         ex_class = getattr(ccxt, exchange)
-        ex = ex_class({
-            "apiKey": api_key,
-            "secret": api_secret,
-            **({"password": api_passphrase} if api_passphrase else {})
-        })
+        ex = ex_class(
+            {"apiKey": api_key, "secret": api_secret, **({"password": api_passphrase} if api_passphrase else {})}
+        )
         # Check balances to validate key
         await ex.fetch_balance()
         await ex.close()
@@ -175,4 +177,3 @@ async def validate_exchange_keys(exchange: str, api_key: str, api_secret: str, a
         return False, "Invalid API key, secret, or passphrase."
     except Exception as e:
         return False, f"Connection or validation error: {str(e)}"
-

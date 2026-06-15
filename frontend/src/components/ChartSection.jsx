@@ -1,7 +1,17 @@
 import { useRef, useState, useEffect, memo } from "react";
 import TradingViewChart from "../TradingViewChart.jsx";
 import AnimatedNumber from "../AnimatedNumber.jsx";
-import { Search, Zap, Maximize2 } from "lucide-react";
+import { Search, Zap, Maximize2, Layers, Sparkles } from "lucide-react";
+
+const CHART_VIEW_KEY = "btcBot.chartViewMode";
+
+function readChartViewMode() {
+  try {
+    return localStorage.getItem(CHART_VIEW_KEY) === "pro" ? "pro" : "clean";
+  } catch {
+    return "clean";
+  }
+}
 
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL
   || (import.meta.env.DEV ? "http://localhost:8000" : "");
@@ -14,7 +24,14 @@ export const ChartSection = memo(function ChartSection({
 }) {
   const [tickerSearch, setTickerSearch] = useState("");
   const [tickerSearchOpen, setTickerSearchOpen] = useState(false);
+  const [chartViewMode, setChartViewMode] = useState(readChartViewMode);
   const tickerSearchRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHART_VIEW_KEY, chartViewMode);
+    } catch { /* ignore */ }
+  }, [chartViewMode]);
 
   useEffect(() => {
     if (!tickerSearchOpen) return;
@@ -45,22 +62,22 @@ export const ChartSection = memo(function ChartSection({
   }, [tickerSearchOpen, tickerSearch, marketTickers, setMultiExchangePrices]);
 
   return (
-    <div className="card chart-card" style={{ display: "flex", flexDirection: "column", padding: "10px", position: "relative", zIndex: 1, overflow: "hidden" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", padding: "0 2px", flexWrap: "wrap", gap: "8px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-          <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "14px", color: "#D4D4D4", fontWeight: "800", letterSpacing: "3px" }}>
+    <div className="card chart-card">
+      <div className="chart-card__header">
+        <div className="chart-card__header-left">
+          <span className="chart-card__title chart-header-title">
             {chartSymbol.includes(":")
               ? (() => { const [, pair] = chartSymbol.split(":"); const base = (pair || "").replace(/USDT?$/i, ""); return `${base} / ${(pair || "").includes("USDT") ? "USDT" : "USD"}`; })()
               : `${chartSymbol} / USD`}
           </span>
-          <span style={{ fontSize: "9px", color: "#5C5C5C", letterSpacing: "1px" }}>TRADINGVIEW PRO</span>
-          {/* Ticker search */}
-          <div ref={tickerSearchRef} style={{ position: "relative" }}>
-            <div style={{ display: "flex", alignItems: "center", background: "#111111", border: "1px solid #1e1e1e", borderRadius: "6px", padding: "2px 8px", gap: "6px" }}>
-              <Search size={10} color="#5C5C5C" />
+          <span className="chart-card__badge">TRADINGVIEW</span>
+          <div ref={tickerSearchRef} className="chart-card__search-wrap">
+            <div className="chart-card__search">
+              <Search size={9} color="#5C5C5C" strokeWidth={2.25} />
               <input
                 type="text"
-                placeholder="Search ticker..."
+                className="chart-card__search-input"
+                placeholder="Ticker"
                 value={tickerSearch}
                 onChange={(e) => { setTickerSearch(e.target.value); setTickerSearchOpen(true); }}
                 onFocus={() => setTickerSearchOpen(true)}
@@ -73,7 +90,6 @@ export const ChartSection = memo(function ChartSection({
                     setTickerSearch("");
                   } else if (e.key === "Escape") { setTickerSearchOpen(false); setTickerSearch(""); }
                 }}
-                style={{ width: "min(140px, calc(100vw - 56px))", minWidth: 64, fontFamily: "'Space Mono',monospace", fontSize: "11px", background: "transparent", border: "none", color: "#D4D4D4", outline: "none" }}
               />
             </div>
             {tickerSearchOpen && (
@@ -165,46 +181,59 @@ export const ChartSection = memo(function ChartSection({
             )}
           </div>
         </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-            {positions.length > 0 && (
-              <div style={{ display: "flex", gap: "10px", fontSize: "9px", alignItems: "center", flexWrap: "wrap" }}>
-                {positions.filter(p => p.symbol === selectedCoin).map(pos => (
-                  <div key={pos.id} style={{ display: "flex", gap: "8px", padding: "2px 6px", borderRadius: "3px", background: pos.side === "buy" ? "#00E67608" : "#FF174408" }}>
-                    <span style={{ color: pos.side === "buy" ? "#00E676" : "#FF1744", fontWeight: "700" }}>{pos.side?.toUpperCase()}</span>
-                    <span style={{ color: "#D4AF37" }}>E $<AnimatedNumber value={pos.entry || 0} format={(v) => v.toLocaleString()} duration={150} /></span>
-                    <span style={{ color: "#00E676" }}>TP $<AnimatedNumber value={pos.tp || 0} format={(v) => v.toLocaleString()} duration={150} /></span>
-                    <span style={{ color: "#FF1744" }}>SL $<AnimatedNumber value={pos.sl || 0} format={(v) => v.toLocaleString()} duration={150} /></span>
-                  </div>
-                ))}
-              </div>
-            )}
+        <div className="chart-card__header-right">
+          {positions.length > 0 && (
+            <div className="chart-card__positions">
+              {positions.filter(p => p.symbol === selectedCoin).map(pos => (
+                <div
+                  key={pos.id}
+                  className="chart-card__position-pill"
+                  style={{ background: pos.side === "buy" ? "#00E67608" : "#FF174408" }}
+                >
+                  <span style={{ color: pos.side === "buy" ? "#00E676" : "#FF1744", fontWeight: "700" }}>{pos.side?.toUpperCase()}</span>
+                  <span style={{ color: "#D4AF37" }}>E $<AnimatedNumber value={pos.entry || 0} format={(v) => v.toLocaleString()} duration={150} /></span>
+                  <span style={{ color: "#00E676" }}>TP $<AnimatedNumber value={pos.tp || 0} format={(v) => v.toLocaleString()} duration={150} /></span>
+                  <span style={{ color: "#FF1744" }}>SL $<AnimatedNumber value={pos.sl || 0} format={(v) => v.toLocaleString()} duration={150} /></span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="chart-card__header-tools">
+            <div className="chart-view-toggle" role="group" aria-label="Chart view mode">
+              <button
+                type="button"
+                className={`chart-view-toggle__btn${chartViewMode === "clean" ? " chart-view-toggle__btn--active" : ""}`}
+                onClick={() => setChartViewMode("clean")}
+                title="Clean chart — candles only"
+                aria-pressed={chartViewMode === "clean"}
+              >
+                <Sparkles size={10} strokeWidth={2.25} /> CLEAN
+              </button>
+              <button
+                type="button"
+                className={`chart-view-toggle__btn${chartViewMode === "pro" ? " chart-view-toggle__btn--active" : ""}`}
+                onClick={() => setChartViewMode("pro")}
+                title="Pro chart — indicators, volume, and toolbars"
+                aria-pressed={chartViewMode === "pro"}
+              >
+                <Layers size={10} strokeWidth={2.25} /> PRO
+              </button>
+            </div>
             {onChartExpand && (
               <button
                 type="button"
+                className="chart-card__action"
                 onClick={(e) => { e.stopPropagation(); onChartExpand(chartSymbol); }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                  padding: "4px 8px",
-                  borderRadius: "4px",
-                  background: "transparent",
-                  color: "#D4AF37",
-                  fontSize: "9px",
-                  fontWeight: "600",
-                  letterSpacing: "1px",
-                  border: "1px solid rgba(212,175,55,0.3)",
-                  cursor: "pointer",
-                }}
                 title="Click to expand chart"
               >
-                <Maximize2 size={12} /> EXPAND
+                <Maximize2 size={10} strokeWidth={2.25} /> EXPAND
               </button>
             )}
           </div>
         </div>
-      <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-        <TradingViewChart symbol={chartSymbol} />
+      </div>
+      <div className="chart-card__canvas">
+        <TradingViewChart symbol={chartSymbol} minimal={chartViewMode === "clean"} key={`${chartSymbol}-${chartViewMode}`} />
       </div>
     </div>
   );

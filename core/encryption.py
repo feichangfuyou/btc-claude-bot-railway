@@ -47,7 +47,9 @@ def _get_fernet_key() -> bytes | None:
             iterations=100000,
         )
         key = base64.urlsafe_b64encode(kdf.derive(secret.encode()))
-        logger.warning("Using derived encryption key from BOT_API_SECRET — set EXCHANGE_KEYS_ENCRYPTION_KEY for production")
+        logger.warning(
+            "Using derived encryption key from BOT_API_SECRET — set EXCHANGE_KEYS_ENCRYPTION_KEY for production"
+        )
         _ENCRYPTION_KEY = key
         return _ENCRYPTION_KEY
 

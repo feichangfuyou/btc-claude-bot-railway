@@ -10,7 +10,7 @@ describe("Privacy page", () => {
         <Privacy />
       </MemoryRouter>
     );
-    expect(screen.getByText("Privacy Policy")).toBeInTheDocument();
+    expect(screen.getByText("PRIVACY POLICY")).toBeInTheDocument();
   });
 
   it("displays the effective date", () => {

@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { PublicNav } from "../components/PublicNav.jsx";
+import { PublicFooter } from "../components/PublicFooter.jsx";
 import { ArrowLeft } from "lucide-react";
 
 const EFFECTIVE_DATE = "March 5, 2026";
@@ -15,15 +17,18 @@ export default function Privacy() {
     }, []);
 
     return (
-        <div style={s.page}>
-            <div style={s.content}>
-                <button style={s.back} onClick={() => navigate(-1)}><ArrowLeft size={14} style={{ verticalAlign: "middle", marginRight: "4px" }} /> Back</button>
-                <h1 style={s.h1}>Privacy Policy</h1>
-                <p style={s.meta}>Effective: {EFFECTIVE_DATE}</p>
+        <div className="public-page">
+            <PublicNav />
+            <div className="legal-page__content">
+                <button type="button" className="page-shell__back" onClick={() => navigate(-1)} style={{ marginBottom: 32 }}>
+                    <ArrowLeft size={14} /> Back
+                </button>
+                <h1 className="legal-page__title">PRIVACY POLICY</h1>
+                <p className="legal-page__meta">Effective: {EFFECTIVE_DATE}</p>
 
-                <section style={s.section}>
-                    <h2 style={s.h2}>1. What We Collect</h2>
-                    <p style={s.p}>
+                <section className="legal-page__section">
+                    <h2>1. What We Collect</h2>
+                    <p>
                         <strong>Account data:</strong> email address, hashed password (via Supabase Auth).<br /><br />
                         <strong>Trading preferences:</strong> strategy, risk level, selected coins, paper/live mode — stored in our database.<br /><br />
                         <strong>Exchange credentials:</strong> API keys and secrets, encrypted at rest (AES-256 Fernet). We store only the encrypted ciphertext — plaintext keys are never persisted.<br /><br />
@@ -32,9 +37,9 @@ export default function Privacy() {
                     </p>
                 </section>
 
-                <section style={s.section}>
-                    <h2 style={s.h2}>2. How We Use It</h2>
-                    <p style={s.p}>
+                <section className="legal-page__section">
+                    <h2>2. How We Use It</h2>
+                    <p>
                         — To operate the trading systems on your behalf<br />
                         — To display your trade history and analytics dashboard<br />
                         — To improve trading strategies (aggregated, never individual)<br />
@@ -43,9 +48,9 @@ export default function Privacy() {
                     </p>
                 </section>
 
-                <section style={s.section}>
-                    <h2 style={s.h2}>3. Data Sharing</h2>
-                    <p style={s.p}>
+                <section className="legal-page__section">
+                    <h2>3. Data Sharing</h2>
+                    <p>
                         We do not sell your data. We share data only with:<br /><br />
                         <strong>Supabase</strong> — database and auth provider (SOC 2 compliant)<br />
                         <strong>Stripe</strong> — payment processing (PCI-DSS compliant)<br />
@@ -54,118 +59,57 @@ export default function Privacy() {
                     </p>
                 </section>
 
-                <section style={s.section}>
-                    <h2 style={s.h2}>4. Data Retention</h2>
-                    <p style={s.p}>
+                <section className="legal-page__section">
+                    <h2>4. Data Retention</h2>
+                    <p>
                         Trading data and preferences are retained while your account is active. Upon account
                         deletion, we delete your personal data within 30 days. Anonymized, aggregated trading
                         statistics may be retained for service improvement.
                     </p>
                 </section>
 
-                <section style={s.section}>
-                    <h2 style={s.h2}>5. Security</h2>
-                    <p style={s.p}>
+                <section className="legal-page__section">
+                    <h2>5. Security</h2>
+                    <p>
                         API keys are encrypted using Fernet symmetric encryption before storage. Access to
                         your data within our database is protected by Row-Level Security (RLS) — no user
                         can query another user's rows. All data is transmitted over TLS 1.2+.
                     </p>
                 </section>
 
-                <section style={s.section}>
-                    <h2 style={s.h2}>6. Your Rights</h2>
-                    <p style={s.p}>
+                <section className="legal-page__section">
+                    <h2>6. Your Rights</h2>
+                    <p>
                         You may request access to, correction of, or deletion of your data at any time by
-                        emailing <a href={`mailto:${CONTACT_EMAIL}`} style={s.link}>{CONTACT_EMAIL}</a>.
+                        emailing <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
                         You can also delete your account directly from the Settings page.
                     </p>
                 </section>
 
-                <section style={s.section}>
-                    <h2 style={s.h2}>7. Cookies</h2>
-                    <p style={s.p}>
+                <section className="legal-page__section">
+                    <h2>7. Cookies</h2>
+                    <p>
                         We use only essential session cookies from Supabase Auth. We do not use tracking
                         cookies or third-party analytics.
                     </p>
                 </section>
 
-                <section style={s.section}>
-                    <h2 style={s.h2}>8. Changes</h2>
-                    <p style={s.p}>
+                <section className="legal-page__section">
+                    <h2>8. Changes</h2>
+                    <p>
                         We may update this policy. Material changes will be emailed to registered users.
                         Continued use after changes constitutes acceptance.
                     </p>
                 </section>
 
-                <section style={s.section}>
-                    <h2 style={s.h2}>9. Contact</h2>
-                    <p style={s.p}>
-                        Privacy questions: <a href={`mailto:${CONTACT_EMAIL}`} style={s.link}>{CONTACT_EMAIL}</a>
+                <section className="legal-page__section">
+                    <h2>9. Contact</h2>
+                    <p>
+                        Privacy questions: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
                     </p>
                 </section>
             </div>
+            <PublicFooter compact />
         </div>
     );
 }
-
-const s = {
-    page: {
-        background: "#0A0A0A",
-        minHeight: "100dvh",
-        color: "#D4D4D4",
-        fontFamily: "'Space Mono', monospace",
-        padding: "32px 16px",
-    },
-    content: {
-        maxWidth: 720,
-        margin: "0 auto",
-    },
-    back: {
-        fontFamily: "'Space Mono', monospace",
-        fontSize: 12,
-        padding: "6px 12px",
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: 8,
-        color: "#888",
-        cursor: "pointer",
-        marginBottom: 32,
-        display: "block",
-    },
-    h1: {
-        fontFamily: "'Montserrat', sans-serif",
-        fontSize: 40,
-        letterSpacing: 4,
-        color: "#D4AF37",
-        margin: "0 0 4px",
-    },
-    meta: {
-        fontSize: 11,
-        color: "#555",
-        marginBottom: 40,
-        letterSpacing: 1,
-    },
-    section: {
-        marginBottom: 32,
-        paddingBottom: 32,
-        borderBottom: "1px solid rgba(255,255,255,0.04)",
-    },
-    h2: {
-        fontFamily: "'Montserrat', sans-serif",
-        fontSize: 14,
-        letterSpacing: 2,
-        color: "#888",
-        textTransform: "uppercase",
-        margin: "0 0 12px",
-    },
-    p: {
-        fontSize: 13,
-        lineHeight: 1.8,
-        color: "#C0C0C0",
-        margin: 0,
-    },
-    link: {
-        color: "#D4AF37",
-        textDecoration: "none",
-    },
-};

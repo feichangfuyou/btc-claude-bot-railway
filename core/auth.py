@@ -5,7 +5,6 @@ Replaces the old shared-secret AuthMiddleware with JWT-based per-user auth.
 
 import hmac
 import logging
-from typing import Optional
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -45,7 +44,7 @@ class AuthenticatedUser:
 
 async def get_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> AuthenticatedUser:
     """Extract and verify the Supabase JWT from the Authorization header.
     Returns an AuthenticatedUser or raises 401.
@@ -60,6 +59,7 @@ async def get_current_user(
     # Fallback: x-bot-secret from localhost/testclient (single-user dev or pytest)
     if not token:
         from core.config import API_SECRET, DEV_USER_EMAIL
+
         secret = (request.headers.get("x-bot-secret") or request.query_params.get("secret") or "").strip()
         if secret and hmac.compare_digest(secret, API_SECRET):
             client_ip = (request.client.host if request.client else "unknown") or "unknown"
@@ -83,6 +83,7 @@ async def get_current_user(
 
         # Load config using the cached helper
         from core.user_config import load_user_config
+
         config = load_user_config(user.id)
 
         email = user.email or ""
@@ -91,6 +92,7 @@ async def get_current_user(
 
         # Check for admin emails in environment if role is not already admin
         from core.config import ADMIN_EMAILS
+
         if role != "admin" and email.lower() in [e.strip().lower() for e in ADMIN_EMAILS.split(",") if e.strip()]:
             role = "admin"
 
@@ -105,7 +107,7 @@ async def get_current_user(
         raise
     except Exception as e:
         logger.warning(f"Auth verification failed: {e}")
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=401, detail="Invalid or expired token") from e
 
 
 async def get_active_user(
@@ -122,8 +124,8 @@ async def get_active_user(
 
 async def get_optional_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
-) -> Optional[AuthenticatedUser]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> AuthenticatedUser | None:
     """Same as get_current_user but returns None instead of raising 401."""
     try:
         return await get_current_user(request, credentials)
@@ -141,7 +143,7 @@ def verify_token(token: str) -> bool:
         return False
 
 
-def get_user_from_token(token: str) -> Optional[tuple[str, str]]:
+def get_user_from_token(token: str) -> tuple[str, str] | None:
     """Extract (user_id, email) from a Supabase JWT if valid."""
     try:
         sb = get_supabase()

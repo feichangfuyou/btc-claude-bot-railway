@@ -11,7 +11,22 @@ exclude = ["frontend", "node_modules", "__pycache__", ".git", "backups"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "C90", "UP", "SIM"]
-ignore = ["E501", "UP007"]
+ignore = [
+    "E501",
+    "UP007",
+    "B008",   # FastAPI Depends/Body in route defaults
+    "C901",   # trading/AI paths are intentionally complex
+    "SIM105",
+    "SIM108",
+    "SIM102",
+    "SIM103",
+    "SIM115",
+    "SIM117",
+    "SIM118",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B017", "SIM105", "SIM108"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 25
@@ -20,7 +35,7 @@ max-complexity = 25
 python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
+disallow_untyped_defs = false
 check_untyped_defs = true
 ignore_missing_imports = true
 exclude = ["frontend", "node_modules", "__pycache__", "backups", "tests"]

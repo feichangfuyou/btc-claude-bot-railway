@@ -26,7 +26,7 @@ export function TradeDetailModal({ tradeDetail, closeTradeDetail, tradeDetailLoa
               {tradeDetail.trade?.win ? "WIN" : "LOSS"}
             </span>
           </div>
-          <button className="btn btn-r" onClick={closeTradeDetail} style={{ width: "36px", height: "36px", borderRadius: "50%", padding: 0, minWidth: "36px", minHeight: "36px" }}><X size={18} /></button>
+          <button className="btn btn-r btn-icon" onClick={closeTradeDetail} aria-label="Close trade detail"><X size={16} /></button>
         </div>
 
         {/* Trade Summary Bar */}
@@ -40,7 +40,7 @@ export function TradeDetailModal({ tradeDetail, closeTradeDetail, tradeDetailLoa
             { label: "SIZE", val: `$${(+(tradeDetail.trade?.usd_size || 0)).toFixed(2)}`, color: "#999" },
             { label: "DATE", val: tradeDetail.trade?.created_at || tradeDetail.trade?.ts || "", color: "#5C5C5C" },
           ].map(s => (
-            <div key={s.label} style={{ background: "#111111", border: "1px solid #1e1e1e", borderRadius: "6px", padding: "10px 12px", textAlign: "center" }}>
+            <div key={s.label} style={{ background: "rgba(14,14,14,0.65)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: "8px", padding: "10px 12px", textAlign: "center", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" }}>
               <div style={{ fontSize: "8px", color: "#3a3a3a", letterSpacing: "1px", marginBottom: "3px" }}>{s.label}</div>
               <div style={{ fontSize: "13px", fontWeight: "700", color: s.color }}>{s.val}</div>
             </div>
@@ -49,7 +49,7 @@ export function TradeDetailModal({ tradeDetail, closeTradeDetail, tradeDetailLoa
 
         {/* Reason */}
         {tradeDetail.trade?.reason && (
-          <div style={{ background: "#111111", border: "1px solid #1e1e1e", borderRadius: "6px", padding: "12px 16px", marginBottom: "20px" }}>
+          <div style={{ background: "rgba(14,14,14,0.65)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: "8px", padding: "12px 16px", marginBottom: "20px", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" }}>
             <div style={{ fontSize: "8px", color: "#3a3a3a", letterSpacing: "1px", marginBottom: "4px" }}>CLOSE REASON</div>
             <div style={{ fontSize: "12px", color: "#D4D4D4" }}>{tradeDetail.trade.reason}</div>
           </div>
@@ -60,7 +60,6 @@ export function TradeDetailModal({ tradeDetail, closeTradeDetail, tradeDetailLoa
           {["entry", "exit"].map(phase => (
             <button key={phase} className="btn" onClick={() => setTradeDetailTab(phase)}
               style={{
-                padding: "8px 20px", fontSize: "11px", letterSpacing: "2px", fontWeight: "700",
                 background: tradeDetailTab === phase ? "#D4AF3722" : "transparent",
                 color: tradeDetailTab === phase ? "#D4AF37" : "#5C5C5C",
                 border: `1px solid ${tradeDetailTab === phase ? "#D4AF3744" : "#2a2a2a"}`,
@@ -184,7 +183,7 @@ export function TradeDetailModal({ tradeDetail, closeTradeDetail, tradeDetailLoa
 
         {/* Trade Context (from DB) */}
         {tradeDetail.context && (
-          <div style={{ marginTop: "20px", background: "#111111", border: "1px solid #1e1e1e", borderRadius: "6px", padding: "14px 16px" }}>
+          <div style={{ marginTop: "20px", background: "rgba(14,14,14,0.65)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: "8px", padding: "14px 16px", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" }}>
             <div style={{ fontSize: "9px", color: "#D4AF37", letterSpacing: "2px", fontWeight: "700", marginBottom: "10px" }}>TRADE CONTEXT</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "8px" }}>
               {[
@@ -197,7 +196,7 @@ export function TradeDetailModal({ tradeDetail, closeTradeDetail, tradeDetailLoa
                 { label: "HOLD TIME", val: tradeDetail.context.hold_duration_sec ? `${Math.round(tradeDetail.context.hold_duration_sec / 60)}m` : null },
                 { label: "HOUR", val: tradeDetail.context.hour_of_day != null ? `${tradeDetail.context.hour_of_day}:00` : null },
               ].filter(s => s.val != null).map(s => (
-                <div key={s.label} style={{ background: "#0A0A0A", borderRadius: "4px", padding: "8px 10px" }}>
+                <div key={s.label} style={{ background: "rgba(6,6,6,0.6)", borderRadius: "6px", padding: "8px 10px", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" }}>
                   <div style={{ fontSize: "8px", color: "#3a3a3a", letterSpacing: "1px", marginBottom: "2px" }}>{s.label}</div>
                   <div style={{ fontSize: "12px", color: "#D4D4D4", fontWeight: "600" }}>{s.val}</div>
                 </div>
@@ -218,7 +217,7 @@ export function TradeDetailModal({ tradeDetail, closeTradeDetail, tradeDetailLoa
 
         {/* Audit Trail */}
         {tradeDetail.audit && (
-          <div style={{ marginTop: "16px", background: "#111111", border: "1px solid #1e1e1e", borderRadius: "6px", padding: "14px 16px", marginBottom: "20px" }}>
+          <div style={{ marginTop: "16px", background: "rgba(14,14,14,0.65)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: "8px", padding: "14px 16px", marginBottom: "20px", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" }}>
             <div style={{ fontSize: "9px", color: "#D4AF37", letterSpacing: "2px", fontWeight: "700", marginBottom: "10px" }}>DECISION AUDIT</div>
             <div style={{ fontSize: "10px", color: "#5C5C5C", lineHeight: "1.8" }}>
               {tradeDetail.audit.reasoning && (

@@ -2,7 +2,22 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 import core.redis_client as rc
+
+
+@pytest.fixture(autouse=True)
+def isolate_memory_state():
+    """Reset module-level state between tests so they don't leak."""
+    rc._memory_cache.clear()
+    rc._rate_limit_memory.clear()
+    rc._ai_pending_memory.clear()
+    with patch.object(rc, "_get_redis", return_value=None):
+        yield
+    rc._memory_cache.clear()
+    rc._rate_limit_memory.clear()
+    rc._ai_pending_memory.clear()
 
 
 class TestCacheDelete:

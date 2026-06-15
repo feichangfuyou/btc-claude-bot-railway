@@ -21,9 +21,9 @@ export function TradeHistoryOverlay({
           </div>
           <div style={{ display: "flex", gap: "8px" }}>
             {historyTrades.length > 0 && (
-              <button className="btn btn-d" onClick={() => exportTrades(historyTrades)} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "9px" }}><Download size={14} /> EXPORT CSV</button>
+              <button className="btn btn-d" onClick={() => exportTrades(historyTrades)}><Download size={12} /> EXPORT CSV</button>
             )}
-            <button className="btn btn-r" onClick={() => setShowHistory(false)} style={{ width: "36px", height: "36px", borderRadius: "50%", padding: 0, minWidth: "36px", minHeight: "36px" }}><X size={18} /></button>
+            <button className="btn btn-r btn-icon" onClick={() => setShowHistory(false)} aria-label="Close history"><X size={16} /></button>
           </div>
         </div>
 
@@ -82,9 +82,9 @@ export function TradeHistoryOverlay({
             </select>
           </div>
           {(historyFilters.date_from || historyFilters.date_to || historyFilters.symbol || historyFilters.side || historyFilters.result || historyFilters.product_type) && (
-            <button className="btn btn-d" onClick={clearHistoryFilters} style={{ fontSize:"9px", color:"#ff9900", borderColor:"#ff990033", padding:"6px 12px", alignSelf:"flex-end" }}>CLEAR FILTERS</button>
+            <button className="btn btn-d" onClick={clearHistoryFilters} style={{ color:"#ff9900", borderColor:"#ff990033", alignSelf:"flex-end" }}>CLEAR FILTERS</button>
           )}
-          <button className="btn btn-d" onClick={() => fetchHistory(historyPage)} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "9px", color: "#D4AF37", borderColor: "#D4AF3733", padding: "6px 12px", alignSelf: "flex-end" }}><RefreshCcw size={12} /> REFRESH</button>
+          <button className="btn btn-d" onClick={() => fetchHistory(historyPage)} style={{ color: "#D4AF37", borderColor: "#D4AF3733", alignSelf: "flex-end" }}><RefreshCcw size={12} /> REFRESH</button>
         </div>
 
         {/* Summary stats */}
@@ -96,7 +96,7 @@ export function TradeHistoryOverlay({
             { label:"WIN RATE", val:`${historyStats.win_rate}%`, color:historyStats.win_rate >= 50 ? "#00E676" : "#FF1744" },
             { label:"NET P&L", val:`${historyStats.total_pnl >= 0 ? "+" : ""}$${historyStats.total_pnl.toFixed(2)}`, color:historyStats.total_pnl >= 0 ? "#00E676" : "#FF1744" },
           ].map(s => (
-            <div key={s.label} style={{ background:"#111111", border:"1px solid #1e1e1e", borderRadius:"5px", padding:"8px 14px" }}>
+            <div key={s.label} style={{ background:"rgba(14,14,14,0.65)", border:"1px solid rgba(255,255,255,0.04)", borderRadius:"8px", padding:"8px 14px", boxShadow:"inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" }}>
               <div style={{ fontSize:"8px", color:"#3a3a3a", letterSpacing:"1px" }}>{s.label}</div>
               <div style={{ fontSize:"14px", fontWeight:"700", color:s.color }}>{s.val}</div>
             </div>
@@ -159,12 +159,12 @@ export function TradeHistoryOverlay({
       {historyTotal > historyLimit && (
         <div style={{ padding:"12px 24px", flexShrink:0, display:"flex", justifyContent:"center", alignItems:"center", gap:"12px" }}>
           <button className="btn btn-d" disabled={historyPage === 0} onClick={() => fetchHistory(historyPage - 1)}
-            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", fontSize: "10px" }}><ChevronLeft size={14} /> PREV</button>
+            ><ChevronLeft size={12} /> PREV</button>
           <span style={{ fontSize:"10px", color:"#5C5C5C" }}>
             Page {historyPage + 1} of {Math.ceil(historyTotal / historyLimit)}
           </span>
           <button className="btn btn-d" disabled={(historyPage + 1) * historyLimit >= historyTotal} onClick={() => fetchHistory(historyPage + 1)}
-            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", fontSize: "10px" }}>NEXT <ChevronRight size={14} /></button>
+            >NEXT <ChevronRight size={12} /></button>
         </div>
       )}
     </div>

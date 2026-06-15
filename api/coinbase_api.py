@@ -10,9 +10,12 @@ import time
 import uuid
 from datetime import datetime
 
+import httpx
+
 from core.config import (
     COINBASE_API_KEY,
     COINBASE_API_SECRET,
+    COINBASE_REST_TICKER,
     PERPETUALS_PORTFOLIO_UUID,
     coinbase_product_id,
 )
@@ -335,3 +338,18 @@ async def list_perpetuals_positions(
         out.append(pos_dict)
 
     return out
+
+
+async def get_ticker(symbol: str) -> tuple[float, float]:
+    """Fetch spot last price and 24h volume from Coinbase public REST API."""
+    product_id = coinbase_product_id(symbol)
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(f"{COINBASE_REST_TICKER}/{product_id}/stats")
+            response.raise_for_status()
+            data = response.json()
+            price = float(data.get("last", 0) or 0)
+            volume = float(data.get("volume", 0) or 0)
+            return price, volume
+    except Exception:
+        return 0.0, 0.0

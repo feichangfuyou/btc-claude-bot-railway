@@ -6,18 +6,19 @@ Falls back gracefully if an exchange is down or not connected.
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from core.user_config import get_user_exchange_keys
 
 logger = logging.getLogger("claudebot.router")
 
+
 @dataclass
 class RouteDecision:
     exchange: str
     reason: str
-    price: Optional[float] = None
-    split: Optional[list] = None
+    price: float | None = None
+    split: list | None = None
+
 
 class OrderRouter:
     """Routes orders to the best available exchange for a user."""
@@ -89,16 +90,72 @@ class OrderRouter:
                 "cbBTC",
             },
             "bybit": {
-                "BTC", "ETH", "SOL", "LINK", "DOGE", "AVAX", "UNI", "AAVE", "XRP", "ADA", "BNB", "DOT", "MATIC", "PEPE", "SHIB",
+                "BTC",
+                "ETH",
+                "SOL",
+                "LINK",
+                "DOGE",
+                "AVAX",
+                "UNI",
+                "AAVE",
+                "XRP",
+                "ADA",
+                "BNB",
+                "DOT",
+                "MATIC",
+                "PEPE",
+                "SHIB",
             },
             "okx": {
-                "BTC", "ETH", "SOL", "LINK", "DOGE", "AVAX", "UNI", "AAVE", "XRP", "ADA", "BNB", "DOT", "MATIC", "PEPE", "SHIB",
+                "BTC",
+                "ETH",
+                "SOL",
+                "LINK",
+                "DOGE",
+                "AVAX",
+                "UNI",
+                "AAVE",
+                "XRP",
+                "ADA",
+                "BNB",
+                "DOT",
+                "MATIC",
+                "PEPE",
+                "SHIB",
             },
             "kucoin": {
-                "BTC", "ETH", "SOL", "LINK", "DOGE", "AVAX", "UNI", "AAVE", "XRP", "ADA", "BNB", "DOT", "MATIC", "PEPE", "SHIB",
+                "BTC",
+                "ETH",
+                "SOL",
+                "LINK",
+                "DOGE",
+                "AVAX",
+                "UNI",
+                "AAVE",
+                "XRP",
+                "ADA",
+                "BNB",
+                "DOT",
+                "MATIC",
+                "PEPE",
+                "SHIB",
             },
             "mexc": {
-                "BTC", "ETH", "SOL", "LINK", "DOGE", "AVAX", "UNI", "AAVE", "XRP", "ADA", "BNB", "DOT", "MATIC", "PEPE", "SHIB",
+                "BTC",
+                "ETH",
+                "SOL",
+                "LINK",
+                "DOGE",
+                "AVAX",
+                "UNI",
+                "AAVE",
+                "XRP",
+                "ADA",
+                "BNB",
+                "DOT",
+                "MATIC",
+                "PEPE",
+                "SHIB",
             },
         }
         available = []
@@ -154,13 +211,7 @@ class OrderRouter:
             p = prices.get(ex)
             if p is None:
                 continue
-            if best_price is None:
-                best_exchange = ex
-                best_price = p
-            elif side == "buy" and p < best_price:
-                best_exchange = ex
-                best_price = p
-            elif side == "sell" and p > best_price:
+            if best_price is None or side == "buy" and p < best_price or side == "sell" and p > best_price:
                 best_exchange = ex
                 best_price = p
 
@@ -229,6 +280,7 @@ class OrderRouter:
         try:
             if target == "coinbase":
                 from executors.coinbase_spot_executor import CoinbaseExecutor
+
                 api_key = keys.get("api_key_enc") or keys.get("api_key")
                 secret = keys.get("api_secret_enc") or keys.get("api_secret")
                 ex = CoinbaseExecutor(api_key, secret)
@@ -238,30 +290,33 @@ class OrderRouter:
 
             elif target == "kraken":
                 from executors.kraken_executor import KrakenExecutor
+
                 api_key = keys.get("api_key_enc") or keys.get("api_key")
                 secret = keys.get("api_secret_enc") or keys.get("api_secret")
-                ex = KrakenExecutor(api_key, secret)
-                res = await ex.execute_trade(symbol, side, amount_usd)
+                kraken_ex = KrakenExecutor(api_key, secret)
+                res = await kraken_ex.execute_trade(symbol, side, amount_usd)
                 if res:
                     return {"success": True, "result": res}
 
             elif target == "binance":
                 from executors.binance_executor import BinanceExecutor
+
                 api_key = keys.get("api_key_enc") or keys.get("api_key")
                 secret = keys.get("api_secret_enc") or keys.get("api_secret")
-                ex = BinanceExecutor(api_key, secret)
-                res = await ex.execute_trade(symbol, side, amount_usd)
+                binance_ex = BinanceExecutor(api_key, secret)
+                res = await binance_ex.execute_trade(symbol, side, amount_usd)
                 if res:
                     return {"success": True, "result": res}
 
             elif target in ["bybit", "okx", "kucoin", "mexc"]:
                 from executors.ccxt_executor import CCXTExecutor
+
                 api_key = keys.get("api_key_enc") or keys.get("api_key")
                 secret = keys.get("api_secret_enc") or keys.get("api_secret")
                 api_passphrase = keys.get("api_passphrase_enc") or keys.get("api_passphrase")
-                ex = CCXTExecutor(target, api_key, secret, api_passphrase)
-                res = await ex.execute_trade(symbol, side, amount_usd)
-                await ex.close()
+                ccxt_ex = CCXTExecutor(target, api_key, secret, api_passphrase)
+                res = await ccxt_ex.execute_trade(symbol, side, amount_usd)
+                await ccxt_ex.close()
                 if res:
                     return {"success": True, "result": res}
 

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { colors } from "../theme.js";
+import { PublicNav } from "../components/PublicNav.jsx";
+import { PublicFooter } from "../components/PublicFooter.jsx";
 import { Cpu, Shield, Zap, ArrowUp, ArrowRight } from "lucide-react";
 
 // Minimal Ticker for Landing if the main one is too heavy
@@ -161,18 +163,9 @@ export default function Login() {
 
   return (
     <div className="landing-container" style={{ paddingBottom: "100px" }}>
-      <nav className="landing-nav">
-        <Link to="/" className="landing-nav__logo">
-          <img src="/Bravo.svg" alt="DoYou.trade Professional Trading System" style={{ width: "32px" }} />
-          <span className="auth-brand" style={{ fontSize: "20px", letterSpacing: "3px" }}>DOYOU.TRADE</span>
-        </Link>
-        <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
-           <a href="#features" className="auth-link" style={{ fontSize: "11px", letterSpacing: "1px" }}>FEATURES</a>
-           <Link to="/signup" className="btn btn-r" style={{ padding: "8px 16px", fontSize: "10px", borderRadius: "100px" }}>GET STARTED</Link>
-        </div>
-      </nav>
+      <PublicNav />
 
-      <div style={{ paddingTop: "80px" }}>
+      <div style={{ paddingTop: "24px" }}>
         <LandingTicker />
       </div>
 
@@ -190,7 +183,7 @@ export default function Login() {
             and global macro trends to facilitate high-precision market interaction.
           </p>
           <div style={{ display: "flex", gap: "16px", marginBottom: "40px", justifyContent: "center", flexWrap: "wrap" }}>
-            <button className="btn btn-r" onClick={() => document.getElementById('login-card').scrollIntoView({ behavior: 'smooth' })} aria-label="Get Started Now" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "16px 32px", fontSize: "14px" }}>GET STARTED NOW <ArrowRight size={18} /></button>
+            <button className="btn btn-r" onClick={() => document.getElementById('login-card').scrollIntoView({ behavior: 'smooth' })} aria-label="Get Started Now">GET STARTED NOW <ArrowRight size={14} /></button>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", opacity: 0.45 }}>
             <div style={{ display: "flex", gap: "32px", justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
@@ -239,7 +232,7 @@ export default function Login() {
                   <button 
                     className="btn btn-r" 
                     onClick={() => navigate("/dashboard")}
-                    style={{ width: "100%", padding: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}
+                    style={{ width: "100%" }}
                     aria-label="Go to Dashboard"
                   >
                     GO TO DASHBOARD <ArrowRight size={18} />
@@ -510,52 +503,7 @@ export default function Login() {
         </div>
       </section>
 
-      <footer className="landing-footer" style={{ padding: "60px 20px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-        <div style={{ maxWidth: "1200px", margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "40px", marginBottom: "40px" }}>
-          <div>
-            <div className="auth-brand" style={{ fontSize: "20px", marginBottom: "15px" }}>DOYOU.TRADE</div>
-            <p style={{ fontSize: "14px", color: "#666", lineHeight: "1.6" }}>
-              The world's most advanced non-custodial trading terminal. 
-              Built for precision, speed, and security.
-            </p>
-          </div>
-          <div>
-            <h4 style={{ fontSize: "12px", color: "#888", letterSpacing: "2px", marginBottom: "15px" }}>MARKET INDEX</h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px" }}>
-              <Link to="/market/btc" title="Bitcoin Analysis" aria-label="Bitcoin Analysis">BTC/USD Intelligence</Link>
-              <Link to="/market/eth" title="Ethereum Strategy" aria-label="Ethereum Strategy">ETH/USD Strategy</Link>
-              <Link to="/market/sol" title="Solana Strategy" aria-label="Solana Strategy">SOL/USD Execution</Link>
-              <Link to="/market/altcoins" title="Altcoin Strategy Engine" aria-label="Altcoin Strategy Engine">Altcoin Analysis Engine</Link>
-            </div>
-          </div>
-          <div>
-            <h4 style={{ fontSize: "12px", color: "#888", letterSpacing: "2px", marginBottom: "15px" }}>PLATFORM</h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px" }}>
-              <a href="#features" title="System Capabilities" aria-label="Features">Features</a>
-              <Link to="/signup" title="Create your trading account" aria-label="Get Started">Get Started</Link>
-              <Link to="/login" title="Sign in to your terminal" aria-label="Terminal Login">Terminal Login</Link>
-              <a href="mailto:feichangfuyou@doyou.trade" title="Contact Support" aria-label="Support">Support</a>
-            </div>
-          </div>
-          <div>
-            <h4 style={{ fontSize: "12px", color: "#888", letterSpacing: "2px", marginBottom: "15px" }}>LEGAL</h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px" }}>
-              <Link to="/terms" title="Terms of Service" aria-label="Terms of Service">Terms</Link>
-              <Link to="/privacy" title="Privacy Policy" aria-label="Privacy Policy">Privacy</Link>
-              <Link to="/terms" title="Risk Disclosure" aria-label="Risk Disclosure">Risk Disclosure</Link>
-            </div>
-          </div>
-        </div>
-        <div style={{ textAlign: "center", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "40px" }}>
-          <div style={{ marginBottom: "8px", fontSize: "13px", color: "#888" }}>
-            Questions? Contact <a href="mailto:feichangfuyou@doyou.trade" style={{ color: "#D4AF37", textDecoration: "none" }}>feichangfuyou@doyou.trade</a>
-          </div>
-          <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-            <img src="/Bravo.svg" alt="DoYou.trade Logo" style={{ width: "20px", opacity: 0.5 }} />
-            <span style={{ opacity: 0.3 }}>&copy; 2025 DOYOU.TRADE. ALL RIGHTS RESERVED.</span>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
 
       {/* Floating Scroll to Top */}
       <button 
@@ -593,8 +541,8 @@ export default function Login() {
             <span style={{ fontSize: "10px", color: "#666" }}>Join 12k+ users leveraging our analysis engine.</span>
           </div>
           <div style={{ display: "flex", gap: "12px" }}>
-            <Link to="/signup" className="btn btn-r" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 24px", fontSize: "11px", whiteSpace: "nowrap" }}>GET STARTED <ArrowRight size={14} /></Link>
-            <Link to="/login" className="btn btn-d desktop-only-flex" style={{ padding: "10px 24px", fontSize: "11px" }}>SIGN IN</Link>
+            <Link to="/signup" className="btn btn-r" style={{ whiteSpace: "nowrap" }}>GET STARTED <ArrowRight size={12} /></Link>
+            <Link to="/login" className="btn btn-d desktop-only-flex">SIGN IN</Link>
           </div>
         </div>
       </div>

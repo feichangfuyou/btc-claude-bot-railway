@@ -25,7 +25,6 @@ import asyncio
 import json
 import logging
 import os
-from typing import Optional
 
 import core.config as _config  # noqa: F401 — ensures .env is loaded before we read os.environ
 
@@ -96,7 +95,7 @@ WALLET_DATA_FILE = "cdp_wallet_data.json"
 ACCOUNT_NAME = "claudebot-trading"
 
 
-def get_token_address(symbol: str) -> Optional[str]:
+def get_token_address(symbol: str) -> str | None:
     """Resolve a coin symbol to its Base network contract address."""
     entry = TOKEN_REGISTRY.get(symbol.upper())
     if entry:
@@ -104,7 +103,7 @@ def get_token_address(symbol: str) -> Optional[str]:
     return None
 
 
-def get_coingecko_id(symbol: str) -> Optional[str]:
+def get_coingecko_id(symbol: str) -> str | None:
     """Resolve a coin symbol to its CoinGecko API id.
     Delegates to symbol_registry (canonical source), falls back to TOKEN_REGISTRY."""
     from strategy.symbol_registry import get_coingecko_id as _registry_get
@@ -137,24 +136,24 @@ class CdpWalletProvider:
         self._cdp = None
         self._account = None
         self._ready = False
-        self._wallet_address: Optional[str] = None
-        self._network: Optional[str] = NETWORK_ID
-        self._error: Optional[str] = None
+        self._wallet_address: str | None = None
+        self._network: str | None = NETWORK_ID
+        self._error: str | None = None
 
     @property
     def ready(self) -> bool:
         return self._ready
 
     @property
-    def wallet_address(self) -> Optional[str]:
+    def wallet_address(self) -> str | None:
         return self._wallet_address
 
     @property
-    def network(self) -> Optional[str]:
+    def network(self) -> str | None:
         return self._network
 
     @property
-    def error(self) -> Optional[str]:
+    def error(self) -> str | None:
         return self._error
 
     def initialize(self) -> bool:

@@ -1,23 +1,13 @@
-# TACTICAL FLOOR MANAGER REVIEW
+# TACTICAL FLOOR MANAGER DEBRIEF
 
-**PERFORMANCE SNAPSHOT:**
-- Total Trades: 0
-- Win Rate: N/A
-- Total P&L: $0
-- Qualitative Data: Empty
+**Core Lesson:**  
+Your system *worked exactly as designed*—it **rejected a documented loser**. Zero trades executed is not a failure; it's discipline enforcement. BTC ranging + buy-side cold streak (22% WR) + recent loss pattern (40% WR, -$2.03) = textbook AVOID condition. You passed the test.
 
----
-
-## DAILY ADVISORY
-
-**You didn't trade.** Zero setups taken means either market conditions failed your filters, or you're being too cautious and leaving money on the table—clarify which today. Get back in tomorrow with documented entry/exit rules; sitting on the sidelines teaches nothing about execution discipline.
+**The Problem:**  
+You're second-guessing rejection signals. The reasoning is sound, but it reads like *justification* rather than *confidence*. That hesitation will erode discipline under FOMO pressure.
 
 ---
 
-## CORE LESSON
-No data = no feedback loop. Trading psychology and technical skill only develop through *attempted* trades (win or lose). A day of inactivity is a day of stagnation.
+## 📋 DAILY ADVISORY
 
-**MANDATE:**
-- Review your entry criteria—are they too tight?
-- Commit to taking *at minimum* 1-2 quality setups tomorrow if they appear.
-- Log every decision (including "passed") with reasoning.
+**Stop overthinking rejections.** BTC buy-in ranging + documented cold streak on that side + borderline confluence = PASS. Your system flagged it correctly; execute the rejection with zero regret. Going forward: tighten entry bars to **4+ CONVERGED signals + A+ confluence only**—no exceptions during cold streaks. Capital preservation today beats chasing weak setups tomorrow.

@@ -38,6 +38,7 @@ class TestModelHelpers:
 
     def test_api_timeout_non_opus_default(self):
         from core.config import CLAUDE_API_TIMEOUT
+
         assert _api_timeout_for_model("claude-sonnet-4-6") == CLAUDE_API_TIMEOUT
         assert _api_timeout_for_model("claude-3-haiku-20240307") == CLAUDE_API_TIMEOUT
 
@@ -56,9 +57,15 @@ class TestModelHelpers:
 class TestCostTracker:
     def test_tracker_structure(self):
         expected_keys = {
-            "scout_calls", "trade_calls", "escalations",
-            "adversary_calls", "adversary_kills", "adversary_reduces",
-            "total_scout_cost", "total_trade_cost", "total_adversary_cost",
+            "scout_calls",
+            "trade_calls",
+            "escalations",
+            "adversary_calls",
+            "adversary_kills",
+            "adversary_reduces",
+            "total_scout_cost",
+            "total_trade_cost",
+            "total_adversary_cost",
             "savings_vs_always_trade",
         }
         assert set(_api_cost_tracker.keys()) == expected_keys

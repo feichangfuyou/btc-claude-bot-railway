@@ -13,7 +13,7 @@ Shared across all users:
 import asyncio
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Any
 
 from billing.stripe_handler import get_tier_limit
 from core.redis_client import is_redis_available, publish
@@ -48,7 +48,7 @@ class UserBotInstance:
         self.open_positions: dict[str, dict] = {}
         self.trades: list[dict] = []
         self.consecutive_losses = 0
-        self.last_trade_time = None
+        self.last_trade_time: datetime | None = None
         self.signal_history: list[dict] = []
         self.created_at = datetime.now()
 
@@ -126,9 +126,9 @@ class UserBotInstance:
 
     def check_feature_access(self, feature: str) -> bool:
         """Check if the user's tier allowed a specific feature."""
-        return get_tier_limit(self.config.subscription_tier, feature, False)
+        return bool(get_tier_limit(self.config.subscription_tier, feature, False))
 
-    def get_limit(self, key: str, default: any = None) -> any:
+    def get_limit(self, key: str, default: Any = None) -> Any:
         """Get a specific limit value for the user's tier."""
         return get_tier_limit(self.config.subscription_tier, key, default)
 
@@ -221,29 +221,28 @@ class UserBotInstance:
                 return
 
             # Place order on exchange
-            result = await self.router.place_order(
-                symbol=symbol,
-                action=action,
-                amount_usd=trade_amount_usd
-            )
+            result = await self.router.place_order(symbol=symbol, action=action, amount_usd=trade_amount_usd)
 
             if result and result.get("success"):
                 logger.info(f"User {self.user_id[:8]} executed {action} for {symbol} successfully via Signal Hub")
                 self.last_trade_time = datetime.now()
                 # Dummy trade tracking just to ensure state is recorded
-                self.save_trade({
-                    "symbol": symbol,
-                    "action": action,
-                    "size_usd": trade_amount_usd,
-                    "timestamp": self.last_trade_time.isoformat(),
-                    "status": "filled",
-                    "source": "admin_hub"
-                })
+                self.save_trade(
+                    {
+                        "symbol": symbol,
+                        "action": action,
+                        "size_usd": trade_amount_usd,
+                        "timestamp": self.last_trade_time.isoformat(),
+                        "status": "filled",
+                        "source": "admin_hub",
+                    }
+                )
             else:
                 logger.warning(f"User {self.user_id[:8]} failed to execute {action} {symbol}")
 
         except Exception as e:
             logger.error(f"Error executing managed signal for user {self.user_id[:8]}: {e}")
+
 
 class BotManager:
     """Manages all active user bot instances."""
@@ -267,6 +266,7 @@ class BotManager:
         """Restore brain_enabled from Redis (survives restarts). 30-day TTL."""
         try:
             from core.redis_client import cache_get
+
             val = cache_get("admin:brain_enabled", ttl_sec=30 * 86400)
             if val is not None:
                 self.brain_enabled = bool(val)
@@ -278,6 +278,7 @@ class BotManager:
         self.brain_enabled = enabled
         try:
             from core.redis_client import cache_set
+
             cache_set("admin:brain_enabled", enabled, ttl_sec=30 * 86400)
         except Exception:
             pass
@@ -297,7 +298,7 @@ class BotManager:
             logger.info(f"Created bot instance for user {user_id[:8]}... ({config.email})")
             return instance
 
-    def get(self, user_id: str) -> Optional[UserBotInstance]:
+    def get(self, user_id: str) -> UserBotInstance | None:
         """Get an existing instance without creating."""
         return self._instances.get(user_id)
 
@@ -373,6 +374,7 @@ class BotManager:
         async with self._broadcast_semaphore:
             # We add a tiny randomized sleep to smooth out exchange API bursts
             import random
+
             await asyncio.sleep(random.uniform(0.01, 0.1))
             await instance.process_signal(signal_data)
 

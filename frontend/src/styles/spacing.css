@@ -1,0 +1,194 @@
+/**
+ * Universal vertical spacing — keeps blocks from touching at any viewport.
+ * Layout shells (.stack, .col, grids) use gap; block children get min padding.
+ * Add .tight or .no-pad to opt out of extra cushion where flush is intentional.
+ */
+
+:root {
+  --block-pad-y: 6px;
+  --inner-stack-gap: 8px;
+  --stack-gap: var(--section-gap, 12px);
+  --min-touch-gap: 8px;
+  --trade-chart-gap: 12px;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --block-pad-y: 5px;
+    --inner-stack-gap: 7px;
+  }
+}
+
+@media (max-width: 400px) {
+  :root {
+    --block-pad-y: 4px;
+    --inner-stack-gap: 6px;
+  }
+}
+
+/* ─── Stack utility ─────────────────────────────────────────────── */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap);
+}
+
+.stack--sm {
+  gap: var(--inner-stack-gap);
+}
+
+/* Page wrappers: consistent vertical rhythm between major blocks */
+[class$="-page"],
+.onboarding-root,
+.onboarding-card {
+  display: flex;
+  flex-direction: column;
+  gap: max(var(--stack-gap), 16px);
+}
+
+[class$="-page"] > *,
+.onboarding-root > *,
+.onboarding-card > * {
+  margin-block: 0 !important;
+}
+
+[class$="-page"] > section,
+[class$="-page"] > .section,
+.settings-page section {
+  margin-bottom: 0 !important;
+}
+
+/* ─── Grid / column gaps (enforce minimums) ───────────────────── */
+
+.col,
+.grid,
+.grid-bottom,
+.bot-charts-grid,
+.analytics-grid,
+.memory-grid,
+.pos-grid,
+.stats-row,
+.indicators-grid {
+  gap: max(var(--grid-gap, 12px), var(--min-touch-gap)) !important;
+}
+
+.col {
+  gap: max(var(--col-gap, 10px), var(--min-touch-gap)) !important;
+}
+
+/* ─── Block padding on layout children (not every nested div) ───── */
+
+.col > :not(.no-pad):not(.tight):not(.card):not(.dash-panel),
+[class$="-page"] > :not(.no-pad):not(.tight),
+.card > div:not(.no-pad):not(.tight):not([aria-hidden="true"]):not(.chart-card__header) {
+  padding-block: var(--block-pad-y);
+}
+
+/* App sections use .section-gap for separation; pad only unmarked blocks */
+.app-root > :not(.no-pad):not(.tight):not(.section-gap) {
+  padding-block: var(--block-pad-y);
+}
+
+/* Inner card / panel content */
+.card > div:not([aria-hidden="true"]):not(.chart-card__header) > :not(.no-pad):not(.tight) + :not(.no-pad):not(.tight),
+.section > :not(.no-pad):not(.tight) + :not(.no-pad):not(.tight) {
+  margin-top: var(--inner-stack-gap);
+}
+
+/* ─── List rows — never zero-height touch ───────────────────────── */
+
+.row,
+.trow,
+.logrow {
+  padding-block: max(5px, var(--block-pad-y)) !important;
+}
+
+/* ─── Flush zones (intentional edge-to-edge UI) ────────────────── */
+
+.tight,
+.no-pad,
+.app-shell-top,
+.tab-trade .chart-card,
+.app-tabbar,
+.app-status-bar,
+.chart-card__canvas,
+.control-panel .cp-divider,
+.nav-drawer-handle,
+.ticker-track,
+[aria-hidden="true"] {
+  padding-block: 0 !important;
+}
+
+/* Control panel still needs internal row breathing room */
+.control-panel {
+  gap: var(--inner-stack-gap) !important;
+}
+
+/* Trade tab: cushion under control panel before chart */
+.app-root[data-tab="trade"] .app-shell-top .control-panel {
+  padding-bottom: var(--block-pad-y, 6px);
+}
+
+.app-root[data-tab="trade"] .grid-bottom.section-gap {
+  margin-top: var(--trade-chart-gap, 12px);
+}
+
+.app-header-deck {
+  gap: var(--inner-stack-gap) !important;
+}
+
+/* ─── Section labels need space below ───────────────────────────── */
+
+.section-label {
+  margin-bottom: max(8px, var(--inner-stack-gap)) !important;
+}
+
+/* ─── Live banner / alerts ──────────────────────────────────────── */
+
+.live-banner {
+  margin-bottom: var(--stack-gap) !important;
+  padding-block: var(--block-pad-y) !important;
+}
+
+/* ─── Modals & overlays ─────────────────────────────────────────── */
+
+.confirm-box > :not(.no-pad) + :not(.no-pad),
+.nav-drawer > :not(.no-pad):not(.nav-drawer-handle) + :not(.no-pad) {
+  margin-top: var(--inner-stack-gap);
+}
+
+/* ─── Auth forms ────────────────────────────────────────────────── */
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--inner-stack-gap);
+}
+
+/* ─── Very narrow viewports — never below touch minimum ─────────── */
+
+@media (max-width: 320px) {
+  :root {
+    --section-gap: max(8px, var(--section-gap, 8px));
+    --col-gap: max(8px, var(--col-gap, 8px));
+    --grid-gap: max(8px, var(--grid-gap, 8px));
+    --min-touch-gap: 8px;
+  }
+}
+
+@media (max-width: 280px) {
+  :root {
+    --section-gap: 8px;
+    --col-gap: 8px;
+    --grid-gap: 8px;
+    --block-pad-y: 4px;
+    --inner-stack-gap: 6px;
+  }
+}

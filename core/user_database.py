@@ -7,14 +7,14 @@ The old SQLite database.py remains for backward compatibility / single-user mode
 import json
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from core.supabase_client import get_supabase
 
 logger = logging.getLogger("claudebot.user_db")
 
 
-def udb_save_trade(user_id: str, trade: dict) -> Optional[int]:
+def udb_save_trade(user_id: str, trade: dict) -> int | None:
     """Save a completed trade for a user. Returns the trade ID."""
     sb = get_supabase()
     data = {
@@ -188,6 +188,7 @@ def udb_save_audit_entry(user_id: str, entry: dict):
     """Save a decision audit log entry."""
     sb = get_supabase()
     from core.sanitizer import sanitize_dict
+
     decision = sanitize_dict(entry.get("decision", {}))
     adversary = sanitize_dict(entry.get("adversary", {}))
     order_json = sanitize_dict(entry.get("order"))
@@ -213,7 +214,7 @@ def udb_save_audit_entry(user_id: str, entry: dict):
     ).execute()
 
 
-def udb_create_signal(user_id: str, signal: dict) -> Optional[str]:
+def udb_create_signal(user_id: str, signal: dict) -> str | None:
     """Create a trade signal for the user's execution agent."""
     sb = get_supabase()
     data = {

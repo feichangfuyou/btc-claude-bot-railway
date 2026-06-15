@@ -3,7 +3,6 @@ BotState — central trading state machine for ClaudeBot.
 """
 
 import asyncio
-import os
 import time
 from datetime import datetime
 from typing import Any
@@ -14,6 +13,7 @@ from ai.trade_screenshots import capture_trade_screenshot
 from api.agentkit_provider import agentkit
 from core.coin_state import CoinState
 from core.config import (
+    _ALL_COINS_LIST,
     ACTIVE_COINS,
     AI_COST_PER_TRADE,
     ANTHROPIC_API_KEY,
@@ -52,7 +52,6 @@ from core.config import (
     TRADE_MODE,
     TRADING_PRESET,
     TRAILING_STOP_PCT,
-    _ALL_COINS_LIST,
 )
 from core.database import (
     db_load_state,
@@ -271,6 +270,7 @@ class BotState:
         ordered = [s for s in self._all_coins_list[:count]]
 
         import core.config as _cfg
+
         _cfg.ACTIVE_COINS = ordered
         _cfg.MAX_SCAN_COINS = count
 
@@ -286,16 +286,21 @@ class BotState:
 
     def add_log(self, msg: str, log_type: str = "info", admin_only: bool = False):
         if not admin_only:
-            tech_keyphrases = ["memory", "learning", "circuit breaker", "semantic", "solver", "admin action", "admin [", "pending trade", "kill switch"]
+            tech_keyphrases = [
+                "memory",
+                "learning",
+                "circuit breaker",
+                "semantic",
+                "solver",
+                "admin action",
+                "admin [",
+                "pending trade",
+                "kill switch",
+            ]
             if log_type == "dim" or any(k in msg.lower() for k in tech_keyphrases):
                 admin_only = True
 
-        entry = {
-            "msg": msg,
-            "type": log_type,
-            "ts": datetime.now().strftime("%H:%M:%S"),
-            "admin_only": admin_only
-        }
+        entry = {"msg": msg, "type": log_type, "ts": datetime.now().strftime("%H:%M:%S"), "admin_only": admin_only}
         self.logs = [entry] + self.logs[:199]
         db_save_log(msg, log_type)
         if self._broadcast_fn and not admin_only:
@@ -370,15 +375,18 @@ class BotState:
                 close_side = "sell" if pos["side"] == "buy" else "buy"
                 if exchange == "binance":
                     from executors.binance_executor import BinanceExecutor
+
                     ex = BinanceExecutor()
                     self.add_log(f"{reason} [{pos_symbol}] — closing Binance mirror...", "warning")
                     asyncio.create_task(ex.execute_trade(pos_symbol, close_side, pos["usd_size"]))
                 elif exchange == "kraken":
                     from executors.kraken_executor import close_kraken
+
                     self.add_log(f"{reason} [{pos_symbol}] — closing Kraken mirror...", "warning")
                     asyncio.create_task(close_kraken(self, pos, reason=reason))
                 elif exchange == "coinbase":
                     from executors.coinbase_spot_executor import close_coinbase_spot
+
                     self.add_log(f"{reason} [{pos_symbol}] — closing Coinbase mirror...", "warning")
                     asyncio.create_task(close_coinbase_spot(self, pos, reason=reason))
 
@@ -1097,13 +1105,16 @@ class BotState:
             close_side = "sell" if pos["side"] == "buy" else "buy"
             if exchange == "binance":
                 from executors.binance_executor import BinanceExecutor
+
                 ex = BinanceExecutor()
                 asyncio.create_task(ex.execute_trade(pos_symbol, close_side, pos["usd_size"]))
             elif exchange == "kraken":
                 from executors.kraken_executor import close_kraken
+
                 asyncio.create_task(close_kraken(self, pos, reason))
             elif exchange == "coinbase":
                 from executors.coinbase_spot_executor import close_coinbase_spot
+
                 asyncio.create_task(close_coinbase_spot(self, pos, reason))
 
         if pos["side"] == "buy":
@@ -1391,7 +1402,9 @@ class BotState:
             if self.account["balance"] >= MIN_TRADE_USD * 1.5:
                 usd_sz = MIN_TRADE_USD
             else:
-                self.last_ai_block_reason = f"{ai_msg} — rejected: trade size ${usd_sz:.2f} < ${MIN_TRADE_USD:.2f} minimum"
+                self.last_ai_block_reason = (
+                    f"{ai_msg} — rejected: trade size ${usd_sz:.2f} < ${MIN_TRADE_USD:.2f} minimum"
+                )
                 self.add_log(self.last_ai_block_reason, "warning")
                 return
 
@@ -1475,18 +1488,21 @@ class BotState:
 
                 if spot_exchange == "binance":
                     from executors.binance_executor import BinanceExecutor
+
                     ex = BinanceExecutor()
                     asyncio.create_task(ex.execute_trade(symbol, action, usd_sz))
                     live_mirrored = True
 
                 elif spot_exchange == "kraken":
                     from executors.kraken_executor import execute_kraken
+
                     asyncio.create_task(execute_kraken(self, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision))
                     live_mirrored = True
 
                 elif spot_exchange == "coinbase":
                     try:
                         from executors.coinbase_spot_executor import execute_coinbase_spot
+
                         asyncio.create_task(
                             execute_coinbase_spot(self, action, symbol, entry, tp, sl, coin_sz, usd_sz, decision)
                         )
@@ -1655,7 +1671,7 @@ class BotState:
             self.last_snapshot_hour = hour
             db_save_account_snapshot(self.account)
 
-            for sym, cs in self.coins.items():
+            for _sym, cs in self.coins.items():
                 if cs.price > 0:
                     try:
                         record_market_snapshot(cs, int(self.fear_greed.get("value", 50)))

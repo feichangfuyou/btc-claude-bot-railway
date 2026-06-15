@@ -80,7 +80,7 @@ async def ask_claude_rest(
             dec = data.get("decision")
             if dec:
                 return dec
-        except asyncio.TimeoutError:
+        except TimeoutError:
             _pending_ai_tasks.pop(task_id, None)
             _bot.claude_thinking = False
             asyncio.create_task(broadcast({"type": "claude_thinking", "claude_thinking": False}))
@@ -217,6 +217,7 @@ async def set_preset(body: dict = Body(default={}), user: AuthenticatedUser = De
 
     # Also save to user_preferences for persistence
     from core.user_config import save_user_preferences
+
     save_user_preferences(user.id, {"trading_preset": pid})
 
     return {"ok": True, "preset": pid}
@@ -252,6 +253,7 @@ def get_costs(user: AuthenticatedUser = Depends(get_active_user)):
 async def get_adversary_analytics(user: AuthenticatedUser = Depends(get_active_user)):
     """Return stats on trades blocked or mitigated by the Adversary Security Agent."""
     from core.database import db_get_adversary_stats
+
     return db_get_adversary_stats()
 
 
@@ -274,7 +276,7 @@ async def get_wallet(user: AuthenticatedUser = Depends(get_active_user)):
 @router.get("/equity")
 async def get_equity(user: AuthenticatedUser = Depends(get_active_user)):
     curve = udb_get_equity_curve(user.id, limit=500)
-    sessions = []
+    sessions: list[dict] = []
     return {
         "curve": curve,
         "sessions": sessions,
@@ -297,11 +299,16 @@ async def emergency_stop(request: Request, user: AuthenticatedUser = Depends(get
     targets = []
     for instance in bot_manager._instances.values():
         if instance.running:
-            targets.append(bot_manager._safely_process_signal(instance, {
-                "action": "close",
-                "symbol": "ALL",
-                "reason": "ADMIN EMERGENCY STOP",
-            }))
+            targets.append(
+                bot_manager._safely_process_signal(
+                    instance,
+                    {
+                        "action": "close",
+                        "symbol": "ALL",
+                        "reason": "ADMIN EMERGENCY STOP",
+                    },
+                )
+            )
 
     if targets:
         # Await their closures

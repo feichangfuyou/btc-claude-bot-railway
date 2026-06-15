@@ -1,32 +1,38 @@
 import asyncio
 import os
 from functools import partial
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from billing.stripe_handler import create_checkout_session, handle_webhook
 from billing.coinbase_handler import create_coinbase_charge, handle_coinbase_webhook
-from billing.manual_handler import submit_manual_payment, get_address_for_crypto, fetch_all_manual_payments, verify_payment_admin
+from billing.manual_handler import (
+    fetch_all_manual_payments,
+    get_address_for_crypto,
+    submit_manual_payment,
+    verify_payment_admin,
+)
+from billing.stripe_handler import create_checkout_session, handle_webhook
 from core.auth import AuthenticatedUser, get_current_user
 from core.shared import _io_executor
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
+
 @router.get("/admin/manual-payments")
 async def admin_get_payments(
-    status: Optional[str] = None,
+    status: str | None = None,
     user: AuthenticatedUser = Depends(get_current_user),
 ):
     """List all manual payments (Admin only)."""
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required.")
-    
+
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
         _io_executor,
         partial(fetch_all_manual_payments, status=status),
     )
+
 
 @router.post("/admin/verify-payment")
 async def admin_verify_payment(
@@ -36,27 +42,32 @@ async def admin_verify_payment(
     """Approve or reject a manual payment (Admin only)."""
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required.")
-        
+
     body = await request.json()
     txid = body.get("txid")
-    status = body.get("status", "verified") # verified or rejected
-    
+    status = body.get("status", "verified")  # verified or rejected
+
     if not txid:
         return {"error": "TXID is required."}
-        
+
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
         _io_executor,
         partial(verify_payment_admin, txid=txid, status=status),
     )
 
+
 @router.get("/address/{crypto_type}")
 async def get_payment_address(crypto_type: str):
     """Retrieve the payment address for a specific crypto. Requires PAYWALL_*_ADDRESS in .env."""
     address = get_address_for_crypto(crypto_type)
     if not address:
-        return {"address": None, "error": "Address not configured. Set PAYWALL_" + crypto_type.upper() + "_ADDRESS in .env."}
+        return {
+            "address": None,
+            "error": "Address not configured. Set PAYWALL_" + crypto_type.upper() + "_ADDRESS in .env.",
+        }
     return {"address": address}
+
 
 @router.post("/manual-payment")
 async def manual_payment_submit(
@@ -69,10 +80,10 @@ async def manual_payment_submit(
     crypto_type = body.get("crypto_type")
     amount = body.get("amount")
     txid = body.get("txid")
-    
+
     if not all([tier, crypto_type, amount, txid]):
         return {"error": "All fields are required (tier, crypto_type, amount, txid)."}
-        
+
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(
         _io_executor,
@@ -87,8 +98,16 @@ async def get_manual_payments(
 ):
     """Retrieve the current user's manual payment submissions."""
     from core.shared import supabase
-    res = supabase.table("manual_payments").select("*").eq("user_id", str(user.id)).order("created_at", desc=True).execute()
+
+    res = (
+        supabase.table("manual_payments")
+        .select("*")
+        .eq("user_id", str(user.id))
+        .order("created_at", desc=True)
+        .execute()
+    )
     return res.data or []
+
 
 @router.post("/checkout")
 async def billing_checkout(
@@ -113,9 +132,10 @@ async def billing_checkout(
     )
     if url:
         return {"url": url}
-    
+
     # Fallback to Coinbase if Stripe failed/unconfigured
     return await coinbase_checkout(request, user)
+
 
 @router.post("/coinbase/checkout")
 async def coinbase_checkout(
@@ -125,11 +145,11 @@ async def coinbase_checkout(
     """Create a Coinbase Commerce charge for subscription."""
     try:
         body = await request.json()
-    except:
+    except Exception:
         body = {}
     tier = body.get("tier", "pro")
     base_url = (os.getenv("APP_URL") or str(request.base_url)).rstrip("/")
-    
+
     loop = asyncio.get_event_loop()
     url = await loop.run_in_executor(
         _io_executor,
@@ -169,6 +189,7 @@ async def billing_webhook(request: Request):
         return JSONResponse(result, status_code=400)
     return result
 
+
 @router.post("/coinbase/webhook")
 async def coinbase_webhook(request: Request):
     """Handle Coinbase Commerce webhook events."""
@@ -176,7 +197,7 @@ async def coinbase_webhook(request: Request):
 
     payload = await request.body()
     signature = request.headers.get("X-CC-Webhook-Signature", "")
-    
+
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(
         _io_executor,

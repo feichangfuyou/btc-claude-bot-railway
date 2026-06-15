@@ -28,7 +28,7 @@ import logging
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 logger = logging.getLogger("claudebot.kya")
 
@@ -115,7 +115,7 @@ def hash_reasoning(decision: dict) -> str:
 
     canonical["timestamp"] = decision.get(
         "timestamp",
-        datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S"),
     )
 
     raw = json.dumps(canonical, sort_keys=True, separators=(",", ":"))
@@ -141,7 +141,7 @@ def sign_reasoning_trace(decision: dict) -> dict:
     return {
         "reasoning_hash": reasoning_hash,
         "bot_did": did,
-        "signed_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "signed_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S"),
         "key_fingerprint": key_hash[:16],
         "signature": signature,
     }
@@ -162,7 +162,7 @@ def build_audit_entry(
 
     entry = {
         "audit_id": str(uuid.uuid4()),
-        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "timestamp": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S"),
         "bot_did": signed_trace["bot_did"],
         "reasoning_hash": signed_trace["reasoning_hash"],
         "signature": signed_trace["signature"],

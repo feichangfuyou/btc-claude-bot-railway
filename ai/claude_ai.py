@@ -23,7 +23,6 @@ from ai.adversary_agent import adversary_review
 from ai.claude_schema import validate_scout_response, validate_trade_decision
 from ai.vision_feed import ENABLE_VISION, get_vision_confirmation
 from api.agentkit_provider import agentkit
-from feeds.news_feeds import fetch_latest_news
 from core.anthropic_keys import get_next_key, pool_size
 from core.config import (
     ACTIVE_COINS,
@@ -48,6 +47,7 @@ from core.config import (
     TEST_MODE,
     TRADE_COST_PER_CALL,
 )
+from feeds.news_feeds import fetch_latest_news
 from learning.memory_compactor import get_compacted_wisdom
 from learning.meta_reviewer import get_meta_guidance
 from learning.trade_memory import build_memory_briefing, get_pattern_verdict
@@ -331,18 +331,20 @@ def get_claude_system(preset_id: str | None = None, model_id: str | None = None,
     # Opus emulation: give Haiku/Sonnet the structure to reason like Opus
     if model_id and _use_opus_emulation(model_id):
         prompt += OPUS_EMULATION_ADDENDUM
-    
+
     # Weekly Strategic Review (Self-Correction)
     prompt += get_meta_guidance()
-    
+
     # ─── NEWS & SENTIMENT (Institutional Pulse) ───
     if news and not news.get("error"):
         sentiment = news.get("sentiment", "neutral").upper()
         fng = news.get("fear_greed", {"value": 50, "classification": "Neutral"})
         lunar = news.get("social_pulse", {"sentiment": "neutral", "galaxy_score": 50})
-        
-        headlines = "\n".join([f"- {h['title']} (Source: {h.get('domain', 'Market Feed')})" for h in news.get("headlines", [])])
-        
+
+        headlines = "\n".join(
+            [f"- {h['title']} (Source: {h.get('domain', 'Market Feed')})" for h in news.get("headlines", [])]
+        )
+
         news_block = (
             f"\n\n═══ INSTITUTIONAL SENTIMENT & SOCIAL PULSE ({sentiment}) ═══\n"
             f"Composite Sentiment Score: {news.get('sentiment_score', 0)} (-10 to +10)\n"
@@ -355,7 +357,7 @@ def get_claude_system(preset_id: str | None = None, model_id: str | None = None,
             f"- If headlines describe a major 'black swan' or 'hack', favor WAIT regardless of technicals."
         )
         prompt += news_block
-    
+
     return prompt
 
 
@@ -380,7 +382,7 @@ def _build_trade_analytics(trades: list) -> dict:
         else:
             coin_performance[sym]["losses"] += 1
 
-    for sym, perf in coin_performance.items():
+    for _sym, perf in coin_performance.items():
         perf["win_rate"] = round(perf["wins"] / perf["trades"] * 100, 1) if perf["trades"] else 0
 
     best_coin: tuple[str | None, dict] = max(
@@ -593,7 +595,7 @@ async def _api_call(model: str, system: Any, user_msg: Any, max_tokens: int = 80
     sys_blocks = system
     if isinstance(system, str):
         sys_blocks = [{"type": "text", "text": system}]
-    
+
     if isinstance(user_msg, str):
         msg_blocks = [{"role": "user", "content": user_msg}]
     else:
@@ -801,12 +803,12 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
         bot.last_claude_call = time.strftime("%H:%M:%S")
         trade_model = bot.claude_model
         trade_model_short = _model_display_name(trade_model)
-        
+
         # ELITE/PRO Optimization: Use Sonnet for scouting instead of Haiku for better quality filtering
         scout_model = SCOUT_MODEL
         if tier in ("pro", "elite"):
             scout_model = "claude-sonnet-4-6"
-            
+
         scout_short = _model_display_name(scout_model)
 
         coins_snapshot = {}
@@ -843,12 +845,10 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
             try:
                 scout_msg = _build_scout_snapshot(bot, coins_snapshot)
                 scout_system = SCOUT_SYSTEM
-                
+
                 # Caching for Scout System Prompt
-                scout_sys_blocks = [
-                    {"type": "text", "text": scout_system, "cache_control": {"type": "ephemeral"}}
-                ]
-                
+                scout_sys_blocks = [{"type": "text", "text": scout_system, "cache_control": {"type": "ephemeral"}}]
+
                 scout_raw = await _api_call(scout_model, scout_sys_blocks, scout_msg, max_tokens=SCOUT_MAX_TOKENS)
                 scout_result = _extract_json(scout_raw)
                 try:
@@ -958,7 +958,7 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
         fixed_cost = AI_COST_PER_TRADE + (GAS_COST_USD * 2 if is_live else 0)
 
         trade_analytics = _build_trade_analytics(bot.trades)
-        
+
         # ─── NEWS CONTEXT (Institutional Briefing) ───
         news_context = None
         if escalate:
@@ -1058,23 +1058,27 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
         }
 
         user_msg_blocks = []
-        
+
         # Block 1: Strategy Drive / Learned Rules (Persistent across many calls)
         compacted_wisdom = get_compacted_wisdom()
         if compacted_wisdom:
-            user_msg_blocks.append({
-                "type": "text", 
-                "text": f"═══ STRATEGY DRIVE (synthesized from trade history) ═══\n{compacted_wisdom}\n",
-                "cache_control": {"type": "ephemeral"}
-            })
+            user_msg_blocks.append(
+                {
+                    "type": "text",
+                    "text": f"═══ STRATEGY DRIVE (synthesized from trade history) ═══\n{compacted_wisdom}\n",
+                    "cache_control": {"type": "ephemeral"},
+                }
+            )
 
         # Block 2: Memory Briefing (Semi-persistent)
         if memory_briefing:
-             user_msg_blocks.append({
-                "type": "text", 
-                "text": f"═══ TRADING MEMORY ═══\n{memory_briefing}\n",
-                "cache_control": {"type": "ephemeral"}
-            })
+            user_msg_blocks.append(
+                {
+                    "type": "text",
+                    "text": f"═══ TRADING MEMORY ═══\n{memory_briefing}\n",
+                    "cache_control": {"type": "ephemeral"},
+                }
+            )
 
         # Block 3: Dynamic Market Snapshot (Changes every call)
         emulation_reminder = ""
@@ -1084,27 +1088,29 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
                 "Fill reasons_to_trade and reasons_to_wait from that analysis, then output JSON.\n\n"
             )
 
-        user_msg_blocks.append({
-            "type": "text",
-            "text": (
-                f"Market Snapshot (v3 hybrid — escalated from scout):\n{json.dumps(snap)}\n"
-                f"{scout_hint}\n\n"
-                f"{emulation_reminder}"
-                "DECISION FRAMEWORK:\n"
-                "1. REGIME: What regime is each coin in?\n"
-                "2. SIGNALS: How many signals confirm per coin? (3+ = actionable)\n"
-                "3. MEMORY: lessons_from_wins (scale into), lessons_from_losses (avoid).\n"
-                "4. COSTS: Will TP profit exceed trading costs?\n"
-                "5. WEIGH BOTH SIDES: List reasons TO TRADE vs reasons TO WAIT.\n"
-                "6. DECISION: Trade only if edge is clear. Otherwise WAIT.\n\n"
-                "Return JSON with reasons_to_trade, reasons_to_wait, and your decision:"
-            )
-        })
+        user_msg_blocks.append(
+            {
+                "type": "text",
+                "text": (
+                    f"Market Snapshot (v3 hybrid — escalated from scout):\n{json.dumps(snap)}\n"
+                    f"{scout_hint}\n\n"
+                    f"{emulation_reminder}"
+                    "DECISION FRAMEWORK:\n"
+                    "1. REGIME: What regime is each coin in?\n"
+                    "2. SIGNALS: How many signals confirm per coin? (3+ = actionable)\n"
+                    "3. MEMORY: lessons_from_wins (scale into), lessons_from_losses (avoid).\n"
+                    "4. COSTS: Will TP profit exceed trading costs?\n"
+                    "5. WEIGH BOTH SIDES: List reasons TO TRADE vs reasons TO WAIT.\n"
+                    "6. DECISION: Trade only if edge is clear. Otherwise WAIT.\n\n"
+                    "Return JSON with reasons_to_trade, reasons_to_wait, and your decision:"
+                ),
+            }
+        )
 
-        system_prompt = get_claude_system(getattr(bot, "strategy_preset", None), model_id=trade_model, news=news_context)
-        system_blocks = [
-            {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
-        ]
+        system_prompt = get_claude_system(
+            getattr(bot, "strategy_preset", None), model_id=trade_model, news=news_context
+        )
+        system_blocks = [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
 
         raw = ""
         try:
@@ -1362,7 +1368,10 @@ def _validate_decision(dec: dict, bot, coins_snapshot: dict, anti_overtrade: dic
     confidence = dec.get("confidence", 0)
     if pa_quality == "choppy" and confidence < 0.50:
         dec["action"] = "wait"
-        dec["reasoning"] = f"[BLOCKED] Price action choppy for {symbol} (conf {confidence*100:.0f}% < 50%). " + dec.get("reasoning", "")
+        dec["reasoning"] = (
+            f"[BLOCKED] Price action choppy for {symbol} (conf {confidence * 100:.0f}% < 50%). "
+            + dec.get("reasoning", "")
+        )
         bot.last_ai_block_reason = f"{ai_msg} — rejected: choppy price action + low confidence"
         bot.add_log(bot.last_ai_block_reason, "warning")
         return dec

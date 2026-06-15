@@ -262,7 +262,7 @@ class TestCircuitBreakerIntegration:
         state.bot_running = True
         _setup_coin_price(state)
 
-        for i in range(4):
+        for _i in range(4):
             state.circuit_breaker.record_loss()
 
         assert state.circuit_breaker.is_tripped() is True

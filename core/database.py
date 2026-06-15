@@ -42,6 +42,10 @@ if not _file_logger.handlers:
     _trade_logger.addHandler(_th)
     _trade_logger.propagate = False
 
+from core.json_logging import configure_structured_logging  # noqa: E402
+
+configure_structured_logging(LOG_DIR)
+
 
 def file_log(msg: str, level: str = "info"):
     getattr(_file_logger, level, _file_logger.info)(msg)
@@ -1416,22 +1420,22 @@ def db_get_adversary_stats() -> dict:
         total_vetoes = conn.execute(
             "SELECT COUNT(*) FROM decision_audit_log WHERE adversary_verdict IN ('veto', 'kill')"
         ).fetchone()[0]
-        
+
         total_reduces = conn.execute(
             "SELECT COUNT(*) FROM decision_audit_log WHERE adversary_verdict = 'reduce'"
         ).fetchone()[0]
-        
+
         latest_vetoes = conn.execute(
             "SELECT symbol, adversary_reasoning as reasoning, ts FROM decision_audit_log "
             "WHERE adversary_verdict IN ('veto', 'kill') ORDER BY id DESC LIMIT 5"
         ).fetchall()
-        
+
         # Estimate capital saved: average position size * frequency of vetoes
         # This is a 'wow' metric for institutional users.
         return {
             "total_vetoes": total_vetoes,
             "total_reduces": total_reduces,
-            "latest_vetoes": [dict(v) for v in latest_vetoes]
+            "latest_vetoes": [dict(v) for v in latest_vetoes],
         }
     except Exception:
         return {"total_vetoes": 0, "total_reduces": 0, "latest_vetoes": []}
@@ -1458,6 +1462,8 @@ if _use_postgres_storage():
     try:
         from core.database_postgres import (
             db_get_admin_logs as _pg_get_admin_logs,
+        )
+        from core.database_postgres import (
             db_save_admin_log as _pg_save_admin_log,
         )
 

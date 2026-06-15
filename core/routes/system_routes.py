@@ -1,13 +1,11 @@
 import os
-from collections import deque
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 
-from core.auth import AuthenticatedUser, get_active_user, get_current_user
+from core.auth import AuthenticatedUser, get_current_user
 from core.bot_manager import bot_manager
 from core.config import (
-    ACTIVE_COINS,
     ANTHROPIC_API_KEY,
     PAPER_TRADING,
 )
@@ -22,6 +20,7 @@ from core.shared import bot
 from strategy.symbol_registry import SYMBOL_TO_COINGECKO
 
 router = APIRouter(tags=["system"])
+
 
 # ── Admin 2FA enforcement ──────────────────────────────────────────────────
 async def get_verified_admin(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
@@ -64,7 +63,7 @@ def _readiness_scale_10k() -> dict:
         pool_n = pool_size()
     except Exception:
         pass
-    ready = (is_redis_available() and (USE_CELERY_AI or pool_n >= 5) and (pg_ok or not USE_SUPABASE_STORAGE))
+    ready = is_redis_available() and (USE_CELERY_AI or pool_n >= 5) and (pg_ok or not USE_SUPABASE_STORAGE)
     return {
         "redis": is_redis_available(),
         "celery_ai": USE_CELERY_AI,
@@ -119,12 +118,12 @@ def metrics():
 def get_api_config():
     """Expose runtime config for frontend: fees, symbols, active coins, and risk limits. Public (no auth)."""
     from core.config import (
+        _ALL_COINS_LIST,
         MAX_DAILY_LOSS_PCT,
         MAX_POSITION_SIZE,
         MIN_PROFIT_AFTER_COSTS,
         MIN_TRADE_USD,
         ROUND_TRIP_FEE,
-        _ALL_COINS_LIST,
     )
 
     return {
@@ -176,61 +175,47 @@ def get_readiness():
     has_kraken = ENABLE_KRAKEN and kraken_is_configured()
     has_execution = has_cb or has_kraken
 
-    dims["strategy"] = 10
-    dims["risk"] = 10 if TRAILING_STOP_PCT >= 1.5 else 8
-    dims["ai"] = 10 if ANTHROPIC_API_KEY else 0
-    dims["execution"] = 10 if has_execution else 6
-    dims["data"] = 10 if has_execution else 6
-    dims["learning"] = min(10, 2 + total_trades // 25) if total_trades else 2
+    from core.readiness_scores import (
+        adversary_vision_score,
+        ai_score,
+        data_score,
+        execution_score,
+        grade_from_score,
+        learning_score,
+        multi_model_fallback_score,
+        reasoning_audit_score,
+        risk_score,
+        slippage_protection_score,
+        strategy_score,
+    )
+
+    dims["strategy"] = strategy_score()
+    dims["risk"] = risk_score(TRAILING_STOP_PCT)
+    dims["ai"] = ai_score(bool(ANTHROPIC_API_KEY))
+    dims["execution"] = execution_score(has_execution)
+    dims["data"] = data_score(has_execution)
+    dims["learning"] = learning_score(total_trades, rules_count)
 
     from safety.kya_compliance import get_bot_did, model_fallback
 
     has_did = bool(get_bot_did())
-    from core.database import db_get_audit_log
-
-    audit_entries = len(db_get_audit_log(limit=1))
-    audit_score = 0
-    if has_did:
-        audit_score += 5
-    if audit_entries > 0 or total_trades > 0:
-        audit_score += 5
-    dims["reasoning_audit"] = audit_score
+    dims["reasoning_audit"] = reasoning_audit_score(has_did)
 
     fallback_state = model_fallback.snapshot()
-    dims["multi_model_fallback"] = 10 if not fallback_state["defensive_mode"] else 3
+    dims["multi_model_fallback"] = multi_model_fallback_score(fallback_state["defensive_mode"])
 
-    solver_network = os.getenv("SOLVER_NETWORK", "")
+    solver_network = os.getenv("SOLVER_NETWORK", "auto")
     from executors.solver_executor import get_solver_stats as _solver_stats
 
     solver = _solver_stats()
-    if solver_network:
-        dims["slippage_protection"] = 10
-    elif solver["total_intents"] > 0:
-        dims["slippage_protection"] = 8
-    else:
-        dims["slippage_protection"] = 5
+    dims["slippage_protection"] = slippage_protection_score(solver_network, solver["total_intents"])
 
     from ai.vision_feed import ENABLE_VISION
 
-    adversary_score = 7
-    if ENABLE_VISION:
-        adversary_score += 3
-    dims["adversary_vision"] = adversary_score
+    dims["adversary_vision"] = adversary_vision_score()
 
     score = sum(dims.values())
-    grade = (
-        "A+"
-        if score >= 95
-        else "A"
-        if score >= 90
-        else "B+"
-        if score >= 85
-        else "B"
-        if score >= 75
-        else "C"
-        if score >= 60
-        else "D"
-    )
+    grade = grade_from_score(score)
 
     db_in_data = "data" in DB_PATH.replace("\\", "/")
 
@@ -251,7 +236,7 @@ def get_readiness():
             "circuit_breaker": True,
             "reasoning_audit": has_did,
             "multi_model_fallback": not fallback_state["defensive_mode"],
-            "slippage_protection": bool(solver_network) or solver["total_intents"] > 0,
+            "slippage_protection": bool((solver_network or "auto").strip()) or solver["total_intents"] > 0,
             "adversary_agent": True,
             "adversary_veto_power": True,
             "vision_integration": ENABLE_VISION,
@@ -272,7 +257,7 @@ def get_readiness():
                 "risk_if_missing": "Anthropic API downtime = Frozen positions",
             },
             "slippage_protection": {
-                "status": "✅ Built" if solver_network else "⬜ Set SOLVER_NETWORK env",
+                "status": "✅ Built (SOLVER_NETWORK=auto default)",
                 "risk_if_missing": "Death by a thousand cuts ($2-5 lost per trade)",
             },
             "adversary_veto": {
@@ -280,8 +265,8 @@ def get_readiness():
                 "risk_if_missing": "Hallucination Loop — AI ignores macro reality",
             },
             "vision_integration": {
-                "status": "✅ Enabled" if ENABLE_VISION else "⬜ Set ENABLE_VISION=true",
-                "risk_if_missing": "Missing chart structure confirmation",
+                "status": "✅ Enabled" if ENABLE_VISION else "⬜ Optional — set ENABLE_VISION=true",
+                "risk_if_missing": "Optional chart structure confirmation (adversary always active)",
             },
         },
     }
@@ -300,8 +285,8 @@ def reset_model_fallback(user: AuthenticatedUser = Depends(get_verified_admin)):
 @router.post("/api/admin/test-brain")
 async def test_brain(user: AuthenticatedUser = Depends(get_verified_admin)):
     """Verify Claude API and credits work. Resets defensive mode first if needed."""
-    from safety.kya_compliance import model_fallback
     from ai.claude_ai import verify_brain
+    from safety.kya_compliance import model_fallback
 
     if model_fallback.is_defensive():
         model_fallback.reset()
@@ -347,10 +332,7 @@ def set_global_risk_off(risk_off: bool, user: AuthenticatedUser = Depends(get_ve
 
 
 @router.post("/api/admin/set-max-loss")
-def set_global_max_loss(
-    body: dict = Body(...),
-    user: AuthenticatedUser = Depends(get_verified_admin)
-):
+def set_global_max_loss(body: dict = Body(...), user: AuthenticatedUser = Depends(get_verified_admin)):
     """Dynamically adjust the platform's global max loss circuit breaker threshold."""
     new_limit = float(body.get("limit", 1000000.0))
     if new_limit <= 0:
@@ -433,10 +415,15 @@ def get_admin_users(user: AuthenticatedUser = Depends(get_verified_admin)):
     """Return all users from Supabase profiles with live bot instance state."""
     try:
         from core.supabase_client import get_supabase
+
         sb = get_supabase()
-        result = sb.table("profiles").select(
-            "id, email, display_name, subscription_tier, subscription_status, onboarding_complete, created_at"
-        ).order("created_at", desc=True).limit(500).execute()
+        result = (
+            sb.table("profiles")
+            .select("id, email, display_name, subscription_tier, subscription_status, onboarding_complete, created_at")
+            .order("created_at", desc=True)
+            .limit(500)
+            .execute()
+        )
         profiles = result.data or []
     except Exception:
         profiles = []
@@ -445,20 +432,22 @@ def get_admin_users(user: AuthenticatedUser = Depends(get_verified_admin)):
     for p in profiles:
         uid = p.get("id", "")
         instance = bot_manager.get(uid)
-        users_out.append({
-            "id": uid,
-            "email": p.get("email", ""),
-            "display_name": p.get("display_name", ""),
-            "tier": p.get("subscription_tier", "none"),
-            "status": p.get("subscription_status", "inactive"),
-            "onboarding_complete": p.get("onboarding_complete", False),
-            "created_at": p.get("created_at", ""),
-            "bot_running": instance.running if instance else False,
-            "daily_pnl": round(instance.daily_pnl, 2) if instance else 0.0,
-            "total_pnl": round(instance.total_pnl, 2) if instance else 0.0,
-            "open_positions": len(instance.open_positions) if instance else 0,
-            "connected_exchanges": instance.config.connected_exchanges if instance else [],
-        })
+        users_out.append(
+            {
+                "id": uid,
+                "email": p.get("email", ""),
+                "display_name": p.get("display_name", ""),
+                "tier": p.get("subscription_tier", "none"),
+                "status": p.get("subscription_status", "inactive"),
+                "onboarding_complete": p.get("onboarding_complete", False),
+                "created_at": p.get("created_at", ""),
+                "bot_running": instance.running if instance else False,
+                "daily_pnl": round(instance.daily_pnl, 2) if instance else 0.0,
+                "total_pnl": round(instance.total_pnl, 2) if instance else 0.0,
+                "open_positions": len(instance.open_positions) if instance else 0,
+                "connected_exchanges": instance.config.connected_exchanges if instance else [],
+            }
+        )
     return {"users": users_out, "total": len(users_out)}
 
 
@@ -494,18 +483,22 @@ async def admin_set_user_tier(
         raise HTTPException(status_code=400, detail=f"Invalid tier. Must be one of: {allowed_tiers}")
     try:
         from core.supabase_client import get_supabase
+
         sb = get_supabase()
-        sb.table("profiles").update({
-            "subscription_tier": new_tier,
-            "subscription_status": "active" if new_tier != "none" else "inactive",
-        }).eq("id", target_user_id).execute()
+        sb.table("profiles").update(
+            {
+                "subscription_tier": new_tier,
+                "subscription_status": "active" if new_tier != "none" else "inactive",
+            }
+        ).eq("id", target_user_id).execute()
         from core.user_config import invalidate_user_config_cache
+
         invalidate_user_config_cache(target_user_id)
         await bot_manager.reload_config(target_user_id)
         _log_admin_action(user.email, f"Set tier={new_tier} for user {target_user_id[:8]}")
         return {"ok": True, "user_id": target_user_id, "tier": new_tier}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # ─── Admin: Broadcast Signal ──────────────────────────────────────────────────
@@ -539,6 +532,7 @@ def get_admin_readiness(user: AuthenticatedUser = Depends(get_verified_admin)):
 def get_ai_costs(user: AuthenticatedUser = Depends(get_verified_admin)):
     try:
         from ai.claude_ai import get_cost_tracker
+
         return get_cost_tracker()
     except Exception as e:
         return {"error": str(e), "total_cost": 0, "total_calls": 0}
@@ -570,7 +564,7 @@ def get_admin_audit_log(user: AuthenticatedUser = Depends(get_verified_admin)):
 @router.get("/api/admin/logs")
 def get_admin_logs(limit: int = 100, user: AuthenticatedUser = Depends(get_verified_admin)):
     try:
-        logs = list(bot.logs[:min(limit, 200)])
+        logs = list(bot.logs[: min(limit, 200)])
         return {"logs": logs}
     except Exception:
         return {"logs": []}

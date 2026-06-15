@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
 import { supabase } from "../supabaseClient.js";
-import { colors, radii, typography } from "../theme.js";
+import { colors, radii, typography, liquidGlass } from "../theme.js";
+import { PageShell } from "../components/PageShell.jsx";
 import { Check, AlertTriangle, ArrowRight, ArrowLeft, Lightbulb, Info, X } from "lucide-react";
 
 const EXCHANGES = [
@@ -312,8 +313,8 @@ export default function Onboarding() {
   return (
     <>
       <style>{responsiveCss}</style>
-      <div style={styles.container}>
-        <div style={styles.card} className="onboarding-card">
+      <PageShell centered maxWidth={520}>
+        <div style={styles.card} className="onboarding-card page-card">
           {/* Progress bar */}
           <div style={styles.progressBar}>
             <div style={{ ...styles.progressFill, width: `${progress}%` }} />
@@ -619,32 +620,17 @@ export default function Onboarding() {
             );
           })()}
         </div>
-      </div>
+      </PageShell>
     </>
   );
 }
 
 const styles = {
-  container: {
-    background: colors.dark,
-    color: colors.text,
-    minHeight: "100dvh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "20px 16px",
-    paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
-  },
   card: {
-    background: "rgba(17,17,17,0.6)",
-    backdropFilter: "blur(40px) saturate(1.6)",
-    WebkitBackdropFilter: "blur(40px) saturate(1.6)",
-    border: "1px solid rgba(212,175,55,0.1)",
     borderRadius: 24,
     padding: "32px 28px",
     width: "100%",
     maxWidth: 520,
-    boxShadow: "0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.06)",
   },
   progressBar: {
     height: 3,
@@ -661,8 +647,8 @@ const styles = {
   },
   stepLabel: { fontSize: 10, color: colors.muted, letterSpacing: 1, marginBottom: 20 },
   heading: {
-    fontFamily: typography.fontDisplay,
-    fontSize: 24,
+    fontFamily: "'Bebas Neue', 'Montserrat', sans-serif",
+    fontSize: 28,
     fontWeight: 400,
     letterSpacing: 3,
     color: colors.gold,
@@ -674,16 +660,11 @@ const styles = {
     fontFamily: typography.fontMono,
     fontSize: 13,
     padding: "10px 12px",
-    background: "rgba(10,10,10,0.6)",
-    backdropFilter: "blur(8px)",
-    WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
-    borderRadius: 8,
+    ...liquidGlass.input,
     color: "#D4D4D4",
     outline: "none",
     width: "100%",
     boxSizing: "border-box",
-    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
   },
   exchangeList: { display: "flex", flexDirection: "column", gap: 8 },
   exchangeRow: {
@@ -691,11 +672,12 @@ const styles = {
     alignItems: "center",
     gap: 12,
     padding: "12px 14px",
-    background: "rgba(10,10,10,0.4)",
+    background: "rgba(6,6,6,0.6)",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 12,
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
     transition: "border-color 0.2s ease",
   },
   exchangeName: { fontSize: 13, fontWeight: 600, color: "#D4D4D4" },
@@ -726,15 +708,16 @@ const styles = {
     minWidth: 160,
     maxWidth: 200,
     padding: "10px 12px",
-    background: "rgba(10,10,10,0.4)",
+    background: "rgba(6,6,6,0.6)",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 10,
     cursor: "pointer",
     textAlign: "left",
     color: "#D4D4D4",
     scrollSnapAlign: "start",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
     transition: "all 0.2s ease",
   },
   presetActive: { borderColor: `${colors.gold}66`, background: `${colors.gold}0F` },
@@ -746,11 +729,12 @@ const styles = {
     fontFamily: typography.fontMono,
     fontSize: 11,
     padding: "8px 0",
-    background: "#0D0D0D",
-    border: `1px solid ${colors.border}`,
+    background: "rgba(6,6,6,0.6)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 4,
     color: "#D4D4D4",
     cursor: "pointer",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   riskActive: { borderColor: colors.gold, color: colors.gold },
   coinGrid: { display: "flex", flexWrap: "wrap", gap: 6 },
@@ -758,11 +742,12 @@ const styles = {
     fontFamily: typography.fontMono,
     fontSize: 11,
     padding: "6px 12px",
-    background: "#0D0D0D",
-    border: `1px solid ${colors.border}`,
+    background: "rgba(6,6,6,0.6)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 4,
     color: "#D4D4D4",
     cursor: "pointer",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   coinActive: { borderColor: colors.gold, color: colors.gold, background: `${colors.gold}0D` },
   toggleRow: { display: "flex", gap: 8 },
@@ -771,28 +756,30 @@ const styles = {
     fontFamily: typography.fontMono,
     fontSize: 11,
     padding: "10px 8px",
-    background: "rgba(10,10,10,0.5)",
+    background: "rgba(6,6,6,0.6)",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 8,
     color: "#D4D4D4",
     cursor: "pointer",
     textAlign: "center",
     minWidth: 0,
     wordBreak: "break-word",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
     transition: "all 0.2s ease",
   },
   toggleActive: { borderColor: `${colors.success}66`, color: colors.success, background: `${colors.success}0D` },
   toggleDanger: { borderColor: `${colors.error}66`, color: colors.error, background: `${colors.error}0D` },
   summaryBox: {
-    background: "rgba(10,10,10,0.4)",
+    background: "rgba(6,6,6,0.6)",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   summaryRow: {
     display: "flex",
@@ -878,9 +865,9 @@ const styles = {
     fontSize: 12,
     padding: "10px 16px",
     background: "rgba(255,255,255,0.03)",
-    backdropFilter: "blur(8px)",
-    WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
+    backdropFilter: "blur(14px) saturate(1.4)",
+    WebkitBackdropFilter: "blur(14px) saturate(1.4)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 8,
     color: colors.muted,
     cursor: "pointer",
@@ -926,17 +913,13 @@ const styles = {
     zIndex: 1000,
   },
   modal: {
-    background: "rgba(17,17,17,0.72)",
-    backdropFilter: "blur(40px) saturate(1.6)",
-    WebkitBackdropFilter: "blur(40px) saturate(1.6)",
-    border: "1px solid rgba(212,175,55,0.12)",
+    ...liquidGlass.heavy,
     borderRadius: 20,
     padding: "28px 24px",
     width: "100%",
     maxWidth: 380,
     margin: "16px",
     boxSizing: "border-box",
-    boxShadow: "0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
   },
   modalTitle: {
     fontFamily: typography.fontDisplay,
@@ -946,13 +929,14 @@ const styles = {
     margin: "0 0 16px",
   },
   keyInfo: {
-    background: "rgba(10,10,10,0.4)",
+    background: "rgba(6,6,6,0.6)",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 8,
     padding: 12,
     marginTop: 12,
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   keyInfoTitle: { fontSize: 11, color: "#888", marginBottom: 6 },
   keyPerm: { fontSize: 11, padding: "2px 0", display: "flex", gap: 6 },

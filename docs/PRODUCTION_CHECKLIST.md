@@ -110,6 +110,7 @@ curl https://your-domain.com/readiness
 - [ ] Built frontend: `cd frontend && npm run build`
 - [ ] Started backend: `python run.py` or `docker compose up`
 - [ ] Verified `/health` and `/readiness` return OK
+- [ ] Ran `./scripts/verify_public_ready.sh` — all checks green
 
 ---
 

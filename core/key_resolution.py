@@ -4,8 +4,6 @@ Dev: uses .env keys when email matches DEV_USER_EMAIL.
 Others: uses get_user_exchange_keys from Supabase (encrypted).
 """
 
-from typing import Optional
-
 from core.config import (
     COINBASE_API_KEY,
     COINBASE_API_SECRET,
@@ -16,7 +14,7 @@ from core.config import (
 from core.user_config import get_user_exchange_keys
 
 
-def _is_dev(email: Optional[str]) -> bool:
+def _is_dev(email: str | None) -> bool:
     """True if email matches DEV_USER_EMAIL (case-insensitive)."""
     if not email or not DEV_USER_EMAIL:
         return False
@@ -24,8 +22,8 @@ def _is_dev(email: Optional[str]) -> bool:
 
 
 def resolve_exchange_keys(
-    user_id: Optional[str],
-    email: Optional[str],
+    user_id: str | None,
+    email: str | None,
     exchange: str,
 ) -> tuple[str, str] | None:
     """

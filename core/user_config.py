@@ -8,7 +8,6 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import Optional
 
 from core.config import ADMIN_EMAILS
 from core.encryption import (
@@ -136,7 +135,7 @@ def _dict_to_config(d: dict) -> UserConfig:
         max_concurrent_positions=int(d.get("max_concurrent_positions", 8) or 8),
         max_position_usd=float(d.get("max_position_usd", 500.0) or 500.0),
         min_trade_usd=float(d.get("min_trade_usd", 75.0) or 75.0),
-        coins=d.get("coins") if isinstance(d.get("coins"), list) else ["BTC", "ETH", "SOL", "LINK"],
+        coins=(list(_coins) if isinstance((_coins := d.get("coins")), list) else ["BTC", "ETH", "SOL", "LINK"]),
         enable_futures=bool(d.get("enable_futures", False)),
         futures_leverage=int(d.get("futures_leverage", 2) or 2),
         trade_mode=str(d.get("trade_mode", "spot") or "spot"),
@@ -145,8 +144,11 @@ def _dict_to_config(d: dict) -> UserConfig:
         analysis_interval=int(d.get("analysis_interval") or d.get("claude_interval") or 90),
         scout_min_signals=int(d.get("scout_min_signals", 2) or 2),
         scout_min_confidence=float(d.get("scout_min_confidence", 0.35) or 0.35),
-        connected_exchanges=d.get("connected_exchanges") if isinstance(d.get("connected_exchanges"), list) else [],
+        connected_exchanges=(
+            list(_exchanges) if isinstance((_exchanges := d.get("connected_exchanges")), list) else []
+        ),
     )
+
 
 def load_user_config(user_id: str) -> UserConfig:
     """Load full user config from Supabase (profile + preferences + exchanges) in parallel."""
@@ -223,7 +225,7 @@ def load_user_config(user_id: str) -> UserConfig:
         max_concurrent_positions=int(pr.get("max_concurrent_positions", 8) or 8),
         max_position_usd=float(pr.get("max_position_usd", 500.0) or 500.0),
         min_trade_usd=float(pr.get("min_trade_usd", 75.0) or 75.0),
-        coins=pr.get("coins") if isinstance(pr.get("coins"), list) else ["BTC", "ETH", "SOL", "LINK"],
+        coins=(list(_coins) if isinstance((_coins := pr.get("coins")), list) else ["BTC", "ETH", "SOL", "LINK"]),
         enable_futures=bool(pr.get("enable_futures", False)),
         futures_leverage=int(pr.get("futures_leverage", 2) or 2),
         trade_mode=str(pr.get("trade_mode", "spot") or "spot"),
@@ -278,7 +280,7 @@ def save_user_preferences(user_id: str, prefs: dict) -> bool:
     return True
 
 
-def _get_or_create_user_dek(user_id: str) -> Optional[str]:
+def _get_or_create_user_dek(user_id: str) -> str | None:
     """Get or create a per-user Data Encryption Key (DEK), encrypted by KEK."""
     sb = get_supabase()
     # Check profile for existing DEK
@@ -311,7 +313,7 @@ def complete_onboarding(user_id: str):
     invalidate_user_config_cache(user_id)
 
 
-def get_user_exchange_keys(user_id: str, exchange: str) -> Optional[dict]:
+def get_user_exchange_keys(user_id: str, exchange: str) -> dict | None:
     """Load exchange credentials for a user. Decrypts using Envelope Encryption."""
     sb = get_supabase()
     try:
@@ -335,20 +337,20 @@ def get_user_exchange_keys(user_id: str, exchange: str) -> Optional[dict]:
     # Decrypt all fields ending in _enc
     user_dek = _get_or_create_user_dek(user_id)
     processed = dict(data)
-    
+
     for k, v in data.items():
         if k.endswith("_enc") and isinstance(v, str) and v:
             dec = None
             if user_dek:
                 dec = decrypt_with_key(v, user_dek)
-            
+
             if dec is None:
                 # Fallback to legacy KEK decryption
                 dec = decrypt_ciphertext(v)
-            
+
             if dec is not None:
                 processed[k] = dec
-            
+
     return processed
 
 

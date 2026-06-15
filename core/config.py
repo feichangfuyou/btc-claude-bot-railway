@@ -149,7 +149,9 @@ COINBASE_REST_TICKER = "https://api.exchange.coinbase.com/products"
 # Lets the dev use personal keys without storing them in Supabase.
 DEV_USER_EMAIL = (os.getenv("DEV_USER_EMAIL") or "").strip()
 # Comma-separated list of emails with admin/system access
-ADMIN_EMAILS = os.getenv("ADMIN_EMAILS", "feichangfuyou@gmail.com,feichangfuyou@doyou.trade,feichangfuyou@killswitch.works")
+ADMIN_EMAILS = os.getenv(
+    "ADMIN_EMAILS", "feichangfuyou@gmail.com,feichangfuyou@doyou.trade,feichangfuyou@killswitch.works"
+)
 
 # ─── Kraken (spot CEX) ───────────────────────────────────────────────────────
 ENABLE_KRAKEN = os.getenv("ENABLE_KRAKEN", "false").lower() == "true"

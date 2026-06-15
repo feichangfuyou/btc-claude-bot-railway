@@ -216,6 +216,7 @@ class CoinbaseExecutor:
                 # Let's use the API to calculate it if needed, or assume the caller knows.
                 # For now, let's fetch the price.
                 from api.coinbase_api import get_ticker
+
                 price, _ = await get_ticker(symbol)
                 if not price:
                     return None
@@ -237,6 +238,6 @@ class CoinbaseExecutor:
             }
         except Exception as e:
             from core.database import file_log
+
             file_log(f"CoinbaseExecutor trade error: {e}", "error")
             return None
-

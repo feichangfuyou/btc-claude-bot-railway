@@ -257,7 +257,7 @@ def calc_vwap(prices: list, volumes: list) -> float | None:
     total_vol = sum(volumes)
     if total_vol == 0:
         return None
-    return float(round(sum(p * v for p, v in zip(prices, volumes)) / total_vol, 2))
+    return float(round(sum(p * v for p, v in zip(prices, volumes, strict=True)) / total_vol, 2))
 
 
 def calc_macd(prices: list, fast: int = 12, slow: int = 26, signal: int = 9) -> dict:

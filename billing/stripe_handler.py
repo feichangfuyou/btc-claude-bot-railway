@@ -14,7 +14,7 @@ Setup:
 
 import logging
 import os
-from typing import Optional
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -94,7 +94,7 @@ def create_checkout_session(
     tier: str,
     success_url: str,
     cancel_url: str,
-) -> Optional[str]:
+) -> str | None:
     """Create a Stripe Checkout session for a subscription.
     Returns the checkout URL or None on failure."""
     stripe = _get_stripe()
@@ -229,9 +229,11 @@ def _stop_user_bot(user_id: str, reason: str = "subscription cancelled") -> None
             try:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
+
                     async def _async_cleanup():
                         try:
                             from core.backend import broadcast
+
                             await broadcast(
                                 {
                                     "type": "bot_status",
@@ -302,11 +304,11 @@ def check_tier_limit(tier: str, feature: str) -> bool:
     return bool(limits.get(feature, False))
 
 
-def get_tier_limit(tier: str, key: str, default: any = None) -> any:
+def get_tier_limit(tier: str, key: str, default: Any = None) -> Any:
     """Get a specific limit value for a tier."""
     return TIER_LIMITS.get(tier, TIER_LIMITS["none"]).get(key, default)
 
 
 def get_max_exchanges(tier: str) -> int:
     """How many exchanges can this tier connect?"""
-    return get_tier_limit(tier, "max_exchanges", 1)
+    return int(get_tier_limit(tier, "max_exchanges", 1))

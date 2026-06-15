@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { supabase } from "../supabaseClient.js";
-import { colors, typography } from "../theme.js";
+import { colors } from "../theme.js";
+import { PageShell } from "../components/PageShell.jsx";
 
 export default function History() {
   const { user, signOut } = useAuth();
@@ -48,15 +49,15 @@ export default function History() {
   return (
     <>
     <style>{responsiveCss}</style>
-    <div style={styles.container}>
-      <div style={styles.page} className="history-page">
-        <div style={styles.header}>
-          <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>&larr; Dashboard</button>
-          <h1 style={styles.title}>TRADE HISTORY</h1>
-          {user && (
-            <button style={styles.signOutBtn} onClick={signOut}>SIGN OUT</button>
-          )}
-        </div>
+    <PageShell
+      title="TRADE HISTORY"
+      onBack={() => navigate("/dashboard")}
+      maxWidth={900}
+      headerRight={user && (
+        <button type="button" className="page-shell__sign-out" onClick={signOut}>SIGN OUT</button>
+      )}
+    >
+      <div className="history-page">
 
         {/* Stats Summary */}
         <div style={styles.statsRow} className="stats-row">
@@ -140,69 +141,22 @@ export default function History() {
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
     </>
   );
 }
 
 const styles = {
-  container: {
-    fontFamily: typography.fontMono,
-    background: colors.dark,
-    color: colors.text,
-    minHeight: "100dvh",
-    width: "100%",
-    maxWidth: "100vw",
-    boxSizing: "border-box",
-    padding: "20px 16px",
-    paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
-  },
-  page: { maxWidth: 900, margin: "0 auto", width: "100%", boxSizing: "border-box" },
-  header: { display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" },
-  title: {
-    fontFamily: typography.fontDisplay,
-    fontSize: 28,
-    fontWeight: 400,
-    letterSpacing: 4,
-    color: colors.gold,
-    margin: 0,
-  },
-  backBtn: {
-    fontFamily: "'Space Mono', monospace",
-    fontSize: 12,
-    padding: "6px 12px",
-    background: "rgba(255,255,255,0.03)",
-    backdropFilter: "blur(8px)",
-    WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
-    borderRadius: 8,
-    color: colors.muted,
-    cursor: "pointer",
-    transition: "all 0.2s ease",
-  },
-  signOutBtn: {
-    fontFamily: "'Space Mono', monospace",
-    fontSize: 11,
-    letterSpacing: 1.5,
-    padding: "6px 12px",
-    background: "transparent",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: 8,
-    color: "#5C5C5C",
-    cursor: "pointer",
-    marginLeft: "auto",
-    transition: "all 0.2s ease",
-  },
   statsRow: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 },
   statCard: {
-    background: "rgba(17,17,17,0.55)",
-    backdropFilter: "blur(20px) saturate(1.4)",
-    WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+    background: "rgba(14, 14, 14, 0.62)",
+    backdropFilter: "blur(24px) saturate(1.5)",
+    WebkitBackdropFilter: "blur(24px) saturate(1.5)",
     border: "1px solid rgba(212,175,55,0.1)",
     borderRadius: 14,
     padding: "14px 16px",
     textAlign: "center",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+    boxShadow: "0 14px 44px rgba(0,0,0,0.50), 0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.11), inset 1px 0 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.18), inset -1px 0 0 rgba(0,0,0,0.08)",
     transition: "border-color 0.3s ease, box-shadow 0.3s ease",
   },
   statLabel: { fontSize: 10, color: colors.muted, letterSpacing: 1, marginBottom: 4 },
@@ -212,22 +166,22 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     fontSize: 11,
     padding: "6px 10px",
-    background: "rgba(17,17,17,0.55)",
-    backdropFilter: "blur(12px)",
-    WebkitBackdropFilter: "blur(12px)",
+    background: "rgba(14, 14, 14, 0.62)",
+    backdropFilter: "blur(24px) saturate(1.5)",
+    WebkitBackdropFilter: "blur(24px) saturate(1.5)",
     border: "1px solid rgba(255,255,255,0.06)",
     borderRadius: 8,
     color: "#D4D4D4",
     transition: "border-color 0.2s ease",
   },
   tableContainer: {
-    background: "rgba(17,17,17,0.55)",
-    backdropFilter: "blur(20px) saturate(1.4)",
-    WebkitBackdropFilter: "blur(20px) saturate(1.4)",
-    border: "1px solid rgba(212,175,55,0.1)",
-    borderRadius: 16,
+    background: "rgba(14, 14, 14, 0.62)",
+    backdropFilter: "blur(24px) saturate(1.5)",
+    WebkitBackdropFilter: "blur(24px) saturate(1.5)",
+    border: "1px solid rgba(255,255,255,0.04)",
+    borderRadius: 18,
     overflow: "auto",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+    boxShadow: "0 14px 44px rgba(0,0,0,0.50), 0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.11), inset 1px 0 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.18), inset -1px 0 0 rgba(0,0,0,0.08)",
   },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 11 },
   th: {

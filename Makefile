@@ -37,5 +37,8 @@ lint:
 	ruff check .
 	ruff format --check .
 
+lock:
+	pip-compile requirements.txt -o requirements.lock --strip-extras --generate-hashes --allow-unsafe 2>/dev/null || pip-compile requirements.txt -o requirements.lock
+
 install-hooks:
 	pre-commit install

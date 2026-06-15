@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
 import { colors, typography } from "../theme.js";
+import { PageShell } from "../components/PageShell.jsx";
 import {
   Shield, ShieldCheck, Lock, AlertTriangle, RefreshCw, QrCode,
   Copy, Check, Users, Zap, Activity, Radio, BarChart2,
@@ -134,10 +135,10 @@ function TwoFactorGate({ onVerified }) {
         </>) : (
           <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
             <p style={{ fontSize: 12, color: colors.muted, margin: 0 }}>Scan with <strong>Google Authenticator</strong> or <strong>Authy</strong></p>
-            {qrUrl && <div style={{ padding: 12, background: "rgba(255,255,255,0.03)", border: `1px solid ${colors.gold}22`, borderRadius: 14 }}>
+            {qrUrl && <div style={{ padding: 12, background: "rgba(6,6,6,0.6)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: 14, boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" }}>
               <img src={qrUrl} alt="QR" style={{ display: "block", width: 160, height: 160, borderRadius: 8 }} />
             </div>}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 14px", width: "100%" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(6,6,6,0.6)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: 10, padding: "10px 14px", width: "100%", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" }}>
             <code className="mono-text" style={{ fontSize: 11, color: colors.gold, flex: 1, wordBreak: "break-all", textAlign: "left" }}>{qrData?.secret}</code>
               <button style={{ background: "none", border: "none", color: colors.muted, cursor: "pointer", padding: 4 }}
                 onClick={() => { navigator.clipboard.writeText(qrData?.secret || ""); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
@@ -428,7 +429,22 @@ export default function Admin() {
   ];
 
   return (
-    <div style={s.container}>
+    <PageShell
+      title="ADMIN CONSOLE"
+      onBack={() => navigate("/dashboard")}
+      maxWidth={1100}
+      headerRight={
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ fontSize: 10, color: sessionLeft < 300 ? colors.error : colors.muted }}>
+            Session: {Math.floor(sessionLeft / 60)}:{String(sessionLeft % 60).padStart(2, "0")}
+            <div style={{ height: 2, background: "rgba(255,255,255,0.05)", borderRadius: 2, marginTop: 4, width: 80, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${sessionPct}%`, background: sessionLeft < 300 ? colors.error : colors.gold, borderRadius: 2, transition: "width 1s linear" }} />
+            </div>
+          </div>
+          <div style={s.badge}>GOD MODE</div>
+        </div>
+      }
+    >
       <style>{adminCss}</style>
 
       {/* Tier Modal */}
@@ -448,22 +464,7 @@ export default function Admin() {
         </div>
       )}
 
-      <div style={s.page} className="admin-page">
-        {/* Header */}
-        <div style={s.header}>
-          <button style={s.backBtn} onClick={() => navigate("/dashboard")}>← Dashboard</button>
-          <h1 style={s.title}>ADMIN CONSOLE</h1>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ fontSize: 10, color: sessionLeft < 300 ? colors.error : colors.muted }}>
-              Session: {Math.floor(sessionLeft / 60)}:{String(sessionLeft % 60).padStart(2, "0")}
-              <div style={{ height: 2, background: "rgba(255,255,255,0.05)", borderRadius: 2, marginTop: 4, width: 80, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${sessionPct}%`, background: sessionLeft < 300 ? colors.error : colors.gold, borderRadius: 2, transition: "width 1s linear" }} />
-              </div>
-            </div>
-            <div style={s.badge}>GOD MODE</div>
-          </div>
-        </div>
-
+      <div className="admin-page">
         {lastRefresh && <div style={{ fontSize: 10, color: "#333", marginBottom: 16, textAlign: "right" }}>Last refresh: {lastRefresh.toLocaleTimeString()}</div>}
 
         {/* Tabs */}
@@ -554,7 +555,7 @@ export default function Admin() {
                 </div>
                 <button 
                   onClick={setMaxLoss}
-                  style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: colors.muted, fontSize: 11, cursor: "pointer" }}
+                  style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(6,6,6,0.6)", border: "1px solid rgba(255,255,255,0.06)", color: colors.muted, fontSize: 11, cursor: "pointer", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" }}
                   className="admin-action-btn">
                   ⚙️ Update Max Loss Limit
                 </button>
@@ -566,7 +567,7 @@ export default function Admin() {
           <Section title="TIER BREAKDOWN" icon={Users}>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {Object.entries(tierBadge).map(([t, c]) => (
-                <div key={t} style={{ padding: "10px 20px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${c}33`, minWidth: 90, textAlign: "center" }}>
+                <div key={t} style={{ padding: "10px 20px", borderRadius: 10, background: "rgba(6,6,6,0.6)", border: `1px solid ${c}33`, minWidth: 90, textAlign: "center", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" }}>
                   <div className="mono-text" style={{ fontSize: 20, fontWeight: 800, color: c }}>{tierCounts[t] || 0}</div>
                   <div style={{ fontSize: 10, color: c, marginTop: 4, letterSpacing: 1 }}>{tierLabel[t]}</div>
                 </div>
@@ -694,7 +695,7 @@ export default function Admin() {
               {/* Dimensions */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
                 {Object.entries(readiness.dimensions || {}).map(([key, val]) => (
-                  <div key={key} style={{ padding: "12px 14px", background: "rgba(255,255,255,0.02)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.04)" }}>
+                  <div key={key} style={{ padding: "12px 14px", background: "rgba(6,6,6,0.6)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.04)", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: 11, color: colors.muted, textTransform: "capitalize" }}>{key.replace(/_/g, " ")}</span>
                       <span className="mono-text" style={{ fontSize: 13, fontWeight: 800, color: val >= 8 ? colors.success : val >= 5 ? colors.gold : colors.error }}>{val}/10</span>
@@ -723,7 +724,7 @@ export default function Admin() {
                 </div>
               )}
               {/* Brain test — verify Claude API & credits after top-up */}
-              <div style={{ marginTop: 20, padding: 16, background: "rgba(255,255,255,0.02)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.04)" }}>
+              <div style={{ marginTop: 20, padding: 16, background: "rgba(6,6,6,0.6)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.04)", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" }}>
                 <div style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>Verify brain (Claude API + credits)</div>
                 <div style={{ fontSize: 11, color: colors.muted, opacity: 0.9, marginBottom: 10, lineHeight: 1.4 }}>
                   If the brain is paused (credits exhausted): add credits at{" "}
@@ -770,7 +771,7 @@ export default function Admin() {
         {activeTab === "costs" && (
           <Section title="AI COST TRACKER" icon={DollarSign}>
             {aiCosts ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              <div className="stack stack--sm">
                 {[
                   ["Total Estimated Spend", `$${(aiCosts.total_cost || 0).toFixed(4)}`],
                   ["Scout Calls", aiCosts.scout_calls ?? 0],
@@ -809,7 +810,7 @@ export default function Admin() {
                     fontWeight: 800,
                     border: "none",
                     cursor: "pointer",
-                    background: paymentsFilter === s ? colors.gold : "rgba(255,255,255,0.05)",
+                    background: paymentsFilter === s ? colors.gold : "rgba(6,6,6,0.6)",
                     color: paymentsFilter === s ? colors.dark : colors.muted,
                   }}
                   onClick={() => setPaymentsFilter(s)}
@@ -907,19 +908,19 @@ export default function Admin() {
 
         <div style={s.footer}>© 2026 DOYOU.TRADE ADMIN SYSTEM • SECURE V4.0 • 2FA ENFORCED</div>
       </div>
-    </div>
+    </PageShell>
   );
 }
 
 // ─── Gate Styles ───────────────────────────────────────────────────────────────
 const gs = {
   overlay: { minHeight: "100vh", background: "#050505", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 },
-  card: { width: "100%", maxWidth: 420, background: "rgba(12,12,12,0.95)", border: "1px solid rgba(212,175,55,0.12)", borderRadius: 28, padding: "44px 36px 36px", boxShadow: "0 24px 80px rgba(0,0,0,0.7)", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", backdropFilter: "blur(20px)" },
-  iconRing: { width: 72, height: 72, borderRadius: "50%", background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.2)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 40px rgba(212,175,55,0.08)", marginBottom: 24 },
+  card: { width: "100%", maxWidth: 420, background: "rgba(14, 14, 14, 0.62)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 28, padding: "44px 36px 36px", boxShadow: "0 14px 44px rgba(0,0,0,0.50), 0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.11), inset 1px 0 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.18), inset -1px 0 0 rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", backdropFilter: "blur(48px) saturate(1.7)" },
+  iconRing: { width: 72, height: 72, borderRadius: "50%", background: "rgba(212,175,55,0.06)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)", marginBottom: 24 },
   title: { fontFamily: typography.fontDisplay, fontSize: 20, fontWeight: 800, letterSpacing: 4, color: colors.gold, margin: "0 0 10px", textShadow: `0 0 20px ${colors.gold}22` },
   sub: { fontSize: 13, color: colors.muted, lineHeight: 1.6, margin: "0 0 28px", maxWidth: 280 },
   row: { display: "flex", gap: 10, marginBottom: 20 },
-  digit: { width: 46, height: 58, borderRadius: 12, background: "rgba(255,255,255,0.03)", color: colors.gold, fontSize: 24, fontWeight: 700, textAlign: "center", outline: "none", transition: "all 0.2s ease", caretColor: "transparent" },
+  digit: { width: 46, height: 58, borderRadius: 12, background: "rgba(6,6,6,0.6)", color: colors.gold, fontSize: 24, fontWeight: 700, textAlign: "center", outline: "none", transition: "all 0.2s ease", caretColor: "transparent", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" },
   err: { display: "flex", alignItems: "center", color: colors.error, fontSize: 12, marginBottom: 16, background: "rgba(192,57,43,0.08)", border: `1px solid ${colors.error}22`, padding: "8px 14px", borderRadius: 8, textAlign: "left", width: "100%" },
   btn: { width: "100%", padding: 16, borderRadius: 14, background: `linear-gradient(135deg, ${colors.gold}cc, ${colors.gold}88)`, border: "none", color: "#000", fontSize: 14, fontWeight: 900, letterSpacing: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.3s ease", marginBottom: 16 },
   link: { background: "none", border: "none", color: colors.muted, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", opacity: 0.7, letterSpacing: 0.5 },
@@ -927,36 +928,31 @@ const gs = {
 
 // ─── Admin Console Styles ──────────────────────────────────────────────────────
 const s = {
-  container: { minHeight: "100vh", background: "#050505", color: "#E0E0E0", display: "flex", justifyContent: "center", padding: "40px 16px" },
-  page: { width: "100%", maxWidth: 1100 },
-  header: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 },
-  backBtn: { background: "none", border: "none", color: colors.muted, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center" },
-  title: { fontFamily: typography.fontDisplay, fontSize: 28, letterSpacing: 6, color: colors.gold, margin: 0, textShadow: `0 0 20px ${colors.gold}22` },
   badge: { fontSize: 10, letterSpacing: 2, padding: "4px 12px", borderRadius: 20, background: "rgba(212,175,55,0.1)", border: `1px solid ${colors.gold}33`, color: colors.gold, fontWeight: 800 },
   tabs: { display: "flex", gap: 6, marginBottom: 24, flexWrap: "wrap" },
-  tab: { padding: "8px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: colors.muted, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", transition: "all 0.2s ease", letterSpacing: 0.5 },
+  tab: { padding: "8px 14px", borderRadius: 10, background: "rgba(6,6,6,0.6)", border: "1px solid rgba(255,255,255,0.04)", color: colors.muted, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", transition: "all 0.2s ease", letterSpacing: 0.5, boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" },
   tabActive: { background: "rgba(212,175,55,0.1)", border: `1px solid ${colors.gold}44`, color: colors.gold },
-  section: { background: "rgba(15,15,15,0.6)", backdropFilter: "blur(20px)", border: "1px solid", borderRadius: 20, padding: 28, boxShadow: "0 10px 40px rgba(0,0,0,0.3)", marginBottom: 20 },
+  section: { background: "rgba(14, 14, 14, 0.62)", backdropFilter: "blur(24px) saturate(1.5)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: 20, padding: 28, boxShadow: "0 14px 44px rgba(0,0,0,0.50), 0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.11), inset 1px 0 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.18), inset -1px 0 0 rgba(0,0,0,0.08)", marginBottom: 20 },
   sTitle: { fontSize: 11, letterSpacing: 3, color: colors.muted, textTransform: "uppercase", margin: 0, fontWeight: 700 },
   statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 },
-  statCard: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.03)", padding: "18px 16px", borderRadius: 14, textAlign: "center" },
+  statCard: { background: "rgba(6,6,6,0.6)", border: "1px solid rgba(255,255,255,0.04)", padding: "18px 16px", borderRadius: 14, textAlign: "center", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" },
   pauseBtn: { padding: "14px 24px", borderRadius: 12, border: "none", color: "#fff", fontSize: 13, fontWeight: 900, letterSpacing: 1.5, cursor: "pointer", transition: "all 0.3s ease" },
   stopBtn: { padding: "14px 20px", borderRadius: 12, border: `1px solid ${colors.error}66`, background: "rgba(0,0,0,0.5)", color: colors.error, fontSize: 12, fontWeight: 800, letterSpacing: 1, cursor: "pointer", transition: "all 0.3s ease" },
   goldBtn: { padding: "14px 24px", borderRadius: 12, background: `linear-gradient(135deg, ${colors.gold}cc, ${colors.gold}88)`, border: "none", color: "#000", fontSize: 13, fontWeight: 900, letterSpacing: 1.5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s ease" },
-  tableWrap: { overflowX: "auto", borderRadius: 12, border: "1px solid rgba(255,255,255,0.04)" },
+  tableWrap: { overflowX: "auto", borderRadius: 12, border: "1px solid rgba(255,255,255,0.04)", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" },
   table: { width: "100%", borderCollapse: "collapse" },
-  th: { padding: "10px 12px", fontSize: 10, color: colors.muted, letterSpacing: 1.5, textAlign: "left", borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.02)", whiteSpace: "nowrap" },
+  th: { padding: "10px 12px", fontSize: 10, color: colors.muted, letterSpacing: 1.5, textAlign: "left", borderBottom: "1px solid rgba(255,255,255,0.04)", background: "rgba(6,6,6,0.6)", whiteSpace: "nowrap" },
   tr: { transition: "background 0.15s ease" },
   td: { padding: "9px 12px", fontSize: 12, borderBottom: "1px solid rgba(255,255,255,0.03)", whiteSpace: "nowrap" },
-  smBtn: { padding: "4px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: colors.muted, cursor: "pointer", fontSize: 10, display: "flex", alignItems: "center" },
-  searchInput: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "#E0E0E0", fontSize: 12, outline: "none", boxSizing: "border-box" },
+  smBtn: { padding: "4px 8px", borderRadius: 6, background: "rgba(6,6,6,0.6)", border: "1px solid rgba(255,255,255,0.06)", color: colors.muted, cursor: "pointer", fontSize: 10, display: "flex", alignItems: "center" },
+  searchInput: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "rgba(6,6,6,0.6)", border: "1px solid rgba(255,255,255,0.06)", color: "#E0E0E0", fontSize: 12, outline: "none", boxSizing: "border-box", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" },
   label: { display: "block", fontSize: 11, color: colors.muted, marginBottom: 8, letterSpacing: 1 },
-  select: { width: "100%", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#E0E0E0", fontSize: 12, outline: "none", cursor: "pointer" },
-  input: { width: "100%", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#E0E0E0", fontSize: 12, outline: "none", boxSizing: "border-box" },
-  logBox: { background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.04)", borderRadius: 12, padding: 16, height: 380, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 },
+  select: { width: "100%", padding: "10px 12px", borderRadius: 10, background: "rgba(6,6,6,0.6)", border: "1px solid rgba(255,255,255,0.06)", color: "#E0E0E0", fontSize: 12, outline: "none", cursor: "pointer", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" },
+  input: { width: "100%", padding: "10px 12px", borderRadius: 10, background: "rgba(6,6,6,0.6)", border: "1px solid rgba(255,255,255,0.06)", color: "#E0E0E0", fontSize: 12, outline: "none", boxSizing: "border-box", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" },
+  logBox: { background: "rgba(6,6,6,0.6)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: 12, padding: 16, height: 380, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2, boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" },
   refreshBtn: { background: "none", border: `1px solid ${colors.muted}44`, color: colors.muted, padding: "8px 16px", borderRadius: 8, fontSize: 11, cursor: "pointer" },
-  modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, backdropFilter: "blur(6px)" },
-  modal: { background: "#111", border: `1px solid ${colors.gold}33`, borderRadius: 20, padding: 28, width: 340, boxShadow: "0 24px 80px rgba(0,0,0,0.7)" },
+  modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, backdropFilter: "blur(24px) saturate(1.5)" },
+  modal: { background: "rgba(14,14,14,0.65)", border: `1px solid rgba(255,255,255,0.06)`, borderRadius: 20, padding: 28, width: 340, boxShadow: "0 14px 44px rgba(0,0,0,0.50), 0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.11), inset 1px 0 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.18), inset -1px 0 0 rgba(0,0,0,0.08)", backdropFilter: "blur(48px) saturate(1.7)" },
   footer: { marginTop: 60, textAlign: "center", color: "#333", fontSize: 10, letterSpacing: 2 },
 };
 

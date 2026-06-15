@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
@@ -24,13 +24,7 @@ export default function AdminManualPayments() {
     }
   }, [profile, isAdmin, navigate]);
 
-  useEffect(() => {
-    if (isAdmin) {
-      fetchPayments();
-    }
-  }, [isAdmin, filter]);
-
-  async function fetchPayments() {
+  const fetchPayments = useCallback(async () => {
     setLoading(true);
     try {
       const base = BACKEND_BASE || "";
@@ -48,7 +42,13 @@ export default function AdminManualPayments() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [filter, getAuthHeaders]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchPayments();
+    }
+  }, [isAdmin, fetchPayments]);
 
   async function handleVerify(txid, status) {
     if (!window.confirm(`Are you sure you want to ${status === "verified" ? "APPROVE" : "REJECT"} this payment?`)) return;
@@ -95,7 +95,7 @@ export default function AdminManualPayments() {
               key={s}
               style={{
                 ...styles.filterBtn,
-                background: filter === s ? colors.gold : "rgba(255,255,255,0.05)",
+                background: filter === s ? colors.gold : "rgba(6,6,6,0.6)",
                 color: filter === s ? colors.dark : colors.muted,
               }}
               onClick={() => setFilter(s)}
@@ -194,8 +194,8 @@ const styles = {
     margin: 0,
   },
   backBtn: {
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.1)",
+    background: "rgba(6,6,6,0.6)",
+    border: "1px solid rgba(255,255,255,0.06)",
     borderRadius: 8,
     color: colors.muted,
     padding: "8px 16px",
@@ -203,6 +203,7 @@ const styles = {
     alignItems: "center",
     gap: 8,
     cursor: "pointer",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   controls: {
     display: "flex",
@@ -221,15 +222,16 @@ const styles = {
     transition: "all 0.2s",
   },
   refreshBtn: {
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.1)",
+    background: "rgba(6,6,6,0.6)",
+    border: "1px solid rgba(255,255,255,0.06)",
     borderRadius: 8,
     color: colors.gold,
     padding: "8px",
     cursor: "pointer",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   loader: { textAlign: "center", padding: "100px", color: colors.muted },
-  error: { textAlign: "center", padding: "40px", color: colors.error, background: "rgba(192,57,43,0.1)", borderRadius: 12 },
+  error: { textAlign: "center", padding: "40px", color: colors.error, background: "rgba(192,57,43,0.1)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.04)" },
   empty: { textAlign: "center", padding: "100px", color: colors.muted },
   grid: { 
     display: "grid", 
@@ -237,13 +239,15 @@ const styles = {
     gap: 20 
   },
   card: {
-    background: "rgba(17,17,17,0.8)",
-    border: "1px solid rgba(255,255,255,0.05)",
-    borderRadius: 16,
+    background: "rgba(14, 14, 14, 0.62)",
+    border: "1px solid rgba(255,255,255,0.04)",
+    borderRadius: 18,
     padding: "20px",
     display: "flex",
     flexDirection: "column",
     gap: 16,
+    backdropFilter: "blur(24px) saturate(1.5)",
+    boxShadow: "0 14px 44px rgba(0,0,0,0.50), 0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.11), inset 1px 0 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.18), inset -1px 0 0 rgba(0,0,0,0.08)",
   },
   cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   tierBadge: {
@@ -261,14 +265,15 @@ const styles = {
   infoValue: { fontSize: 13, color: colors.text, wordBreak: "break-all" },
   txSection: {},
   txBox: {
-    background: "rgba(0,0,0,0.3)",
-    border: "1px solid rgba(255,255,255,0.05)",
+    background: "rgba(6,6,6,0.6)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 8,
     padding: "10px",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   txText: { fontSize: 11, color: colors.gold, wordBreak: "break-all", fontFamily: typography.fontMono },
   explorerLink: { color: colors.muted, display: "flex", alignItems: "center" },
@@ -310,6 +315,7 @@ const styles = {
     border: "1px solid",
     fontSize: 12,
     fontWeight: 700,
-    background: "rgba(255,255,255,0.03)",
+    background: "rgba(6,6,6,0.6)",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   }
 };

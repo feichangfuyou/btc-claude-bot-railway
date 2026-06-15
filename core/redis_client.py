@@ -8,12 +8,12 @@ import logging
 import os
 import threading
 import time
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger("claudebot.redis")
 
-_redis_client: Optional[Any] = None
-_redis_available: Optional[bool] = None
+_redis_client: Any | None = None
+_redis_available: bool | None = None
 
 
 def _get_redis():
@@ -54,12 +54,19 @@ def is_redis_available() -> bool:
     return r is not None
 
 
+def _invalidate_redis() -> None:
+    """Drop cached client after a failed operation; next call retries or uses memory."""
+    global _redis_client, _redis_available
+    _redis_client = None
+    _redis_available = False
+
+
 # ─── Cache helpers (Redis or in-memory fallback) ─────────────────────────────
 
 _memory_cache: dict[str, tuple[float, Any]] = {}
 
 
-def cache_get(key: str, ttl_sec: int = 60) -> Optional[Any]:
+def cache_get(key: str, ttl_sec: int = 60) -> Any | None:
     """Get cached value. Returns None if miss or expired."""
     r = _get_redis()
     if r:
@@ -71,7 +78,7 @@ def cache_get(key: str, ttl_sec: int = 60) -> Optional[Any]:
             return data
         except Exception as e:
             logger.debug(f"Redis cache get error: {e}")
-            return None
+            _invalidate_redis()
     # In-memory fallback
     if key in _memory_cache:
         ts, val = _memory_cache[key]
@@ -87,9 +94,10 @@ def cache_set(key: str, value: Any, ttl_sec: int = 60) -> None:
     if r:
         try:
             r.setex(key, ttl_sec, json.dumps(value, default=str))
+            return
         except Exception as e:
             logger.debug(f"Redis cache set error: {e}")
-            return
+            _invalidate_redis()
     # In-memory fallback
     _memory_cache[key] = (time.time(), value)
 
@@ -127,7 +135,9 @@ def rate_limit_check(key: str, max_per_window: int, window_sec: int, fail_closed
             return bool(count <= max_per_window)
         except Exception as e:
             logger.debug(f"Redis rate limit error: {e}")
-            return not fail_closed
+            _invalidate_redis()
+            if fail_closed:
+                return False
     # In-memory fallback
     now = time.time()
     if key not in _rate_limit_memory:
@@ -169,7 +179,7 @@ def ai_pending_check_and_increment(user_id: str) -> bool:
             return True
         except Exception as e:
             logger.debug(f"AI pending check error: {e}")
-            return True  # Fail open
+            _invalidate_redis()
     # In-memory fallback (single-instance)
     n = _ai_pending_memory.get(user_id, 0)
     if n >= AI_PENDING_MAX:

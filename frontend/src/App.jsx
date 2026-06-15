@@ -9,7 +9,6 @@ import TradingViewChart from "./TradingViewChart.jsx";
 import { staggerIn, slideUp, popIn } from "./animations.js";
 import { useAuthHeaders, useAuthQueryParam } from "./hooks/useAuthHeaders.js";
 import { colors } from "./theme.js";
-import { TradeQuote } from "./components/TradeQuote.jsx";
 import { TickerTape, FALLBACK_SYMBOL_TO_COINGECKO } from "./components/TickerTape.jsx";
 import { AnalyticsSection } from "./components/AnalyticsSection.jsx";
 import { TradeHistoryOverlay } from "./components/TradeHistoryOverlay.jsx";
@@ -19,7 +18,11 @@ import { PositionsPanel } from "./components/PositionsPanel.jsx";
 import { ControlPanel } from "./components/ControlPanel.jsx";
 import { ChartSection } from "./components/ChartSection.jsx";
 import { TerminalEnginePanel, MarketRegimePanel, AgentKitPanel, IndicatorsPanel, RiskMonitorPanel, RecentTradesPanel, ActivityLogPanel } from "./components/BottomPanels.jsx";
-import { AlertTriangle, Cpu, Maximize2 } from "lucide-react";
+import { MeshGradientBackground } from "./components/MeshGradientBackground.jsx";
+import { GlassNavBar } from "./components/GlassNavBar.jsx";
+import { AppHeader } from "./components/AppHeader.jsx";
+import { StatusBar } from "./components/StatusBar.jsx";
+import { AlertTriangle, Cpu, Maximize2, Sun, Moon } from "lucide-react";
 
 // ─── Error Boundary ────────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -42,7 +45,7 @@ class ErrorBoundary extends Component {
           <button
             onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
             className="btn"
-            style={{ fontSize: "12px", fontWeight: "800", letterSpacing: "2px", padding: "10px 24px", background: `linear-gradient(180deg,${colors.gold},${colors.goldDark})`, color: colors.dark }}
+            style={{ background: `linear-gradient(180deg,${colors.gold},${colors.goldDark})`, color: colors.dark }}
           >
             RELOAD TERMINAL
           </button>
@@ -281,6 +284,19 @@ function Dashboard() {
   const [activeTab, setActiveTab] = useState("trade"); // "trade", "bot", "logs", "analytics"
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
+  // ── Theme ──────────────────────────────────────────────────────────────
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("app-theme") || "dark";
+    }
+    return "dark";
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("app-theme", theme);
+  }, [theme]);
+  const toggleTheme = useCallback(() => setTheme(t => t === "dark" ? "light" : "dark"), []);
+
   useEffect(() => {
     if (mobileNavOpen) {
       document.body.style.overflow = "hidden";
@@ -349,7 +365,7 @@ function Dashboard() {
       if (cfg.max_available_coins) setMaxAvailableCoins(cfg.max_available_coins);
       if (cfg.all_available_coins) setAllAvailableCoins(cfg.all_available_coins);
     }).catch(() => { });
-  }, []);
+  }, [getAuthHeaders]);
 
   // ── Logs ────────────────────────────────────────────────────────────────────
   const [logs, setLogs] = useState([{ id: logId(), msg: "Connecting to backend...", type: "info", ts: "--:--:--" }]);
@@ -719,7 +735,7 @@ function Dashboard() {
       clearInterval(pollId);
       if (staleId) clearInterval(staleId);
     };
-  }, [connected, activeCoins, cbLive, fetchCoinGeckoDirect]);
+  }, [connected, activeCoins, cbLive, fetchCoinGeckoDirect, getAuthHeaders]);
 
   // ── Coinbase WebSocket — real-time price stream matching TradingView ─────────
   useEffect(() => {
@@ -1199,32 +1215,33 @@ function Dashboard() {
   }, []);
 
   return (
-    <div className="app-root" data-tab={activeTab} style={{ fontFamily: "'Space Mono',monospace", background: "#0A0A0A", color: "#D4D4D4", padding: "14px 16px 68px", fontSize: "12px", width: "100%", maxWidth: "100vw", boxSizing: "border-box", overflowX: "hidden" }}>
+    <div className="app-root" data-tab={activeTab} style={{ fontFamily: "'Space Mono',monospace", width: "100%", maxWidth: "100vw", boxSizing: "border-box", overflowX: "hidden" }}>
       <style>{`
-        .grid{display:grid;grid-template-columns:260px 1fr 260px;gap:10px}
-        .grid-bottom{display:grid;grid-template-columns:300px 1fr 300px;gap:28px;margin-top:12px}
-        .col{display:flex;flex-direction:column;gap:28px}
-        .card{background:rgba(17,17,17,0.55);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border:1px solid rgba(212,175,55,0.1);border-radius:14px;padding:24px;position:relative;box-shadow:0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.04);transition:border-color 0.3s ease,box-shadow 0.3s ease;height:auto}
-        .grid-bottom .card:not(.chart-card){padding:24px}
-        .card:hover{border-color:rgba(212,175,55,0.2);box-shadow:0 12px 40px rgba(0,0,0,0.45),0 0 24px rgba(212,175,55,0.06),inset 0 1px 0 rgba(255,255,255,0.06)}
-        .control-panel{height:auto}
-        .card::before,.card::after{content:'';position:absolute;width:16px;height:16px;pointer-events:none;opacity:0.6;transition:opacity 0.3s ease}
-        .card:hover::before,.card:hover::after{opacity:1}
-        .card::before{top:-1px;left:-1px;border-top:2px solid rgba(212,175,55,0.5);border-left:2px solid rgba(212,175,55,0.5);border-radius:16px 0 0 0}
-        .card::after{bottom:-1px;right:-1px;border-bottom:2px solid rgba(212,175,55,0.5);border-right:2px solid rgba(212,175,55,0.5);border-radius:0 0 16px 0}
+        .grid{display:grid;grid-template-columns:260px 1fr 260px;gap:var(--grid-gap,12px)}
+        .grid-bottom{display:grid;grid-template-columns:300px 1fr 300px;gap:var(--grid-gap,12px);width:100%;max-width:100%;box-sizing:border-box;align-items:start}
+        .grid-bottom>.col{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
+        .grid-bottom .dash-panel{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+        .col{display:flex;flex-direction:column;gap:var(--col-gap,10px);min-width:0}
+        .card{background:var(--lg-bg);backdrop-filter:blur(var(--lg-blur)) saturate(var(--lg-saturate));-webkit-backdrop-filter:blur(var(--lg-blur)) saturate(var(--lg-saturate));border:1px solid var(--lg-border);border-radius:var(--radius-card,12px);padding:var(--card-pad,14px);position:relative;box-shadow:var(--lg-shadow);transition:border-color 0.3s ease,box-shadow 0.35s ease;height:auto}
+        .card.chart-card{height:clamp(300px,max(48dvh,min(38vw,620px)),min(68dvh,680px));display:flex;flex-direction:column;overflow:hidden;max-width:100%;box-sizing:border-box;margin-inline:auto}
+        @media(min-width:900px){.card.chart-card{max-width:min(100%,1280px);height:clamp(420px,min(calc((min(100vw,1280px) - 2 * var(--app-pad-x,16px)) * 0.55),640px),min(72dvh,720px))}}
+        .grid-bottom .dash-panel{padding:var(--card-pad,14px)}
+        .card:hover{border-color:rgba(212,175,55,0.18);box-shadow:var(--lg-shadow-elevated)}
+        .control-panel{height:auto;padding:8px 10px!important}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
         @keyframes fadein{from{opacity:0;transform:translateY(-6px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}
         @keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
         @keyframes punchImpact{0%{box-shadow:0 0 0 0 rgba(212,175,55,0.6)}50%{box-shadow:0 0 40px 10px rgba(212,175,55,0.3)}100%{box-shadow:0 0 0 0 transparent}}
         .pulse{animation:pulse 2s infinite}.blink{animation:pulse 0.7s infinite}.fadein{animation:fadein 0.35s cubic-bezier(0.4,0,0.2,1)}
-        .btn{font-family:'Oswald',sans-serif;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;padding:8px 16px;border:none;border-radius:8px;cursor:pointer;transition:all 0.25s cubic-bezier(0.4,0,0.2,1);touch-action:manipulation;min-height:36px;position:relative;overflow:hidden}
+        .btn{font-family:'Oswald',sans-serif;font-size:var(--btn-font-size,10px);font-weight:500;letter-spacing:var(--btn-letter-spacing,0.6px);text-transform:uppercase;padding:var(--btn-padding-y,5px) var(--btn-padding-x,12px);border:none;border-radius:var(--btn-radius,7px);cursor:pointer;transition:all 0.2s cubic-bezier(0.4,0,0.2,1);touch-action:manipulation;min-height:var(--btn-height,30px);position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;gap:5px;line-height:1.2;box-sizing:border-box}
         .btn:disabled{opacity:.4;cursor:not-allowed}
         .btn:focus-visible{outline:2px solid rgba(212,175,55,0.5);outline-offset:2px}
         .btn:active:not(:disabled){transform:scale(0.97)}
-        .btn-g{background:linear-gradient(180deg,#D4AF37,#B8860B);color:#0A0A0A;font-weight:700;box-shadow:0 4px 16px rgba(212,175,55,0.15)}.btn-g:hover:not(:disabled){background:linear-gradient(180deg,#E5C04B,#D4AF37);transform:translateY(-1px);box-shadow:0 8px 24px rgba(212,175,55,0.3)}
-        .btn-r{background:rgba(192,57,43,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;box-shadow:0 4px 16px rgba(192,57,43,0.15)}.btn-r:hover:not(:disabled){background:rgba(231,76,60,0.9);box-shadow:0 8px 24px rgba(192,57,43,0.3)}
-        .btn-p{background:rgba(212,175,55,0.05);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#D4AF37;border:1px solid rgba(212,175,55,0.2)}.btn-p:hover:not(:disabled){background:rgba(212,175,55,0.1);border-color:rgba(212,175,55,0.35);box-shadow:0 0 20px rgba(212,175,55,0.1)}
-        .btn-d{background:rgba(255,255,255,0.03);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#5C5C5C;border:1px solid rgba(255,255,255,0.06);font-size:9px;padding:6px 12px;border-radius:6px}.btn-d:hover:not(:disabled){background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.1)}
+        .btn-g{background:linear-gradient(180deg,#D4AF37,#B8860B);color:#0A0A0A;font-weight:600;box-shadow:0 2px 10px rgba(212,175,55,0.14)}.btn-g:hover:not(:disabled){background:linear-gradient(180deg,#E5C04B,#D4AF37);transform:translateY(-1px);box-shadow:0 4px 16px rgba(212,175,55,0.22)}
+        .btn-r{background:rgba(192,57,43,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;box-shadow:0 2px 10px rgba(192,57,43,0.14)}.btn-r:hover:not(:disabled){background:rgba(231,76,60,0.9);box-shadow:0 4px 16px rgba(192,57,43,0.22)}
+        .btn-p{background:rgba(212,175,55,0.05);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#D4AF37;border:1px solid rgba(212,175,55,0.2)}.btn-p:hover:not(:disabled){background:rgba(212,175,55,0.1);border-color:rgba(212,175,55,0.35);box-shadow:0 0 12px rgba(212,175,55,0.08)}
+        .btn-d{background:rgba(255,255,255,0.03);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#5C5C5C;border:1px solid rgba(255,255,255,0.06)}.btn-d:hover:not(:disabled){background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.1)}
+        .btn-icon{width:var(--btn-height,30px);height:var(--btn-height,30px);min-width:var(--btn-height,30px);min-height:var(--btn-height,30px);padding:0;border-radius:50%}
         .row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
         .tag{display:inline-block;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.5px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
         .logrow{padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
@@ -1233,22 +1250,10 @@ function Dashboard() {
         .section-label{font-family:'Oswald',sans-serif;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#D4AF37;border-left:3px solid rgba(212,175,55,0.6);padding-left:6px}
         .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);display:flex;align-items:center;justify-content:center;z-index:9999;animation:fadein 0.2s cubic-bezier(0.4,0,0.2,1);padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
         .confirm-box{background:rgba(17,17,17,0.72);backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);border:1px solid rgba(212,175,55,0.15);border-radius:16px;padding:20px 24px;width:calc(100% - 32px);max-width:min(400px,calc(100vw - 24px));text-align:center;box-shadow:0 24px 64px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.04),inset 0 1px 0 rgba(255,255,255,0.06);box-sizing:border-box}
-        select option,select optgroup{background:#111111;color:#D4D4D4;font-family:'Space Mono',monospace;font-size:10px}
+        select option,select optgroup{background:rgba(14,14,14,0.95);color:#D4D4D4;font-family:'Space Mono',monospace;font-size:10px}
         select optgroup{color:#5C5C5C;font-weight:700}
-        .chasing-container { position: relative; overflow: hidden; border: none !important; padding: 0 !important; box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 24px rgba(212,175,55,0.15) !important; background: rgba(212,175,55,0.15) !important; }
-        .chasing-container::before, .chasing-container::after { display: none !important; }
-        .chasing-light { position: absolute; top: 50%; left: 50%; width: 250%; height: 250%; background: conic-gradient(from 0deg, transparent 75%, rgba(212,175,55,0.6) 90%, rgba(212,175,55,1) 100%); transform: translate(-50%, -50%); animation: spinAround 5s linear infinite; z-index: 0; }
-        .chasing-content { position: absolute; inset: 1.5px; background: #111111; border-radius: 14.5px; z-index: 1; padding: 12px; display: flex; flex-direction: column; }
         .scan-border{animation:scanGlow 1.5s infinite ease-in-out;}
         .app-root{min-height:100vh;min-height:100dvh}
-        .brand-ticker-row{display:flex;align-items:center;margin-bottom:12px;position:relative;overflow:hidden;background:rgba(17,17,17,0.55);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border:1px solid rgba(212,175,55,0.1);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.04)}
-        .brand-ticker-row::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#D4AF37,#C0392B,#D4AF37);z-index:20;opacity:0.7}
-        .brand-ticker-row::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(212,175,55,0.15),transparent);z-index:20}
-        .ironmike-brand{display:flex;align-items:center;gap:10px;padding:10px 0 10px 12px;position:relative;z-index:10;flex-shrink:0;background:rgba(17,17,17,0.7)}
-        .ironmike-brand::after{content:'';position:absolute;top:0;bottom:0;right:-48px;width:48px;background:linear-gradient(90deg,rgba(17,17,17,0.7) 0%,transparent 100%);z-index:6;pointer-events:none}
-        .ticker-wrapper{flex:1;min-width:0;overflow:hidden;position:relative;z-index:1;display:flex;align-items:center}
-        .ticker-wrapper .ticker-tape{margin-bottom:0;border:none;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;padding:0;flex:1;min-width:0}
-        .ticker-wrapper .ticker-tape::before{display:none}
         /* ── Ticker tape — motion driven by rAF loop in TickerTape.jsx, NOT by CSS animation ── */
         .ticker-tape{margin-bottom:12px;overflow:hidden;position:relative;background:rgba(10,10,10,0.85);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:6px 0;box-shadow:0 4px 24px rgba(0,0,0,0.5);z-index:1}
         .ticker-tape::before,.ticker-tape::after{content:'';position:absolute;top:0;bottom:0;width:60px;z-index:3;pointer-events:none}
@@ -1256,15 +1261,12 @@ function Dashboard() {
         .ticker-tape::after{right:0;background:linear-gradient(270deg,rgba(10,10,10,0.9) 0%,transparent 100%)}
         /* No animation here — rAF writes transform directly to this element */
         .ticker-track{display:flex;align-items:center;gap:20px;will-change:transform;width:max-content;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;backface-visibility:hidden;-webkit-backface-visibility:hidden}
-        .section-gap{margin-bottom:12px}
+        .section-gap{margin-bottom:var(--section-gap,10px)}
+        .app-root[data-tab="trade"] .app-shell-top.section-gap{margin-bottom:var(--trade-chart-gap,12px)!important}
+        .tab-trade .card.chart-card{background:transparent!important;border:none!important;box-shadow:none!important;border-radius:0!important;padding:0!important;max-width:100%!important}
         @keyframes lossToastIn{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
         @keyframes slideDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
-        /* ── Unified Nav Tabs for Desktop ── */
-        .desktop-nav { display: flex; gap: 24px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 0 12px; font-family: 'Montserrat', sans-serif; letter-spacing: 2px; text-transform: uppercase; font-size: 13px; }
-        .desktop-nav-item { padding: 10px 12px; color: #5C5C5C; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; position: relative; }
-        .desktop-nav-item:hover { color: #D4D4D4; }
-        .desktop-nav-item.active { color: #D4AF37; font-weight: 600; }
-        .desktop-nav-item.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #D4AF37; box-shadow: 0 0 10px rgba(212,175,55,0.5); }
+        .desktop-nav { display: none !important; }
         .app-root[data-tab="trade"] .tab-bot,
         .app-root[data-tab="trade"] .tab-logs { display: none !important; }
         .app-root[data-tab="bot"] .tab-trade,
@@ -1274,162 +1276,49 @@ function Dashboard() {
         .app-root[data-tab="logs"] .hide-on-logs { display: none !important; }
 
         @media(min-width: 1025px) {
-          .app-root[data-tab="trade"] .grid-bottom { grid-template-columns: 350px 1fr; }
-          .app-root[data-tab="bot"] .grid-bottom { grid-template-columns: 350px 1fr; }
+          .app-root[data-tab="trade"] .grid-bottom { grid-template-columns: minmax(0,350px) minmax(0,1fr); }
+          .app-root[data-tab="bot"] .grid-bottom { grid-template-columns: minmax(0,350px) minmax(0,1fr); }
           .app-root[data-tab="logs"] .grid-bottom { grid-template-columns: 1fr; }
           .app-root[data-tab="logs"] .col.tab-logs { flex-direction: row; flex-wrap: wrap; }
           .app-root[data-tab="logs"] .col.tab-logs > * { flex: 1 1 45%; min-height: 400px; }
         }
-        /* ── Hamburger nav drawer ── */
-        .nav-drawer{position:fixed;top:76px;right:0;left:0;z-index:9000;background:rgba(10,10,10,0.97);backdrop-filter:blur(40px) saturate(1.6);-webkit-backdrop-filter:blur(40px) saturate(1.6);border-bottom:1px solid rgba(212,175,55,0.15);padding:12px;display:flex;flex-direction:column;gap:8px;animation:slideDown 0.2s cubic-bezier(0.4,0,0.2,1)}
-        .nav-drawer-btn{font-family:'Montserrat', sans-serif;font-size:12px;font-weight:600;letter-spacing:2px;padding:10px 16px;border-radius:8px;border:1px solid rgba(212,175,55,0.15);background:rgba(212,175,55,0.05);color:#D4AF37;cursor:pointer;text-align:center;touch-action:manipulation}
-        .nav-drawer-btn:active{background:rgba(212,175,55,0.12)}
-        .hamburger-btn{display:none;background:transparent;border:1px solid rgba(212,175,55,0.2);border-radius:8px;color:#D4AF37;cursor:pointer;padding:6px 10px;flex-direction:column;gap:4px;align-items:center;justify-content:center;min-width:36px;min-height:36px;flex-shrink:0}
+        /* ── Menu drawer — styles in mobile-app.css ── */
+        .hamburger-btn{display:none;background:transparent;border:1px solid rgba(212,175,55,0.2);border-radius:7px;color:#D4AF37;cursor:pointer;padding:5px 8px;flex-direction:column;gap:3px;align-items:center;justify-content:center;min-width:30px;min-height:30px;flex-shrink:0}
         .hamburger-btn span{display:block;width:18px;height:2px;background:#D4AF37;border-radius:1px;transition:all 0.2s}
-        .mobile-bottom-nav{display:none}
         .bot-charts-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 16px; }
         @media(min-width: 1025px) { .bot-charts-grid { grid-template-columns: 1fr 1fr; } }
-        /* TABLET 601–1024px */
+        /* TABLET */
         @media(max-width:1024px){
-          .app-root{padding:12px 14px 72px}
           .grid{grid-template-columns:1fr 1fr!important}
           .grid>.col:first-child{order:2}.grid>.col:nth-child(2){order:1;grid-column:1/-1}.grid>.col:last-child{order:3}
           .grid-bottom{grid-template-columns:1fr 1fr!important}
-          .grid-bottom>.col:nth-child(2){grid-column:1/-1}
-          .card{border-radius:10px;padding:12px}
-          .btn{min-height:44px;padding:10px 18px}
-          .chart-card{height:400px!important;min-height:400px!important;max-height:600px!important}
+          .grid-bottom>.col:nth-child(2){grid-column:1/-1;grid-row:2}
+          .app-root[data-tab="trade"] .grid-bottom>.col:nth-child(2),
+          .app-root[data-tab="bot"] .grid-bottom>.col:nth-child(2){grid-column:2;grid-row:1}
           .control-panel{max-width:100%!important}
-          .cp-row1{gap:3px!important;flex-wrap:wrap!important}
-          .cp-row1 .btn{min-height:28px!important;padding:3px 10px!important}
+          .cp-row1{gap:4px!important;flex-wrap:wrap!important}
+          .cp-goal-row{justify-content:center!important;gap:4px!important}
         }
-        /* PHONE ≤600px */
-        @media(max-width:600px){
-          .app-root{padding:6px 6px 90px !important;margin:0;max-width:100%;border-radius:0;font-size:10px}
+        /* PHONE */
+        @media(max-width:768px){
           .desktop-nav { display: none !important; }
-          
-          .mobile-bottom-nav{
-            display:flex; position:fixed; bottom:0; left:0; right:0;
-            background:rgba(10,10,10,0.95); backdrop-filter:blur(20px);
-            border-top:1px solid rgba(212,175,55,0.15); z-index:9000;
-            padding-bottom:env(safe-area-inset-bottom);
-          }
-          .mobile-nav-item{
-            flex:1; text-align:center; padding:10px 0;
-            color:#5C5C5C; font-size:9px; font-weight:700;
-            font-family:'Montserrat', sans-serif; letter-spacing:1px;
-            display:flex; flex-direction:column; align-items:center; gap:3px;
-            cursor:pointer; -webkit-tap-highlight-color:transparent;
-          }
-          .mobile-nav-item.active{color:#D4AF37;}
-          .mobile-nav-item svg{width:16px; height:16px; fill:currentColor;}
-          
-          .grid{grid-template-columns:1fr!important;gap:4px!important}
-          .grid>.col{order:unset!important;grid-column:unset!important;gap:4px!important}
-          .grid-bottom{grid-template-columns:1fr!important;gap:4px!important}
-          .grid-bottom>.col{grid-column:unset!important;gap:4px!important}
+          .grid{grid-template-columns:1fr!important;gap:var(--grid-gap)!important}
+          .grid>.col{order:unset!important;grid-column:unset!important;gap:var(--col-gap)!important}
+          .grid-bottom{grid-template-columns:1fr!important;gap:var(--grid-gap)!important}
+          .grid-bottom>.col{grid-column:unset!important;gap:var(--col-gap)!important}
           .header-main{grid-template-columns:1fr!important;grid-template-rows:auto!important;gap:8px!important}
           .header-main>*{grid-column:1!important;grid-row:auto!important;justify-self:stretch!important}
           .header-price{justify-self:center!important}
-          .header-price div[style*="font-size: 36px"]{font-size:24px!important}
-          
-          .control-panel{padding:12px!important;max-width:100%!important}
-          .control-panel > div { padding-bottom: 5px !important; }
-          .cp-row1{gap:6px!important;justify-content:center!important;flex-wrap:wrap!important}
-          .cp-row1 > div { padding: 2px 6px !important; }
-          .cp-row1 > div > div:first-child { font-size: 7px !important; }
-          .cp-row1 > div > div:last-child { font-size: 11px !important; }
-          .cp-row1 .btn{min-height:24px!important;padding:4px 6px!important;font-size:8px!important}
-          .cp-row2{justify-content:center!important;gap:4px!important;flex-wrap:wrap!important}
-          
-          .status-bar-badges{display:none!important}
-          .status-bar-user{flex:1;min-width:0;font-size:8px!important}
-          .hamburger-btn{display:flex!important; min-width:32px; min-height:32px;}
-          .pos-grid{grid-template-columns:repeat(2,1fr)!important;gap:4px!important}
-          
-          .card{border-radius:8px;padding:8px}
-          .btn{min-height:32px;padding:6px 12px;font-size:9px;border-radius:6px}
-          .live-banner{border-radius:8px;padding:4px 8px;margin-bottom:8px;gap:4px}
-          .live-banner span[style*="font-size: 14px"]{font-size:10px!important}
-          .brand-ticker-row{flex-direction:column;overflow:visible;align-items:stretch;position:relative;margin-bottom:12px}
-          .ironmike-brand{padding:12px 40px 12px 12px;gap:8px;justify-content:flex-start}
-          .ironmike-brand::after{display:none}
-          .ticker-wrapper{width:100%; overflow:hidden;}
-          .ticker-wrapper .ticker-tape{border-top:1px solid rgba(255,255,255,0.05);padding:8px 0;margin-bottom:0;}
-          .ironmike-brand img{width:32px!important;height:32px!important}
-          .ironmike-brand div div:first-child{font-size:16px!important}
-          .coin-btn{min-height:32px;padding:6px 10px;font-size:9px!important;-webkit-tap-highlight-color:transparent}
-          .chart-card{height:50vh!important;min-height:300px!important;max-height:450px!important}
-          .section-gap{margin-bottom:6px}
-          .row{padding:3px 0;font-size:9px!important}
-          .section-label{font-size:9px!important;padding-left:4px!important;margin-bottom:6px!important}
-          .trow{padding:3px 0;font-size:9px!important}
-          .logrow{padding:2px 0;font-size:8px!important;line-height:1.4!important}
+          .hamburger-btn{display:none!important}
+          .live-banner{border-radius:8px;padding:6px 10px;margin-bottom:8px;gap:6px;font-size:11px}
+          .row{padding:3px 0}
+          .trow{padding:3px 0}
+          .logrow{padding:2px 0;line-height:1.45!important}
+          .analytics-grid,.memory-grid{grid-template-columns:1fr!important}
         }
-        /* NARROW ≤400px: Z Fold cover, Galaxy S etc */
         @media(max-width:400px){
-          .app-root{padding:4px 4px 64px !important}
-          .card{padding:6px; border-radius:6px}
-          .section-label{font-size:8px!important;letter-spacing:0.5px!important}
           .pos-grid{grid-template-columns:1fr!important}
-          .cp-row1 .btn{font-size:7px!important;padding:2px 4px!important;letter-spacing:0.5px!important}
-          .cp-row1 > div > div:last-child { font-size: 11px !important; }
-          .cp-row2 .btn{font-size:7px!important;padding:2px 4px!important}
-          .status-bar{font-size:7px!important}
-          .ironmike-brand img{width:28px!important;height:28px!important}
-          .ironmike-brand div div:first-child{font-size:14px!important;letter-spacing:2px!important}
-          .section-gap{margin-bottom:6px}
-          .header-price div[style*="font-size: 36px"]{font-size:20px!important}
-          .ticker-wrapper .ticker-tape{padding:3px 0}
-          .analytics-grid, .memory-grid { grid-template-columns: 1fr !important; }
-          
-          .nav-drawer { padding: 8px !important; }
-          .nav-drawer > div { padding-left: 8px !important; padding-right: 8px !important; padding-bottom: 8px !important; }
-          .nav-drawer-btn { padding: 10px 12px !important; font-size: 11px !important; }
-          .confirm-box { padding: 16px !important; }
-          div[style*="padding: 20px"], div[style*="padding: 24px"], div[style*="padding: 30px"], div[style*="padding: 40px"] {
-             padding: 12px 10px !important;
-          }
-        }
-        /* ULTRA-NARROW ≤280px */
-        @media(max-width:280px){
-          .app-root{padding:2px 2px 60px !important; font-size: 8px !important;}
-          .ticker-track{gap:12px!important}
-          .coin-btn{min-height:28px!important;padding:4px 8px!important;font-size:8px!important;gap:4px!important}
-          .coin-btn img{width:16px!important;height:16px!important}
-          .coin-btn .ticker-chg{min-width:36px!important;font-size:8px!important}
-          .cp-row2{flex-wrap:wrap!important;gap:2px!important}
-          .cp-row2 button{font-size:8px!important;padding:2px 4px!important}
-          .cp-row2 input[type="number"]{width:44px!important;font-size:9px!important}
-          .card{padding:4px;border-radius:4px}
-          .section-label{font-size:7px!important;letter-spacing:0.5px!important;margin-bottom:4px!important}
-          .btn{font-size:7px!important;padding:4px 6px!important;letter-spacing:0.5px!important; min-height: 24px !important;}
-          .brand-ticker-row{border-radius:6px;margin-bottom:8px}
-          .ironmike-brand img{width:24px!important;height:24px!important}
-          .ironmike-brand{gap:4px!important;padding:4px 36px 4px 4px!important}
-          .ironmike-brand div div:first-child{font-size:11px!important;letter-spacing:1px!important}
-          .section-gap{margin-bottom:4px}
-          .grid-bottom{gap:4px!important}
-          .col{gap:4px!important}
-          
-          .control-panel{padding:4px!important;}
-          .control-panel > div { padding-bottom: 3px !important; margin-bottom: 2px !important; }
-          .cp-row1 > div { padding: 1px 4px !important; }
-          .cp-row1 > div > div:last-child { font-size: 10px !important; }
-          
-          .tag{padding: 2px 4px !important; font-size: 6px !important;}
-          .analytics-grid, .memory-grid { grid-template-columns: 1fr !important; gap: 4px !important; }
-          .row{padding:2px 0;font-size:8px!important}
-          .trow{padding:2px 0;font-size:8px!important}
-          .header-price div[style*="font-size: 36px"]{font-size:18px!important}
-          
-          .nav-drawer { padding: 4px !important; }
-          .nav-drawer > div { padding-left: 4px !important; padding-right: 4px !important; padding-bottom: 4px !important; }
-          .nav-drawer-btn { padding: 8px 10px !important; font-size: 10px !important; }
-          .confirm-box { padding: 12px 10px !important; }
-          div[style*="padding: 20px"], div[style*="padding: 24px"], div[style*="padding: 30px"], div[style*="padding: 40px"] {
-             padding: 8px 6px !important;
-          }
+          .confirm-box{padding:16px!important}
         }
       `}</style>
 
@@ -1445,110 +1334,86 @@ function Dashboard() {
       {/* ══ MOBILE COMPACT HEADER NAV DRAWER ══ */}
       {mobileNavOpen && (
         <>
-          <div className="nav-drawer-overlay" onClick={() => setMobileNavOpen(false)} style={{ position: "fixed", inset: 0, top: "76px", zIndex: 8999, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", touchAction: "none" }} />
-          <div className="nav-drawer" role="dialog" aria-label="Navigation" style={{ maxHeight: "85vh", overflowY: "auto", overscrollBehavior: "none" }}>
-            <div style={{ padding: "8px 20px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: "8px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
-                <span style={{ fontSize: "10px", color: "#5C5C5C", letterSpacing: "1px" }}>ACCOUNT</span>
+          <div className="nav-drawer-overlay" onClick={() => setMobileNavOpen(false)} />
+          <div className="nav-drawer" role="dialog" aria-label="Menu">
+            <div className="nav-drawer-handle" aria-hidden="true" />
+            <div className="nav-drawer__section">
+              <div className="nav-drawer__section-head">
+                <span className="nav-drawer__section-label">Account</span>
                 {isAdminEmail(user?.email) ? (
-                  <span style={{ fontSize: "9px", color: colors.success, background: "rgba(0,230,118,0.1)", padding: "2px 6px", borderRadius: "4px", letterSpacing: "1px" }}>DEV · ELITE</span>
+                  <span className="nav-drawer__tier nav-drawer__tier--elite">Dev · Elite</span>
                 ) : (
-                  <span style={{ fontSize: "9px", color: colors.gold, background: "rgba(212,175,55,0.1)", padding: "2px 6px", borderRadius: "4px" }}>{(profile?.subscription_status === "active" ? (profile?.subscription_tier || "NONE") : "NONE").toUpperCase()}</span>
+                  <span className="nav-drawer__tier">{(profile?.subscription_status === "active" ? (profile?.subscription_tier || "NONE") : "NONE").toUpperCase()}</span>
                 )}
               </div>
-              <div style={{ fontSize: "13px", color: "#D4D4D4", marginBottom: "4px", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.email}</div>
+              <div className="nav-drawer__email">{user?.email}</div>
             </div>
 
-            <div style={{ padding: "0 20px 20px" }}>
-              <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", padding: "12px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-                  <span style={{ fontSize: "10px", color: "#5C5C5C" }}>Daily PnL</span>
-                  <span style={{ fontSize: "11px", fontWeight: "700", color: account.daily_pnl >= 0 ? "#00E676" : "#FF1744" }}>
+            <div className="nav-drawer__stats">
+              <div className="nav-drawer__stats-card">
+                <div className="nav-drawer__stat-row">
+                  <span className="nav-drawer__stat-label">Daily PnL</span>
+                  <span className="nav-drawer__stat-value" style={{ color: account.daily_pnl >= 0 ? "#00E676" : "#FF1744" }}>
                     {account.daily_pnl >= 0 ? "+" : ""}${Math.abs(account.daily_pnl).toFixed(2)}
                   </span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-                  <span style={{ fontSize: "10px", color: "#5C5C5C" }}>Total PnL</span>
-                  <span style={{ fontSize: "11px", fontWeight: "700", color: account.total_pnl >= 0 ? "#00E676" : "#FF1744" }}>
+                <div className="nav-drawer__stat-row">
+                  <span className="nav-drawer__stat-label">Total PnL</span>
+                  <span className="nav-drawer__stat-value" style={{ color: account.total_pnl >= 0 ? "#00E676" : "#FF1744" }}>
                     {account.total_pnl >= 0 ? "+" : ""}${Math.abs(account.total_pnl).toFixed(2)}
                   </span>
                 </div>
                 {directionBias !== "both" && (
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: "10px", color: "#5C5C5C" }}>Bias</span>
-                    <span style={{ fontSize: "10px", fontWeight: "700", color: directionBias === "long" ? "#00E676" : "#FF1744" }}>
+                  <div className="nav-drawer__stat-row">
+                    <span className="nav-drawer__stat-label">Bias</span>
+                    <span className="nav-drawer__stat-value" style={{ color: directionBias === "long" ? "#00E676" : "#FF1744" }}>
                       {directionBias === "long" ? "▲ LONG" : "▼ SHORT"}
                     </span>
                   </div>
                 )}
               </div>
               {(price > 0 || (wsRetrying && !connected)) && (
-                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", marginTop: "12px", padding: "4px" }}>
-                  {price > 0 && <span style={{ fontSize: "9px", color: priceAge > 60 ? "#ff9900" : "#5C5C5C" }}>price <AnimatedNumber value={priceAge} format={(v) => `${Math.round(v)}s`} duration={100} /> ago</span>}
-                  {wsRetrying && !connected && <span style={{ fontSize: "9px", color: "#ff9900" }}>Reconnecting…</span>}
+                <div className="nav-drawer__meta">
+                  {price > 0 && <span style={{ color: priceAge > 60 ? "#ff9900" : "#5C5C5C" }}>price <AnimatedNumber value={priceAge} format={(v) => `${Math.round(v)}s`} duration={100} /> ago</span>}
+                  {wsRetrying && !connected && <span style={{ color: "#ff9900" }}>Reconnecting…</span>}
                 </div>
               )}
             </div>
 
-            <button className="nav-drawer-btn" onClick={() => { navigate("/history"); setMobileNavOpen(false); }}>HISTORY</button>
-            <button className="nav-drawer-btn" onClick={() => { navigate("/billing"); setMobileNavOpen(false); }}>BILLING</button>
-            <button className="nav-drawer-btn" onClick={() => { navigate("/settings"); setMobileNavOpen(false); }}>SETTINGS</button>
-            <a href="mailto:feichangfuyou@doyou.trade" className="nav-drawer-btn" style={{ textAlign: "center", textDecoration: "none" }} onClick={() => setMobileNavOpen(false)}>CONTACT</a>
-            <button className="nav-drawer-btn" style={{ color: "#5C5C5C", borderColor: "rgba(255,255,255,0.08)" }} onClick={() => { signOut(); setMobileNavOpen(false); }}>SIGN OUT</button>
+            <button className="nav-drawer-btn" onClick={() => { navigate("/history"); setMobileNavOpen(false); }}>History</button>
+            <button className="nav-drawer-btn" onClick={() => { navigate("/billing"); setMobileNavOpen(false); }}>Billing</button>
+            <button className="nav-drawer-btn" onClick={() => { navigate("/settings"); setMobileNavOpen(false); }}>Settings</button>
+            <button className="nav-drawer-btn nav-drawer-btn--row" onClick={() => { toggleTheme(); }}>
+              {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+              {theme === "dark" ? "Light mode" : "Dark mode"}
+            </button>
+            {isAdminEmail(user?.email) && (
+              <button className="nav-drawer-btn" onClick={() => { navigate("/admin"); setMobileNavOpen(false); }}>Admin</button>
+            )}
+            <a href="mailto:feichangfuyou@doyou.trade" className="nav-drawer-btn" onClick={() => setMobileNavOpen(false)}>Contact</a>
+            <button className="nav-drawer-btn nav-drawer-btn--muted" onClick={() => { signOut(); setMobileNavOpen(false); }}>Sign out</button>
           </div>
         </>
       )}
 
-      {/* ══ BRAND + TICKER — horizontal row, ticker fades behind brand ══ */}
-      <div className="brand-ticker-row">
-        <button
-          className="hamburger-btn"
-          style={{ position: "absolute", top: "12px", right: "12px", zIndex: 100, background: "rgba(10,10,10,0.85)", backdropFilter: "blur(8px)" }}
-          onClick={() => setMobileNavOpen(o => !o)}
-          aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
-          aria-expanded={mobileNavOpen}
-        >
-          <span style={{ transform: mobileNavOpen ? "rotate(45deg) translateY(6px)" : "none" }} />
-          <span style={{ opacity: mobileNavOpen ? 0 : 1 }} />
-          <span style={{ transform: mobileNavOpen ? "rotate(-45deg) translateY(-6px)" : "none" }} />
-        </button>
-        <div className="ironmike-brand" style={{ minWidth: 0 }}>
-          <img src="/Bravo.svg" alt="DoYou.trade" style={{ width: "80px", height: "80px", flexShrink: 0 }} />
-          <div style={{ minWidth: 0, overflow: "hidden" }}>
-            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "36px", color: "transparent", letterSpacing: "6px", lineHeight: "1", background: "linear-gradient(180deg,#D4AF37,#B8860B)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>DOYOU.TRADE</div>
-            <div style={{ width: "100%", height: "1px", background: "linear-gradient(90deg,#D4AF37,#C0392B,transparent)", margin: "4px 0" }} />
-            <TradeQuote />
-          </div>
-        </div>
-        <div className="ticker-wrapper">
-          <TickerTape
-            marketTickers={marketTickers}
-            activeCoins={activeCoins}
-            coins={coins}
-            price={price}
-            selectedCoin={selectedCoin}
-            positions={positions}
-            onSelectCoin={(sym) => { setSelectedCoin(sym); setChartSymbol(sym); if (!activeCoins.includes(sym)) setActiveCoins(prev => [...prev, sym]); }}
-          />
-        </div>
-      </div>
+      <div className="app-shell-top section-gap">
+        <AppHeader
+          marketTickers={marketTickers}
+          activeCoins={activeCoins}
+          coins={coins}
+          price={price}
+          selectedCoin={selectedCoin}
+          positions={positions}
+          onSelectCoin={(sym) => { setSelectedCoin(sym); setChartSymbol(sym); if (!activeCoins.includes(sym)) setActiveCoins(prev => [...prev, sym]); }}
+        />
 
-      {/* ══ DESKTOP NAV TABS ══ */}
-      <div className="desktop-nav">
-        <div className={`desktop-nav-item ${activeTab === 'trade' ? 'active' : ''}`} onClick={() => setActiveTab('trade')}>MARKET</div>
-        <div className={`desktop-nav-item ${activeTab === 'bot' ? 'active' : ''}`} onClick={() => setActiveTab('bot')}>AGENT AI & BOTS</div>
-        <div className={`desktop-nav-item ${activeTab === 'logs' ? 'active' : ''}`} onClick={() => setActiveTab('logs')}>ACTIVITY LOGS</div>
-      </div>
-
-      {/* ══ HEADER ══ */}
-      {activeTab !== "logs" && (
-        <div className="header-main section-gap hide-on-logs" style={{ display: "grid", gridTemplateColumns: "1fr", gridTemplateRows: "auto auto", alignItems: "center", gap: "12px 16px" }}>
-          {/* Price — always centered */}
-          <div className="header-price" style={{ gridColumn: "1", gridRow: "1", justifySelf: "center", textAlign: "center", contain: "layout paint", minWidth: 0 }}>
+        {activeTab !== "logs" && (
+          <div className="header-main app-header-deck hide-on-logs">
+          <div className="header-price">
             {price > 0 ? (
               <>
-                <div className="section-label" style={{ fontSize: "11px", color: "#D4AF37", letterSpacing: "3px", fontWeight: "600", marginBottom: "2px" }}>{selectedCoin}</div>
-                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "36px", letterSpacing: "2px", color: priceUp ? "#00E676" : "#FF1744" }}>
+                <div className="section-label price-label" style={{ color: "#D4AF37", fontWeight: "600", marginBottom: "2px" }}>{selectedCoin}</div>
+                <div className="price-hero" style={{ color: priceUp ? "#00E676" : "#FF1744" }}>
                   $<AnimatedNumber value={price} format={(v) => priceFormat(v)} duration={50} />
                 </div>
                 <div style={{ fontSize: "10px", color: change24h >= 0 ? "#00E676" : "#FF1744", marginTop: "2px" }}>
@@ -1573,11 +1438,14 @@ function Dashboard() {
             handleStart={handleStart} handleStop={handleStop} handleAsk={handleAsk} handleReset={handleReset}
           />
         </div>
-      )}
+        )}
+      </div>
+
+      <MeshGradientBackground />
 
       {/* ══ FULL-WIDTH CHART ══ */}
       {activeTab === "trade" && (
-        <div className="section-gap tab-trade" style={{ marginTop: "24px" }}>
+        <div className="section-gap tab-trade">
           <ChartSection
             chartSymbol={chartSymbol} setChartSymbol={setChartSymbol}
             selectedCoin={selectedCoin} positions={positions} price={price}
@@ -1591,65 +1459,63 @@ function Dashboard() {
       {/* ══ BOT CHARTS ══ */}
       {activeTab === "bot" && (
         <div className="section-gap tab-bot">
-          <div style={{ marginBottom: "16px", paddingLeft: "8px" }}>
-            <span className="section-label">BOT CHARTS & POSITIONS</span>
-          </div>
           <div className="bot-charts-grid">
             {positions.length > 0 ? positions.map(pos => (
-              <div key={pos.id} className="card chart-card" style={{ display: "flex", flexDirection: "column", padding: "12px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                  <span className="section-label" style={{ fontSize: "14px", color: "#D4AF37", letterSpacing: "2px" }}>
-                    {pos.symbol} - {pos.side.toUpperCase()}
-                  </span>
-                  <span className="tag" style={{ background: pos.side === "buy" ? "#00E67618" : "#FF174418", color: pos.side === "buy" ? "#00E676" : "#FF1744" }}>
-                    {pos.side.toUpperCase()} @ {pos.entry}
-                  </span>
+              <div key={pos.id} className="card chart-card">
+                <div className="chart-card__header">
+                  <div className="chart-card__header-left">
+                    <span className="chart-card__title chart-header-title">{pos.symbol} / USDT</span>
+                    <span
+                      className="tag"
+                      style={{
+                        background: pos.side === "buy" ? "#00E67618" : "#FF174418",
+                        color: pos.side === "buy" ? "#00E676" : "#FF1744",
+                      }}
+                    >
+                      {pos.side?.toUpperCase()} @ {pos.entry}
+                    </span>
+                  </div>
+                  <div className="chart-card__header-right">
+                    <div className="chart-card__header-tools">
+                      <button
+                        type="button"
+                        className="chart-card__action"
+                        onClick={() => setChartModal({ symbol: `BINANCE:${pos.symbol}USDT`, title: `${pos.symbol} - ${pos.side?.toUpperCase()}` })}
+                        title="Click to expand chart"
+                      >
+                        <Maximize2 size={10} strokeWidth={2.25} /> EXPAND
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-                  <button
-                    type="button"
-                    onClick={() => setChartModal({ symbol: `BINANCE:${pos.symbol}USDT`, title: `${pos.symbol} - ${pos.side?.toUpperCase()}` })}
-                    style={{
-                      position: "absolute", top: "8px", right: "8px", zIndex: 10,
-                      display: "flex", alignItems: "center", gap: "4px", padding: "6px 10px",
-                      borderRadius: "4px", background: "rgba(0,0,0,0.7)", color: "#D4AF37",
-                      fontSize: "9px", letterSpacing: "1px", border: "1px solid rgba(212,175,55,0.3)",
-                      cursor: "pointer",
-                    }}
-                    title="Click to expand chart"
-                  >
-                    <Maximize2 size={12} /> EXPAND
-                  </button>
-                  <TradingViewChart symbol={`BINANCE:${pos.symbol}USDT`} />
+                <div className="chart-card__canvas">
+                  <TradingViewChart symbol={`BINANCE:${pos.symbol}USDT`} minimal />
                 </div>
               </div>
             )) : (
               <div className="card chart-card chasing-container">
-                <div className="chasing-light"></div>
+                <div className="chasing-light" aria-hidden="true" />
                 <div className="chasing-content">
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", alignItems: "center" }}>
-                    <span className="section-label" style={{ fontSize: "14px", color: "#D4AF37", letterSpacing: "2px" }}>
-                      BOT SCAN: {fastScanCoin}
-                    </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span className="tag" style={{ background: "#D4AF3733", color: "#D4AF37", animation: "pulse 1.5s infinite" }}>SEARCHING</span>
-                      <button
-                        type="button"
-                        onClick={() => setChartModal({ symbol: `BINANCE:${chartScanCoin}USDT`, title: `BOT SCAN: ${chartScanCoin}` })}
-                        style={{
-                          display: "flex", alignItems: "center", gap: "4px", padding: "4px 8px",
-                          borderRadius: "4px", background: "transparent", color: "#D4AF37",
-                          fontSize: "9px", fontWeight: "600", letterSpacing: "1px", border: "1px solid rgba(212,175,55,0.3)",
-                          cursor: "pointer",
-                        }}
-                        title="Click to expand chart"
-                      >
-                        <Maximize2 size={12} /> EXPAND
-                      </button>
+                  <div className="chart-card__header">
+                    <div className="chart-card__header-left">
+                      <span className="chart-card__title chart-header-title">BOT SCAN: {fastScanCoin} / USDT</span>
+                      <span className="tag pulse" style={{ background: "#D4AF3720", color: "#D4AF37" }}>SEARCHING</span>
+                    </div>
+                    <div className="chart-card__header-right">
+                      <div className="chart-card__header-tools">
+                        <button
+                          type="button"
+                          className="chart-card__action"
+                          onClick={() => setChartModal({ symbol: `BINANCE:${chartScanCoin}USDT`, title: `BOT SCAN: ${chartScanCoin}` })}
+                          title="Click to expand chart"
+                        >
+                          <Maximize2 size={10} strokeWidth={2.25} /> EXPAND
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-                    <TradingViewChart symbol={`BINANCE:${chartScanCoin}USDT`} />
+                  <div className="chart-card__canvas">
+                    <TradingViewChart symbol={`BINANCE:${chartScanCoin}USDT`} minimal />
                   </div>
                 </div>
               </div>
@@ -1717,11 +1583,25 @@ function Dashboard() {
       </div>
 
       {/* ══ ANALYTICS ROW (equity + analytics + memory) ══ */}
-      <AnalyticsSection connected={connected} log={log} lossToast={lossToast}
-        cbLive={cbLive} krakenEnabled={krakenEnabled} binanceEnabled={binanceEnabled} hasEngine={hasEngine}
-        isLiveMode={isLiveMode} agentKit={agentKit} paperMode={paperMode}
-        directionBias={directionBias} requireTradeApproval={requireTradeApproval}
-        price={price} priceAge={priceAge} wsRetrying={wsRetrying} />
+      <AnalyticsSection connected={connected} log={log} lossToast={lossToast} news={newsData} send={send} />
+
+      <StatusBar
+        user={user}
+        profile={profile}
+        connected={connected}
+        cbLive={cbLive}
+        krakenEnabled={krakenEnabled}
+        binanceEnabled={binanceEnabled}
+        isLiveMode={isLiveMode}
+        price={price}
+        priceAge={priceAge}
+      />
+
+      <GlassNavBar
+        activeTab={activeTab}
+        onTabChange={(tab) => { setActiveTab(tab); setMobileNavOpen(false); }}
+        onMenuOpen={() => setMobileNavOpen(true)}
+      />
 
       {/* ══ FULL TRADE HISTORY OVERLAY ══ */}
       <TradeHistoryOverlay
@@ -1763,22 +1643,6 @@ function Dashboard() {
         </div>
       )}
 
-      {/* ══ MOBILE BOTTOM NAV ══ */}
-      <div className="mobile-bottom-nav" role="navigation">
-        <div className={`mobile-nav-item ${activeTab === "trade" ? "active" : ""}`} onClick={() => setActiveTab("trade")}>
-          <svg viewBox="0 0 24 24"><path d="M3 3v18h18V3H3zm16 16H5V5h14v14zM7 10h2v7H7v-7zm4-3h2v10h-2V7zm4 5h2v5h-2v-5z" /></svg>
-          MARKET
-        </div>
-        <div className={`mobile-nav-item ${activeTab === "bot" ? "active" : ""}`} onClick={() => setActiveTab("bot")}>
-          <svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9c0-1.1.9-2 2-2h5V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2zM6 9v9h12V9H6zm4 2h4v2h-4v-2zm-1 4h6v2H9v-2z" /></svg>
-          AGENT AI
-        </div>
-        <div className={`mobile-nav-item ${activeTab === "logs" ? "active" : ""}`} onClick={() => setActiveTab("logs")}>
-          <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" /></svg>
-          ACTIVITY
-        </div>
-      </div>
-
       {/* ══ SUBSCRIPTION GATE ══ */}
       {profile && profile.subscription_status !== "active" && !isAdminEmail(user?.email) && (
         <div className="glass-overlay fadein" style={{ zIndex: 99999, position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1792,7 +1656,7 @@ function Dashboard() {
             <button 
               className="btn btn-r" 
               onClick={() => navigate("/billing")}
-              style={{ width: "100%", padding: "16px", fontSize: "12px", fontWeight: "800", letterSpacing: "2px", background: `linear-gradient(180deg, ${colors.gold}, ${colors.goldDark})`, color: colors.dark, border: "none", borderRadius: "10px", cursor: "pointer" }}
+              style={{ width: "100%", background: `linear-gradient(180deg, ${colors.gold}, ${colors.goldDark})`, color: colors.dark, border: "none" }}
             >
               UPGRADE & ACTIVATE &rarr;
             </button>

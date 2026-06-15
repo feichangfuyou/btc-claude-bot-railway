@@ -3,7 +3,7 @@ import hmac
 import json
 import time
 import urllib.parse
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -276,8 +276,11 @@ async def add_market_order(
         "type": "MARKET",
         "quantity": f"{quantity:.8f}".rstrip("0").rstrip("."),
     }
-    return await binance_private_request(
-        "/api/v3/order", method="POST", params=params, api_key=api_key, api_secret=api_secret
+    return cast(
+        dict | None,
+        await binance_private_request(
+            "/api/v3/order", method="POST", params=params, api_key=api_key, api_secret=api_secret
+        ),
     )
 
 
@@ -295,6 +298,9 @@ async def add_market_order_by_quote(
         "type": "MARKET",
         "quoteOrderQty": f"{quote_order_qty:.2f}",
     }
-    return await binance_private_request(
-        "/api/v3/order", method="POST", params=params, api_key=api_key, api_secret=api_secret
+    return cast(
+        dict | None,
+        await binance_private_request(
+            "/api/v3/order", method="POST", params=params, api_key=api_key, api_secret=api_secret
+        ),
     )

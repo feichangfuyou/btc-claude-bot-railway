@@ -69,18 +69,12 @@ export function ChartModal({ symbol, title, onClose }) {
         <button
           type="button"
           onClick={onClose}
-          className="btn btn-r"
+          className="btn btn-r btn-icon"
           style={{
             position: "absolute",
             top: "20px",
             right: "20px",
-            width: "36px",
-            height: "36px",
-            borderRadius: "50%",
             zIndex: 10000,
-            padding: 0,
-            minHeight: "36px",
-            minWidth: "36px",
           }}
           title="Close Chart"
         >
@@ -109,9 +103,10 @@ export function ChartModal({ symbol, title, onClose }) {
           style={{
             flex: 1,
             minHeight: "70vh",
-            background: "#0a0a0a",
+            background: "rgba(6,6,6,0.7)",
             borderRadius: "12px",
-            border: "1px solid rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.04)",
+            boxShadow: "inset 0 2px 6px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.03)",
             overflow: "hidden",
             position: "relative",
           }}

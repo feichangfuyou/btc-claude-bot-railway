@@ -22,7 +22,7 @@ v2 changes:
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 
@@ -82,7 +82,7 @@ ADVERSARY_SYSTEM = (
 def _get_macro_context() -> dict:
     """Build macro event awareness context.
     Checks current time against known high-impact economic event windows."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     hour_utc = now.hour
     dow = now.weekday()  # 0=Mon, 6=Sun
     day = now.day
@@ -105,7 +105,7 @@ def _get_macro_context() -> dict:
         warnings.append("Weekend/early Monday — reduced institutional liquidity")
 
     # Asian session low liquidity for USD pairs
-    if 22 <= hour_utc or hour_utc <= 6:
+    if hour_utc >= 22 or hour_utc <= 6:
         warnings.append("Off-hours (Asian session) — lower USD pair liquidity")
 
     return {
@@ -122,7 +122,7 @@ def _build_adversary_prompt(
     memory_briefing: dict,
     open_positions: list,
     fear_greed: dict,
-    news: dict = None,
+    news: dict | None = None,
 ) -> str:
     symbol = trade_decision.get("symbol", "BTC")
     action = trade_decision.get("action", "wait")
@@ -206,7 +206,7 @@ async def adversary_review(
     memory_briefing: dict,
     open_positions: list,
     fear_greed: dict,
-    news: dict = None,
+    news: dict | None = None,
 ) -> dict:
     """Run adversary review on a proposed trade. Returns verdict dict.
 
@@ -287,7 +287,7 @@ async def adversary_review(
         if result["verdict"] in ("kill", "veto"):
             _veto_history.append(
                 {
-                    "ts": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+                    "ts": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S"),
                     "symbol": trade_decision.get("symbol", "?"),
                     "action": action,
                     "verdict": result["verdict"],

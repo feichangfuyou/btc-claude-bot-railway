@@ -1,7 +1,5 @@
 """Tests for core/coin_state.py — CoinState price, indicators, snapshots."""
 
-import time
-
 from core.coin_state import CoinState
 
 

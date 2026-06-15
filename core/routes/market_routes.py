@@ -1,5 +1,4 @@
 import asyncio
-from typing import Optional
 import ipaddress
 import socket
 import time
@@ -88,7 +87,9 @@ async def proxy_coinbase_ticker(user: AuthenticatedUser = Depends(get_active_use
 
 
 @router.get("/api/coinbase/tickers")
-async def proxy_coinbase_tickers(symbols: str = "BTC,ETH,SOL,DOGE,LINK,AVAX,UNI,AAVE", user: AuthenticatedUser = Depends(get_active_user)):
+async def proxy_coinbase_tickers(
+    symbols: str = "BTC,ETH,SOL,DOGE,LINK,AVAX,UNI,AAVE", user: AuthenticatedUser = Depends(get_active_user)
+):
     """Multi-coin ticker. Coinbase primary (matches TradingView chart). CoinGecko fallback for robustness.
     Serves from bot state when fresh; else Coinbase REST; missing symbols from CoinGecko."""
     sym_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
@@ -205,7 +206,9 @@ async def exchange_tickers(limit: int = 500, user: AuthenticatedUser = Depends(g
 
 
 @router.get("/api/prices/multi")
-async def multi_exchange_prices(symbols: str = "BTC,ETH,SOL,XRP,DOGE,ADA", user: AuthenticatedUser = Depends(get_active_user)):
+async def multi_exchange_prices(
+    symbols: str = "BTC,ETH,SOL,XRP,DOGE,ADA", user: AuthenticatedUser = Depends(get_active_user)
+):
     """Fetch prices from Binance, Coinbase, and Kraken for arbitrage view. Symbols comma-separated."""
     sym_list = [s.strip().upper() for s in symbols.split(",") if s.strip()][:20]
     if not sym_list:
@@ -337,8 +340,9 @@ async def proxy_alternative(path: str, request: Request, user: AuthenticatedUser
             status_code=502,
         )
 
+
 @router.get("/api/market/news")
-async def get_market_news(symbol: str = "all", user: Optional[AuthenticatedUser] = Depends(get_optional_user)):
+async def get_market_news(symbol: str = "all", user: AuthenticatedUser | None = Depends(get_optional_user)):
     """Fetch latest market news from CryptoPanic."""
     news = await fetch_latest_news(symbol)
     return news

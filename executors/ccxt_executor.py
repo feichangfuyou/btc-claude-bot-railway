@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 try:
     import ccxt.async_support as ccxt
@@ -8,10 +7,17 @@ except ImportError:
 
 logger = logging.getLogger("claudebot.executor.ccxt")
 
+
 class CCXTExecutor:
     """Executor for exchanges supported by CCXT (Bybit, OKX, KuCoin, MEXC, etc.)."""
 
-    def __init__(self, exchange_id: str, api_key: Optional[str] = None, api_secret: Optional[str] = None, api_passphrase: Optional[str] = None):
+    def __init__(
+        self,
+        exchange_id: str,
+        api_key: str | None = None,
+        api_secret: str | None = None,
+        api_passphrase: str | None = None,
+    ):
         self.exchange_id = exchange_id.lower()
         self.api_key = api_key
         self.api_secret = api_secret
@@ -36,9 +42,10 @@ class CCXTExecutor:
             if self.api_passphrase:
                 config["password"] = self.api_passphrase
 
-            self._exchange = ex_class(config)
-            await self._exchange.load_markets()
-            return self._exchange
+            exchange = ex_class(config)
+            await exchange.load_markets()
+            self._exchange = exchange
+            return exchange
         except Exception as e:
             logger.error(f"Failed to initialize CCXT exchange {self.exchange_id}: {e}")
             return None
@@ -57,7 +64,7 @@ class CCXTExecutor:
             logger.error(f"Failed to get {self.exchange_id} balance: {e}")
             return 0.0
 
-    async def execute_trade(self, symbol: str, side: str, usd_size: float) -> Optional[dict]:
+    async def execute_trade(self, symbol: str, side: str, usd_size: float) -> dict | None:
         """Execute a market order on the exchange."""
         ex = await self._get_exchange()
         if not ex:
@@ -128,7 +135,7 @@ class CCXTExecutor:
             logger.error(f"{self.exchange_id} trade error: {e}")
             return None
 
-    async def get_order_status(self, symbol: str, order_id: str) -> Optional[str]:
+    async def get_order_status(self, symbol: str, order_id: str) -> str | None:
         """Check status of an existing order."""
         ex = await self._get_exchange()
         if not ex:
@@ -147,7 +154,7 @@ class CCXTExecutor:
 
         try:
             order = await ex.fetch_order(order_id, formatted_symbol)
-            status = order.get("status", "unknown").lower()
+            status = str(order.get("status", "unknown")).lower()
             if status == "closed":
                 return "filled"
             return status

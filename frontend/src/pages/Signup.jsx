@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { colors } from "../theme.js";
+import { PublicNav } from "../components/PublicNav.jsx";
+import { PublicFooter } from "../components/PublicFooter.jsx";
 
 // Minimal Ticker for Landing — rAF-driven for butter-smooth scroll
 function LandingTicker() {
@@ -127,18 +129,9 @@ export default function Signup() {
 
   return (
     <div className="landing-container">
-      <nav className="landing-nav">
-        <Link to="/" className="landing-nav__logo">
-          <img src="/Bravo.svg" alt="DoYou.trade Professional Trading Terminal" style={{ width: "32px" }} />
-          <span className="auth-brand" style={{ fontSize: "20px", letterSpacing: "3px" }}>DOYOU.TRADE</span>
-        </Link>
-        <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
-           <a href="#features" className="auth-link" style={{ fontSize: "11px", letterSpacing: "1px" }}>FEATURES</a>
-           <Link to="/login" className="auth-link" style={{ fontSize: "11px", fontWeight: "700" }}>SIGN IN</Link>
-        </div>
-      </nav>
+      <PublicNav />
 
-      <div style={{ paddingTop: "80px" }}>
+      <div style={{ paddingTop: "24px" }}>
         <LandingTicker />
       </div>
 
@@ -155,7 +148,7 @@ export default function Signup() {
             Connect your favorite exchanges and let our systems do the heavy lifting.
           </p>
           <div style={{ display: "flex", gap: "16px", marginBottom: "40px", justifyContent: "center", flexWrap: "wrap" }}>
-            <button className="btn btn-r" onClick={() => document.getElementById('signup-card').scrollIntoView({ behavior: 'smooth' })} style={{ padding: "16px 32px", fontSize: "14px" }}>CREATE ACCOUNT &rarr;</button>
+            <button className="btn btn-r" onClick={() => document.getElementById('signup-card').scrollIntoView({ behavior: 'smooth' })}>CREATE ACCOUNT &rarr;</button>
           </div>
         </div>
 
@@ -274,40 +267,7 @@ export default function Signup() {
         </div>
       </section>
 
-      <footer className="landing-footer" style={{ padding: "60px 20px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-        <div style={{ maxWidth: "1200px", margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "40px", marginBottom: "40px" }}>
-          <div>
-            <div className="auth-brand" style={{ fontSize: "20px", marginBottom: "15px" }}>DOYOU.TRADE</div>
-            <p style={{ fontSize: "14px", color: "#666", lineHeight: "1.6" }}>
-              Join the future of algorithmic trading. Automated. Secure. Non-custodial.
-            </p>
-          </div>
-          <div>
-            <h4 style={{ fontSize: "12px", color: "#888", letterSpacing: "2px", marginBottom: "15px" }}>PLATFORM</h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px" }}>
-              <Link to="/login" title="Already have an account? Sign in">Sign In</Link>
-              <Link to="/" title="Go back to home">Home</Link>
-              <a href="mailto:feichangfuyou@doyou.trade" title="Contact Support">Support</a>
-            </div>
-          </div>
-          <div>
-            <h4 style={{ fontSize: "12px", color: "#888", letterSpacing: "2px", marginBottom: "15px" }}>LEGAL</h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px" }}>
-              <Link to="/terms" title="Terms of Service">Terms</Link>
-              <Link to="/privacy" title="Privacy Policy">Privacy</Link>
-            </div>
-          </div>
-        </div>
-        <div style={{ textAlign: "center", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "40px" }}>
-          <div style={{ marginBottom: "8px", fontSize: "13px", color: "#888" }}>
-            Questions? Contact <a href="mailto:feichangfuyou@doyou.trade" style={{ color: "#D4AF37", textDecoration: "none" }}>feichangfuyou@doyou.trade</a>
-          </div>
-          <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-            <img src="/Bravo.svg" alt="DoYou.trade Logo" style={{ width: "20px", opacity: 0.5 }} />
-            <span style={{ opacity: 0.3 }}>&copy; 2026 DOYOU.TRADE. ALL RIGHTS RESERVED.</span>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

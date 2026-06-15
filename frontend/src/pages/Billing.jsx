@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
 import { isAdminEmail } from "../utils/adminEmails.js";
 import { colors, typography } from "../theme.js";
-import { ArrowLeft, Check, Lightbulb, Zap, Shield, Code2 } from "lucide-react";
+import { PageShell } from "../components/PageShell.jsx";
+import { Check, Lightbulb, Zap, Shield, Code2 } from "lucide-react";
 
 const TIERS = [
   {
@@ -57,21 +58,7 @@ export default function Billing() {
     ? "elite"
     : (profile?.subscription_status === "active" ? (profile?.subscription_tier || "none") : "none");
 
-  useEffect(() => {
-    const success = searchParams.get("success");
-    const cancelled = searchParams.get("cancelled");
-    if (success === "true") {
-      setMessage({ type: "success", text: "Subscription activated. Welcome to your new plan!" });
-      refreshProfile?.();
-      setSearchParams({}, { replace: true });
-    } else if (cancelled === "true") {
-      setMessage({ type: "info", text: "Checkout cancelled." });
-      setSearchParams({}, { replace: true });
-    }
-    fetchHistory();
-  }, [searchParams, refreshProfile, setSearchParams]);
-
-  async function fetchHistory() {
+  const fetchHistory = useCallback(async () => {
     try {
       const base = BACKEND_BASE || "";
       const res = await fetch(`${base}/billing/manual-payments`, {
@@ -87,7 +74,21 @@ export default function Billing() {
     } catch (e) {
       console.error("History fetch failed", e);
     }
-  }
+  }, [getAuthHeaders]);
+
+  useEffect(() => {
+    const success = searchParams.get("success");
+    const cancelled = searchParams.get("cancelled");
+    if (success === "true") {
+      setMessage({ type: "success", text: "Subscription activated. Welcome to your new plan!" });
+      refreshProfile?.();
+      setSearchParams({}, { replace: true });
+    } else if (cancelled === "true") {
+      setMessage({ type: "info", text: "Checkout cancelled." });
+      setSearchParams({}, { replace: true });
+    }
+    fetchHistory();
+  }, [searchParams, refreshProfile, setSearchParams, fetchHistory]);
 
   const CRYPTO_OPTIONS = [
     { id: "BTC", name: "Bitcoin", icon: "₿", color: "#F7931A" },
@@ -182,18 +183,17 @@ export default function Billing() {
   return (
     <>
       <style>{responsiveCss}</style>
-      <div style={styles.container}>
-        <div style={styles.page} className="billing-page">
-          <div style={styles.header}>
-            <button style={styles.backBtn} onClick={() => paymentStep === "tiers" ? navigate("/dashboard") : setPaymentStep("tiers")}>
-              <ArrowLeft size={14} style={{ marginRight: "4px", verticalAlign: "middle" }} /> 
-              {paymentStep === "tiers" ? "Dashboard" : "Back"}
-            </button>
-            <h1 style={styles.title}>BILLING</h1>
-            {user && (
-              <button style={styles.signOutBtn} onClick={signOut}>SIGN OUT</button>
-            )}
-          </div>
+      <PageShell
+        title="BILLING"
+        onBack={() => paymentStep === "tiers" ? navigate("/dashboard") : setPaymentStep("tiers")}
+        backLabel={paymentStep === "tiers" ? "Dashboard" : "Back"}
+        maxWidth={800}
+        showFooter
+        headerRight={user && (
+          <button type="button" className="page-shell__sign-out" onClick={signOut}>SIGN OUT</button>
+        )}
+      >
+        <div className="billing-page">
 
           {/* Dev account banner */}
           {isDevUser && (
@@ -446,67 +446,12 @@ export default function Billing() {
             </div>
           )}
         </div>
-
-        <div style={styles.legalFooter}>
-          <Link to="/terms" style={styles.legalLink}>Terms of Service</Link>
-          <span style={{ color: "#333" }}> · </span>
-          <Link to="/privacy" style={styles.legalLink}>Privacy Policy</Link>
-          <span style={{ color: "#333" }}> · </span>
-          <a href="mailto:feichangfuyou@doyou.trade" style={styles.legalLink}>Support</a>
-        </div>
-      </div>
+      </PageShell>
     </>
   );
 }
 
 const styles = {
-  container: {
-    fontFamily: typography.fontMono,
-    background: colors.dark,
-    color: colors.text,
-    minHeight: "100dvh",
-    width: "100%",
-    maxWidth: "100vw",
-    boxSizing: "border-box",
-    padding: "20px 16px",
-    paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
-  },
-  page: { maxWidth: 800, margin: "0 auto", width: "100%", boxSizing: "border-box" },
-  header: { display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" },
-  title: {
-    fontFamily: typography.fontDisplay,
-    fontSize: 28,
-    fontWeight: 400,
-    letterSpacing: 4,
-    color: colors.gold,
-    margin: 0,
-  },
-  backBtn: {
-    fontFamily: "'Space Mono', monospace",
-    fontSize: 12,
-    padding: "6px 12px",
-    background: "rgba(255,255,255,0.03)",
-    backdropFilter: "blur(8px)",
-    WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
-    borderRadius: 8,
-    color: colors.muted,
-    cursor: "pointer",
-    transition: "all 0.2s ease",
-  },
-  signOutBtn: {
-    fontFamily: "'Space Mono', monospace",
-    fontSize: 11,
-    letterSpacing: 1.5,
-    padding: "6px 12px",
-    background: "transparent",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: 8,
-    color: "#5C5C5C",
-    cursor: "pointer",
-    marginLeft: "auto",
-    transition: "all 0.2s ease",
-  },
   devBanner: {
     display: "flex",
     alignItems: "center",
@@ -535,16 +480,16 @@ const styles = {
   },
   tierGrid: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 32 },
   tierCard: {
-    background: "rgba(17,17,17,0.55)",
-    backdropFilter: "blur(20px) saturate(1.4)",
-    WebkitBackdropFilter: "blur(20px) saturate(1.4)",
-    border: "1px solid rgba(212,175,55,0.1)",
+    background: "rgba(14, 14, 14, 0.62)",
+    backdropFilter: "blur(24px) saturate(1.5)",
+    WebkitBackdropFilter: "blur(24px) saturate(1.5)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 20,
     padding: "24px 20px",
     position: "relative",
     display: "flex",
     flexDirection: "column",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+    boxShadow: "0 14px 44px rgba(0,0,0,0.50), 0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.11), inset 1px 0 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.18), inset -1px 0 0 rgba(0,0,0,0.08)",
     transition: "border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease",
   },
   popularBadge: {
@@ -588,27 +533,27 @@ const styles = {
   },
   selectBtn: {
     fontFamily: "'Montserrat', sans-serif",
-    fontSize: 13,
-    fontWeight: 600,
-    letterSpacing: 2,
-    padding: "10px 0",
+    fontSize: 10,
+    fontWeight: 500,
+    letterSpacing: 0.6,
+    padding: "5px 0",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 7,
     cursor: "pointer",
     background: `linear-gradient(180deg, ${colors.gold}, ${colors.goldDark})`,
     color: colors.dark,
     textAlign: "center",
-    boxShadow: "0 4px 20px rgba(212,175,55,0.2)",
-    transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+    boxShadow: "0 2px 10px rgba(212,175,55,0.16)",
+    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
   },
   faq: {
-    background: "rgba(17,17,17,0.55)",
-    backdropFilter: "blur(20px) saturate(1.4)",
-    WebkitBackdropFilter: "blur(20px) saturate(1.4)",
-    border: "1px solid rgba(212,175,55,0.1)",
-    borderRadius: 16,
+    background: "rgba(14, 14, 14, 0.62)",
+    backdropFilter: "blur(24px) saturate(1.5)",
+    WebkitBackdropFilter: "blur(24px) saturate(1.5)",
+    border: "1px solid rgba(255,255,255,0.04)",
+    borderRadius: 18,
     padding: 20,
-    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+    boxShadow: "0 14px 44px rgba(0,0,0,0.50), 0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.11), inset 1px 0 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.18), inset -1px 0 0 rgba(0,0,0,0.08)",
   },
   faqItem: { marginBottom: 16 },
   faqQ: { fontSize: 12, fontWeight: 600, marginBottom: 4 },
@@ -630,10 +575,11 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: 3,
-    background: "rgba(0,0,0,0.2)",
+    background: "rgba(6,6,6,0.6)",
     border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 8,
     padding: "9px 11px",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   calloutVal: {
     fontFamily: "'Montserrat', sans-serif",
@@ -651,32 +597,21 @@ const styles = {
     fontSize: 10,
     color: "#777",
     lineHeight: 1.6,
-    background: "rgba(0,0,0,0.18)",
+    background: "rgba(6,6,6,0.6)",
     border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 8,
     padding: "7px 10px",
-  },
-  legalFooter: {
-    textAlign: "center",
-    marginTop: 24,
-    fontSize: 11,
-    color: "#444",
-    letterSpacing: 0.5,
-  },
-  legalLink: {
-    color: "#555",
-    textDecoration: "none",
-    transition: "color 0.2s",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   paymentSection: {
-    background: "rgba(17,17,17,0.55)",
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
-    border: "1px solid rgba(212,175,55,0.1)",
+    background: "rgba(14, 14, 14, 0.62)",
+    backdropFilter: "blur(24px) saturate(1.5)",
+    WebkitBackdropFilter: "blur(24px) saturate(1.5)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 20,
     padding: "32px 24px",
     marginBottom: 32,
-    boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+    boxShadow: "0 14px 44px rgba(0,0,0,0.50), 0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.11), inset 1px 0 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.18), inset -1px 0 0 rgba(0,0,0,0.08)",
   },
   sectionTitle: {
     fontFamily: typography.fontDisplay,
@@ -692,7 +627,7 @@ const styles = {
     gap: 16,
   },
   cryptoBtn: {
-    background: "rgba(255,255,255,0.03)",
+    background: "rgba(14,14,14,0.65)",
     border: "1px solid",
     borderRadius: 16,
     padding: "20px 16px",
@@ -703,6 +638,7 @@ const styles = {
     cursor: "pointer",
     transition: "all 0.2s ease",
     color: colors.text,
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   cryptoIcon: {
     fontSize: 32,
@@ -735,14 +671,15 @@ const styles = {
     color: colors.text,
   },
   addressBox: {
-    background: "rgba(0,0,0,0.3)",
-    border: "1px solid rgba(255,255,255,0.08)",
+    background: "rgba(6,6,6,0.6)",
+    border: "1px solid rgba(255,255,255,0.06)",
     borderRadius: 10,
     padding: "12px 16px",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   addressText: {
     fontSize: 12,
@@ -762,8 +699,8 @@ const styles = {
   },
   input: {
     width: "100%",
-    background: "rgba(0,0,0,0.3)",
-    border: "1px solid rgba(255,255,255,0.1)",
+    background: "rgba(6,6,6,0.6)",
+    border: "1px solid rgba(255,255,255,0.06)",
     borderRadius: 10,
     padding: "14px 16px",
     color: colors.text,
@@ -772,19 +709,21 @@ const styles = {
     boxSizing: "border-box",
     marginBottom: 16,
     outline: "none",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   submitBtn: {
     width: "100%",
-    padding: "14px",
-    borderRadius: 12,
+    padding: "6px 12px",
+    borderRadius: 7,
     border: "none",
     background: `linear-gradient(180deg, ${colors.gold}, ${colors.goldDark})`,
     color: colors.dark,
     fontFamily: typography.fontButton,
-    fontWeight: 700,
-    letterSpacing: 2,
+    fontSize: 10,
+    fontWeight: 500,
+    letterSpacing: 0.6,
     cursor: "pointer",
-    boxShadow: "0 4px 20px rgba(212,175,55,0.2)",
+    boxShadow: "0 2px 10px rgba(212,175,55,0.16)",
   },
 };
 

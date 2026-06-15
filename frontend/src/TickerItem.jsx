@@ -77,24 +77,21 @@ function TickerItem({
       className={`coin-btn ticker-text ${isSelected ? "selected" : ""}`}
       onClick={onClick}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "5px",
-        flexShrink: 0,
-        fontSize: "10px",
-        fontWeight: "700",
-        padding: "5px 10px",
-        borderRadius: "6px",
         cursor: "pointer",
         border: isSelected
-          ? `1px solid ${colors.gold}66`
+          ? `1px solid ${colors.gold}55`
           : hasPosition
-            ? `1px solid ${colors.success}44`
+            ? `1px solid ${colors.success}33`
             : "1px solid transparent",
-        background: isSelected ? `${colors.gold}11` : "transparent",
+        background: isSelected ? "rgba(212,175,55,0.08)" : "transparent",
         color: isSelected ? "#fff" : colors.text,
         borderBottom: isSelected ? `2px solid ${colors.gold}` : "none",
-        transition: "border-color 0.3s, background 0.3s, color 0.15s",
+        boxShadow: isSelected
+          ? "0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -1px 0 rgba(0,0,0,0.12), 0 0 12px rgba(212,175,55,0.06)"
+          : "none",
+        backdropFilter: isSelected ? "blur(12px) saturate(1.3)" : "none",
+        WebkitBackdropFilter: isSelected ? "blur(12px) saturate(1.3)" : "none",
+        transition: "border-color 0.3s, background 0.3s, color 0.15s, box-shadow 0.35s",
         position: "relative",
         whiteSpace: "nowrap",
       }}
@@ -102,8 +99,8 @@ function TickerItem({
       <img
         src={logoUrl}
         alt=""
-        width={20}
-        height={20}
+        width={18}
+        height={18}
         data-sym={imgDataSym || sym}
         style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
         onError={onImgError}
@@ -129,7 +126,8 @@ function TickerItem({
       />
       {hasPosition && (
         <span
-          style={{ fontSize: "9px", color: colors.gold, marginLeft: "2px", display: "flex", alignItems: "center", gap: "2px" }}
+          className="ticker-open-label"
+          style={{ fontSize: "8px", color: colors.gold, marginLeft: "2px", display: "flex", alignItems: "center", gap: "2px" }}
         >
           <CheckCircle2 size={10} /> OPEN
         </span>

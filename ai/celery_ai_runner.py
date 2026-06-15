@@ -22,7 +22,6 @@ from ai.claude_ai import (
     validate_trade_decision,
 )
 from core.config import (
-    ACTIVE_COINS,
     MAX_CONCURRENT_POSITIONS,
     SCOUT_MIN_CONFIDENCE,
     SCOUT_MIN_SIGNALS,

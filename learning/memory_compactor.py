@@ -57,7 +57,7 @@ def should_compact() -> bool:
 
 def load_strategy_drive() -> str:
     if os.path.exists(STRATEGY_DRIVE_PATH):
-        with open(STRATEGY_DRIVE_PATH, "r") as f:
+        with open(STRATEGY_DRIVE_PATH) as f:
             return f.read()
     return ""
 

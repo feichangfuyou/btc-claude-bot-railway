@@ -10,11 +10,11 @@ import os
 import re
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger("claudebot.db_postgres")
 
-_PG_AVAILABLE: Optional[bool] = None
+_PG_AVAILABLE: bool | None = None
 _POOL = None
 
 
@@ -26,7 +26,7 @@ def _get_pool_max() -> int:
     return int(os.getenv("DATABASE_POOL_MAX", "20"))
 
 
-def _get_database_url() -> Optional[str]:
+def _get_database_url() -> str | None:
     url = os.getenv("DATABASE_URL", "").strip()
     if url:
         return url

@@ -62,7 +62,7 @@ def run_ai_analysis(self, task_id: str, skip_scout: bool = False):
         from core.redis_client import ai_pending_decrement
 
         ai_pending_decrement(user_id)
-        raise self.retry(exc=e)
+        raise self.retry(exc=e) from e
 
     r.delete(state_key)
 

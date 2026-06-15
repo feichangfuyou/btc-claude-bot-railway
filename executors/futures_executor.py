@@ -122,9 +122,7 @@ def close_futures_position(bot, pos: dict, exit_price: float, reason: str):
 
             loop = asyncio.get_running_loop()
             future = asyncio.run_coroutine_threadsafe(
-                close_perpetual_position(
-                    product_id=product_id, size=coin_size, api_key=api_key, api_secret=api_secret
-                ),
+                close_perpetual_position(product_id=product_id, size=coin_size, api_key=api_key, api_secret=api_secret),
                 loop,
             )
             ok = future.result(timeout=15)

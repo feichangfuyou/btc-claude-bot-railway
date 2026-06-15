@@ -4,8 +4,9 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
 import { isAdminEmail } from "../utils/adminEmails.js";
 import { supabase } from "../supabaseClient.js";
-import { colors, typography } from "../theme.js";
-import { ArrowLeft, Check, ArrowRight, Lightbulb, Zap, X, Info } from "lucide-react";
+import { colors, typography, liquidGlass } from "../theme.js";
+import { PageShell } from "../components/PageShell.jsx";
+import { Check, ArrowRight, Lightbulb, Zap, X, Info } from "lucide-react";
 
 const PRESETS_FALLBACK = [
   { id: "default", name: "Default (Balanced)", category: "General" },
@@ -412,13 +413,13 @@ export default function Settings() {
     return (
       <>
         <style>{responsiveCss}</style>
-        <div style={styles.container}>
-          <div style={{ color: "#C0392B", fontSize: 12, textAlign: "center", paddingTop: 60 }}>
+        <PageShell title="SETTINGS" onBack={() => navigate("/dashboard")} maxWidth={600}>
+          <div style={{ color: "#C0392B", fontSize: 12, textAlign: "center", paddingTop: 20 }}>
             Could not load settings. Check your connection and try again.
             <br /><br />
             <button style={styles.saveBtn} onClick={() => window.location.reload()}>Retry</button>
           </div>
-        </div>
+        </PageShell>
       </>
     );
   }
@@ -427,9 +428,9 @@ export default function Settings() {
     return (
       <>
         <style>{responsiveCss}</style>
-        <div style={styles.container}>
+        <PageShell title="SETTINGS" onBack={() => navigate("/dashboard")} maxWidth={600}>
           <div style={{ color: colors.muted, fontSize: 12 }}>Loading settings...</div>
-        </div>
+        </PageShell>
       </>
     );
   }
@@ -437,15 +438,10 @@ export default function Settings() {
   return (
     <>
       <style>{responsiveCss}</style>
-      <div style={styles.container}>
-        <div style={styles.page} className="settings-page">
-          <div style={styles.header}>
-            <button style={styles.backBtn} onClick={() => navigate("/dashboard")}><ArrowLeft size={14} style={{ marginRight: "4px", verticalAlign: "middle" }} /> Dashboard</button>
-            <h1 style={styles.title}>SETTINGS</h1>
-          </div>
+      <PageShell title="SETTINGS" onBack={() => navigate("/dashboard")} maxWidth={600}>
+        <div className="settings-page">
 
-          {/* Account */}
-          <section style={styles.section}>
+          <section className="page-card" style={styles.section}>
             <h2 style={styles.sectionTitle}>Account</h2>
             <div style={styles.row}>
               <span style={styles.rowLabel}>Email</span>
@@ -469,19 +465,18 @@ export default function Settings() {
             <button style={styles.dangerBtn} onClick={signOut}>Sign Out</button>
           </section>
 
-          {/* Connected Exchanges */}
-          <section style={styles.section}>
+          <section className="page-card" style={styles.section}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>Connected Exchanges</h2>
               {exchanges.filter(e => e.is_active).length < (TIER_MAX_EXCHANGES[profile?.subscription_tier || "none"] ?? 0) ? (
                 <button 
-                  style={{...styles.connectBtn, padding: "6px 16px"}}
+                  style={styles.connectBtn}
                   onClick={() => { setKeyModal(true); setSelectedPlatform("coinbase"); setKeyError(""); setApiKey(""); setApiSecret(""); setApiPassphrase(""); setWalletAddress(""); }}
                 >
                   + Add Exchange
                 </button>
               ) : (
-                <button style={{...styles.connectBtn, padding: "6px 16px"}} onClick={() => navigate("/billing")}>
+                <button style={styles.connectBtn} onClick={() => navigate("/billing")}>
                   Upgrade to add more
                 </button>
               )}
@@ -510,8 +505,7 @@ export default function Settings() {
             )}
           </section>
 
-          {/* Trading Preferences */}
-          <section style={styles.section}>
+          <section className="page-card" style={styles.section}>
             <h2 style={styles.sectionTitle}>Trading</h2>
 
             <label style={styles.label}>Strategy Preset</label>
@@ -657,7 +651,7 @@ export default function Settings() {
                       }
                     }
                   }}
-                  style={{ ...styles.coinCatActionBtn, padding: "0 10px", height: "auto" }}
+                  style={styles.coinCatActionBtn}
                 >
                   Add
                 </button>
@@ -770,8 +764,7 @@ export default function Settings() {
             </div>
           </section>
 
-          {/* Support & Legal */}
-          <section style={styles.section}>
+          <section className="page-card" style={styles.section}>
             <h2 style={styles.sectionTitle}>Support & Legal</h2>
             <div style={styles.row}>
               <span style={styles.rowLabel}>Privacy Policy</span>
@@ -906,52 +899,15 @@ export default function Settings() {
             );
           })()}
         </div>
-      </div>
+      </PageShell>
     </>
   );
 }
 
 const styles = {
-  container: {
-    background: colors.dark,
-    color: colors.text,
-    minHeight: "100dvh",
-    padding: "20px 16px",
-    paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
-  },
-  page: { maxWidth: 600, margin: "0 auto" },
-  header: { display: "flex", alignItems: "center", gap: 16, marginBottom: 24 },
-  title: {
-    fontFamily: typography.fontDisplay,
-    fontSize: 28,
-    fontWeight: 400,
-    letterSpacing: 4,
-    color: colors.gold,
-    margin: 0,
-  },
-  backBtn: {
-    fontFamily: "'Space Mono', monospace",
-    fontSize: 12,
-    padding: "6px 12px",
-    background: "rgba(255,255,255,0.03)",
-    backdropFilter: "blur(8px)",
-    WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
-    borderRadius: 8,
-    color: colors.muted,
-    cursor: "pointer",
-    transition: "all 0.2s ease",
-  },
   section: {
-    background: "rgba(17,17,17,0.55)",
-    backdropFilter: "blur(20px) saturate(1.4)",
-    WebkitBackdropFilter: "blur(20px) saturate(1.4)",
-    border: "1px solid rgba(212,175,55,0.1)",
-    borderRadius: 16,
     padding: "20px",
     marginBottom: 16,
-    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
-    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
   },
   sectionTitle: {
     fontFamily: "'Montserrat', sans-serif",
@@ -1009,10 +965,11 @@ const styles = {
   },
   // We'll handle grid responsiveness in responsiveCss via a class
   capitalItem: {
-    background: "rgba(0,0,0,0.25)",
-    border: "1px solid rgba(255,255,255,0.05)",
+    background: "rgba(6,6,6,0.6)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 10,
     padding: "10px 12px",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   capitalValue: {
     fontFamily: "'Montserrat', sans-serif",
@@ -1040,38 +997,29 @@ const styles = {
     fontSize: 10,
     color: "#888",
     lineHeight: 1.6,
-    background: "rgba(0,0,0,0.2)",
+    background: "rgba(6,6,6,0.6)",
     border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 8,
     padding: "8px 10px",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   select: {
     fontFamily: "'Space Mono', monospace",
     fontSize: 12,
     padding: "8px 10px",
-    background: "rgba(10,10,10,0.6)",
-    backdropFilter: "blur(8px)",
-    WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
-    borderRadius: 8,
+    ...liquidGlass.input,
     color: "#D4D4D4",
     width: "100%",
-    transition: "border-color 0.2s ease",
   },
   input: {
     fontFamily: "'Space Mono', monospace",
     fontSize: 13,
     padding: "10px 12px",
-    background: "rgba(10,10,10,0.6)",
-    backdropFilter: "blur(8px)",
-    WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
-    borderRadius: 8,
+    ...liquidGlass.input,
     color: "#D4D4D4",
     outline: "none",
     width: "100%",
     boxSizing: "border-box",
-    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
   },
   riskRow: { display: "flex", gap: 8 },
   riskBtn: {
@@ -1079,14 +1027,15 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     fontSize: 11,
     padding: "8px 0",
-    background: "rgba(10,10,10,0.5)",
+    background: "rgba(6,6,6,0.6)",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 8,
     color: "#D4D4D4",
     cursor: "pointer",
     textAlign: "center",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
     transition: "all 0.2s ease",
   },
   riskActive: { borderColor: `${colors.gold}66`, color: colors.gold, background: `${colors.gold}0D` },
@@ -1096,9 +1045,10 @@ const styles = {
     gap: 5,
     marginBottom: 8,
     padding: "6px",
-    background: "rgba(0,0,0,0.2)",
+    background: "rgba(6,6,6,0.6)",
     borderRadius: 10,
     border: "1px solid rgba(255,255,255,0.04)",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   coinCatBtn: {
     fontFamily: "'Space Mono', monospace",
@@ -1161,13 +1111,14 @@ const styles = {
     fontFamily: "'Space Mono', monospace",
     fontSize: 10,
     padding: "5px 10px",
-    background: "rgba(10,10,10,0.5)",
+    background: "rgba(6,6,6,0.6)",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 7,
     color: "#A0A0A0",
     cursor: "pointer",
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
     transition: "all 0.18s ease",
     letterSpacing: 0.5,
   },
@@ -1205,10 +1156,10 @@ const styles = {
   },
   dangerBtn: {
     fontFamily: typography.fontMono,
-    fontSize: 11,
-    padding: "8px 16px",
+    fontSize: 10,
+    padding: "5px 12px",
     border: `1px solid ${colors.error}4D`,
-    borderRadius: 8,
+    borderRadius: 7,
     background: `${colors.error}0D`,
     color: colors.error,
     cursor: "pointer",
@@ -1229,17 +1180,17 @@ const styles = {
   saveRow: { marginTop: 20, textAlign: "right" },
   saveBtn: {
     fontFamily: "'Montserrat', sans-serif",
-    fontSize: 13,
-    fontWeight: 600,
-    letterSpacing: 2,
-    padding: "10px 24px",
+    fontSize: 10,
+    fontWeight: 500,
+    letterSpacing: 0.6,
+    padding: "5px 14px",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 7,
     cursor: "pointer",
     background: `linear-gradient(180deg, ${colors.gold}, ${colors.goldDark})`,
     color: colors.dark,
-    boxShadow: "0 4px 20px rgba(212,175,55,0.2)",
-    transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+    boxShadow: "0 2px 10px rgba(212,175,55,0.16)",
+    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
   },
   modalOverlay: {
     position: "fixed",
@@ -1253,15 +1204,11 @@ const styles = {
     zIndex: 1000,
   },
   modal: {
-    background: "rgba(17,17,17,0.72)",
-    backdropFilter: "blur(40px) saturate(1.6)",
-    WebkitBackdropFilter: "blur(40px) saturate(1.6)",
-    border: "1px solid rgba(212,175,55,0.12)",
+    ...liquidGlass.heavy,
     borderRadius: 20,
     padding: "28px 24px",
     width: "100%",
     maxWidth: 380,
-    boxShadow: "0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
   },
   modalTitle: {
     fontFamily: typography.fontDisplay,
@@ -1299,11 +1246,12 @@ const styles = {
     paddingLeft: 2,
   },
   keyInfo: {
-    background: "rgba(10,10,10,0.4)",
-    border: "1px solid rgba(255,255,255,0.06)",
+    background: "rgba(6,6,6,0.6)",
+    border: "1px solid rgba(255,255,255,0.04)",
     borderRadius: 8,
     padding: 12,
     marginTop: 12,
+    boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
   },
   keyInfoTitle: { fontSize: 11, color: "#888", marginBottom: 6 },
   keyPerm: { fontSize: 11, padding: "2px 0", display: "flex", gap: 6, alignItems: "center" },

@@ -28,9 +28,9 @@ code=$(curl -s -o /dev/null -w "%{http_code}" -H "x-bot-secret: $SECRET" "$BASE/
 code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/account?secret=$SECRET")
 [[ "$code" == "200" ]] && echo "OK /account ?secret= -> 200" || { echo "FAIL /account ($code)"; exit 1; }
 
-# Protected: Bearer (any) -> not 401
+# Protected: invalid Bearer -> 403 (not 401 — auth was attempted)
 code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer x" "$BASE/account")
-[[ "$code" != "401" ]] && echo "OK /account Bearer -> $code" || { echo "FAIL /account Bearer ($code)"; exit 1; }
+[[ "$code" == "403" ]] && echo "OK /account invalid Bearer -> 403" || { echo "FAIL /account Bearer ($code)"; exit 1; }
 
 # Protected: wrong secret -> 401
 code=$(curl -s -o /dev/null -w "%{http_code}" -H "x-bot-secret: wrong" "$BASE/account")

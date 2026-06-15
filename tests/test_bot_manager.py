@@ -40,6 +40,7 @@ def mock_dependencies():
         mock_load_config.return_value = mock_config
         yield mock_load_config
 
+
 # ── BotManager create / get ──────────────────────────────────────────────────
 
 

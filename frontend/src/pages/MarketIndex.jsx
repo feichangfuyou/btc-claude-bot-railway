@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
+import { PublicNav } from "../components/PublicNav.jsx";
+import { PublicFooter } from "../components/PublicFooter.jsx";
 import {
-  ArrowRight, ArrowUp, TrendingUp, TrendingDown, Shield, Zap, Cpu,
+  ArrowRight, TrendingUp, TrendingDown, Shield, Zap, Cpu,
   BarChart2, Target, Settings as Bot, Diamond,
   Flame, Activity, Shuffle, Globe,
   Rocket, Cloud, Layers, Waves,
@@ -279,8 +281,8 @@ function StrategyCard({ strategy, accentColor }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
-        border: `1px solid ${hovered ? accentColor + "44" : "rgba(255,255,255,0.05)"}`,
+        background: hovered ? "rgba(14,14,14,0.70)" : "rgba(14,14,14,0.62)",
+        border: `1px solid ${hovered ? accentColor + "44" : "rgba(255,255,255,0.04)"}`,
         borderRadius: "12px", padding: "20px",
         transition: "all 0.25s ease",
         transform: hovered ? "translateY(-2px)" : "none",
@@ -306,8 +308,9 @@ function StrategyCard({ strategy, accentColor }) {
 function MetricCard({ label, value, accentColor }) {
   return (
     <div style={{
-      background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+      background: "rgba(14,14,14,0.65)", border: "1px solid rgba(255,255,255,0.06)",
       borderRadius: "12px", padding: "20px", textAlign: "center",
+      boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)",
     }}>
       <div style={{ fontSize: "22px", fontFamily: "'Bebas Neue', sans-serif", color: accentColor, letterSpacing: "1px", marginBottom: "6px" }}>{value}</div>
       <div style={{ fontSize: "9px", color: "#555", letterSpacing: "2px" }}>{label}</div>
@@ -333,34 +336,10 @@ export default function MarketIndex() {
   return (
     <div style={{ minHeight: "100vh", background: "#050505", color: "#D4D4D4" }}>
 
-      {/* ── Nav ── */}
-      <nav style={{
-        position: "sticky", top: 0, zIndex: 100,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "16px 24px",
-        background: "rgba(5,5,5,0.85)", backdropFilter: "blur(20px)",
-        borderBottom: "1px solid rgba(212,175,55,0.1)",
-      }}>
-        <Link to="/" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
-          <img src="/Bravo.svg" alt="DoYou.trade Professional Systematic Trading" style={{ width: "28px" }} />
-          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "20px", color: colors.gold, letterSpacing: "3px" }}>DOYOU.TRADE</span>
-        </Link>
-        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-          <Link to="/login" style={{ fontSize: "11px", color: "#666", textDecoration: "none", letterSpacing: "1px" }}>SIGN IN</Link>
-          <Link to="/signup" style={{
-            fontFamily: "'Montserrat', sans-serif", fontSize: "11px", fontWeight: "800",
-            letterSpacing: "1.5px", padding: "8px 18px",
-            background: `linear-gradient(180deg, ${colors.gold}, ${colors.goldDark})`,
-            color: "#0A0A0A", border: "none", borderRadius: "100px",
-            textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px",
-          }}>
-            GET STARTED <ArrowRight size={12} />
-          </Link>
-        </div>
-      </nav>
+      <PublicNav />
 
       {/* ── Coin tabs ── */}
-      <div style={{ display: "flex", gap: "0", borderBottom: "1px solid rgba(255,255,255,0.05)", overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: "0", borderBottom: "1px solid rgba(255,255,255,0.04)", overflowX: "auto" }}>
         {Object.entries(COIN_DATA).map(([key, c]) => (
           <Link
             key={key}
@@ -422,8 +401,8 @@ export default function MarketIndex() {
               <Link to="/login" style={{
                 fontFamily: "'Montserrat', sans-serif", fontWeight: "700", fontSize: "12px",
                 letterSpacing: "2px", padding: "14px 28px",
-                background: "rgba(255,255,255,0.03)", color: "#888",
-                border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px",
+                background: "rgba(14,14,14,0.62)", color: "#888",
+                border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px",
                 textDecoration: "none",
               }}>
                 SIGN IN
@@ -468,8 +447,10 @@ export default function MarketIndex() {
 
         {/* ── How it works ── */}
         <div style={{
-          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)",
+          background: "rgba(14, 14, 14, 0.62)", border: "1px solid rgba(255,255,255,0.04)",
           borderRadius: "20px", padding: "40px", marginBottom: "60px",
+          backdropFilter: "blur(24px) saturate(1.5)", WebkitBackdropFilter: "blur(24px) saturate(1.5)",
+          boxShadow: "0 14px 44px rgba(0,0,0,0.50), 0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.11), inset 1px 0 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.18), inset -1px 0 0 rgba(0,0,0,0.08)",
         }}>
           <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "18px", fontWeight: "800", color: data.color, letterSpacing: "2px", marginBottom: "32px" }}>
             HOW THE SYSTEM TRADES {data.symbol}
@@ -496,6 +477,8 @@ export default function MarketIndex() {
           textAlign: "center", padding: "60px 20px",
           background: `linear-gradient(135deg, ${data.color}08, rgba(0,0,0,0.4))`,
           border: `1px solid ${data.color}22`, borderRadius: "24px",
+          backdropFilter: "blur(24px) saturate(1.5)", WebkitBackdropFilter: "blur(24px) saturate(1.5)",
+          boxShadow: "0 14px 44px rgba(0,0,0,0.50), 0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.11), inset 1px 0 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.18), inset -1px 0 0 rgba(0,0,0,0.08)",
         }}>
           <div style={{ fontSize: "10px", color: data.color, letterSpacing: "3px", marginBottom: "16px" }}>JOIN THE COMMUNITY</div>
           <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(28px, 4vw, 48px)", letterSpacing: "4px", color: "#fff", marginBottom: "16px" }}>
@@ -516,21 +499,7 @@ export default function MarketIndex() {
         </div>
       </div>
 
-      {/* ── Footer ── */}
-      <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "24px", textAlign: "center", fontSize: "11px", color: "#333" }}>
-        <div style={{ display: "flex", justifyContent: "center", gap: "24px", marginBottom: "12px", flexWrap: "wrap" }}>
-          {Object.entries(COIN_DATA).map(([key, c]) => (
-            <Link key={key} to={`/market/${key}`} style={{ color: "#444", textDecoration: "none", fontSize: "11px" }}>{c.label}</Link>
-          ))}
-        </div>
-        <div style={{ display: "flex", justifyContent: "center", gap: "16px", flexWrap: "wrap" }}>
-          <Link to="/" style={{ color: "#333", textDecoration: "none" }}>Home</Link>
-          <Link to="/terms" style={{ color: "#333", textDecoration: "none" }}>Terms</Link>
-          <Link to="/privacy" style={{ color: "#333", textDecoration: "none" }}>Privacy</Link>
-          <a href="mailto:feichangfuyou@doyou.trade" style={{ color: "#D4AF37", textDecoration: "none" }}>Contact</a>
-        </div>
-        <div style={{ marginTop: "12px" }}>© 2026 DOYOU.TRADE. ALL RIGHTS RESERVED.</div>
-      </div>
+      <PublicFooter />
 
       <style>{`
         @keyframes shimmer {

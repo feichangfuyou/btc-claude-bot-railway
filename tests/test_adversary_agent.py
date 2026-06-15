@@ -1,6 +1,6 @@
 """Tests for adversary_agent — macro context and prompt building."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 from ai.adversary_agent import _build_adversary_prompt, _get_macro_context, get_veto_history
@@ -17,7 +17,7 @@ def test_get_macro_context_structure():
 
 def test_macro_context_sunday():
     """Sunday triggers weekend warning (dow == 6)."""
-    sunday = datetime(2026, 3, 8, 12, 0, tzinfo=timezone.utc)
+    sunday = datetime(2026, 3, 8, 12, 0, tzinfo=UTC)
     with patch("ai.adversary_agent.datetime") as mock_dt:
         mock_dt.now.return_value = sunday
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
@@ -28,7 +28,7 @@ def test_macro_context_sunday():
 
 def test_macro_context_off_hours():
     """2 AM UTC triggers Asian session warning."""
-    late_night = datetime(2026, 3, 4, 2, 0, tzinfo=timezone.utc)
+    late_night = datetime(2026, 3, 4, 2, 0, tzinfo=UTC)
     with patch("ai.adversary_agent.datetime") as mock_dt:
         mock_dt.now.return_value = late_night
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
@@ -38,7 +38,7 @@ def test_macro_context_off_hours():
 
 def test_macro_context_no_high_risk_normal_day():
     """Normal trading hours on a weekday with no events should not be high risk."""
-    normal = datetime(2026, 3, 4, 16, 0, tzinfo=timezone.utc)  # Wednesday 4 PM UTC
+    normal = datetime(2026, 3, 4, 16, 0, tzinfo=UTC)  # Wednesday 4 PM UTC
     with patch("ai.adversary_agent.datetime") as mock_dt:
         mock_dt.now.return_value = normal
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)

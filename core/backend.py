@@ -15,7 +15,7 @@ import signal
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,7 +31,6 @@ from core.ai_state_builder import build_ai_state
 from core.auth import get_user_from_token, verify_token
 from core.bot_manager import bot_manager
 from core.config import (
-    ACTIVE_COINS,
     API_SECRET,
     CLAUDE_INTERVAL,
     COINBASE_API_KEY,
@@ -88,9 +87,6 @@ from strategy.trading_presets import PRESETS
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 
-
-
-
 # ─── Broadcast helpers ───────────────────────────────────────────────────────
 async def broadcast(data: dict, user_id: str | None = None):
     """Broadcast to all connected clients. If user_id set, only to that user's WS (O(1) via _user_to_ws)."""
@@ -127,16 +123,18 @@ async def broadcast_price(symbol: str | None = None):
     }
     if symbol is None:
         # Full sync: send everything
-        payload.update({
-            "history": btc.price_history if btc else [],
-            "candles": (btc.candles if btc else [])[-5:],
-            "indicators": btc.indicators if btc else {},
-            "market_condition": btc.market_cond if btc else "ranging",
-            "open_position": bot.open_position,
-            "open_positions": bot.open_positions,
-            "account": bot.account,
-            "agentkit": agentkit.status_snapshot(),
-        })
+        payload.update(
+            {
+                "history": btc.price_history if btc else [],
+                "candles": (btc.candles if btc else [])[-5:],
+                "indicators": btc.indicators if btc else {},
+                "market_condition": btc.market_cond if btc else "ranging",
+                "open_position": bot.open_position,
+                "open_positions": bot.open_positions,
+                "account": bot.account,
+                "agentkit": agentkit.status_snapshot(),
+            }
+        )
     await broadcast(payload)
     if is_redis_available():
         publish("price:update", payload)
@@ -194,7 +192,15 @@ async def _celery_ask_claude(skip_scout: bool = False):
     bot.claude_thinking = True
     bot._last_claude_ts = time.time()
     bot.last_claude_call = time.strftime("%H:%M:%S")
-    await broadcast({"type": "claude_thinking", "claude_thinking": True, "analysis_thinking": True, "last_claude_call": bot.last_claude_call, "last_analysis_call": bot.last_claude_call})
+    await broadcast(
+        {
+            "type": "claude_thinking",
+            "claude_thinking": True,
+            "analysis_thinking": True,
+            "last_claude_call": bot.last_claude_call,
+            "last_analysis_call": bot.last_claude_call,
+        }
+    )
 
     fut = asyncio.get_running_loop().create_future()
     _pending_ai_tasks[task_id] = fut
@@ -203,7 +209,7 @@ async def _celery_ask_claude(skip_scout: bool = False):
     try:
         data = await asyncio.wait_for(fut, timeout=120.0)
         _apply_celery_decision(data)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         _pending_ai_tasks.pop(task_id, None)
         bot.add_log("AI analysis timed out", "warning")
     except Exception as e:
@@ -286,8 +292,8 @@ async def hub_scan_cycle(tier: str):
 
     limits = TIER_LIMITS.get(tier, TIER_LIMITS["starter"])
     model = limits["ai_model"]
-    interval = limits["min_interval"]
-    coin_limit = limits.get("max_coins", 10)
+    interval = int(cast(int, limits["min_interval"]))
+    coin_limit = int(cast(int, limits.get("max_coins", 10)))
 
     bot.add_log(f"🛰️ {tier.upper()} Hub started ({model} @ {interval}s)", "info")
 
@@ -302,8 +308,9 @@ async def hub_scan_cycle(tier: str):
                 continue
 
             # Check for active users in this tier OR the shared bot running (for admin/dev)
-            active_users = sum(1 for i in bot_manager._instances.values()
-                             if i.running and i.config.subscription_tier == tier)
+            active_users = sum(
+                1 for i in bot_manager._instances.values() if i.running and i.config.subscription_tier == tier
+            )
             shared_bot_active = bot.bot_running
 
             if active_users > 0 or (tier == "starter" and shared_bot_active):
@@ -316,10 +323,7 @@ async def hub_scan_cycle(tier: str):
                 await call_claude(bot, broadcast_price, skip_scout=skip_scout, coin_limit=coin_limit, tier=tier)
 
                 if bot.claude_decision and bot.claude_decision.get("action") != "wait":
-                    await bot_manager.broadcast_managed_signal(
-                        bot.claude_decision,
-                        tier=tier
-                    )
+                    await bot_manager.broadcast_managed_signal(bot.claude_decision, tier=tier)
 
                 await asyncio.sleep(final_interval)
             else:
@@ -328,6 +332,7 @@ async def hub_scan_cycle(tier: str):
         except Exception as e:
             bot.add_log(f"{tier.upper()} Hub error: {str(e)[:80]}", "error")
             await asyncio.sleep(interval or 60)
+
 
 async def bot_cycle():
     """Service-level maintenance — daily/hourly bookkeeping that was previously missing."""
@@ -368,7 +373,7 @@ async def meta_review_cycle():
                         bot.add_log(f"⚠ {timeframe.capitalize()} Meta-Review failed: {res['error'][:60]}", "warning")
         except Exception as e:
             bot.add_log(f"Meta-Review cycle error: {str(e)[:60]}", "error")
-        
+
         # Check all periods every 30 minutes
         await asyncio.sleep(1800)
 
@@ -473,6 +478,7 @@ async def status_heartbeat():
 async def news_pulse_cycle(bot, broadcast):
     """Institutional Pulse — broadcast latest news every 5 minutes."""
     from feeds.news_feeds import fetch_latest_news
+
     while True:
         try:
             news = await fetch_latest_news("all")
@@ -480,7 +486,7 @@ async def news_pulse_cycle(bot, broadcast):
                 await broadcast({"type": "news_update", "news": news})
         except Exception as e:
             file_log(f"News pulse error: {e}", "warning")
-        await asyncio.sleep(300) # 5 minutes
+        await asyncio.sleep(300)  # 5 minutes
 
 
 # ─── Lifespan ────────────────────────────────────────────────────────────────
@@ -679,6 +685,7 @@ async def lifespan(app: FastAPI):
             bot.add_log(f"  Sentry: ❌ init failed: {str(e)[:60]}", "warning")
 
     import core.shared as _shared
+
     _shared._PRESETS_CACHE = None
 
     # Yield immediately so the HTTP server starts and /health responds.
@@ -697,10 +704,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Institutional Trading Backend",
     lifespan=lifespan,
-    docs_url=None, # Disable Swagger UI for security
-    redoc_url=None, # Disable Redoc for security
+    docs_url=None,  # Disable Swagger UI for security
+    redoc_url=None,  # Disable Redoc for security
 )
-
 
 
 _DEFAULT_CORS = "https://doyou.trade,https://www.doyou.trade"
@@ -758,26 +764,24 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+
 # ─── FastAPI app handlers ───────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: StarletteRequest, exc: Exception):
     """Ensure all unhandled exceptions return JSON instead of uvicorn's default HTML."""
     from core.database import file_log
+
     err_msg = str(exc)
     file_log(f"Unhandled Exception: {err_msg}", "error")
     # Log full traceback locally if in development
     if os.getenv("RAILWAY_ENVIRONMENT", "development") == "development":
         import traceback
+
         traceback.print_exc()
-    
+
     is_dev = os.getenv("RAILWAY_ENVIRONMENT", "development") == "development"
     detail = err_msg[:200] if is_dev else "An unexpected error occurred"
-    return JSONResponse(
-        status_code=500,
-        content={"error": "internal_server_error", "detail": detail}
-    )
-
-
+    return JSONResponse(status_code=500, content={"error": "internal_server_error", "detail": detail})
 
 
 if API_SECRET:
@@ -824,17 +828,31 @@ if API_SECRET:
             auth_header = request.headers.get("authorization", "")
             secret_ok = False
             if token and hmac.compare_digest(token, API_SECRET):
-                client_ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-                            or (request.client.host if request.client else "unknown") or "unknown")
+                client_ip = (
+                    request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+                    or (request.client.host if request.client else "unknown")
+                    or "unknown"
+                )
                 # Only allow BOT_API_SECRET for localhost (service-to-service) or TestClient (testclient)
                 if client_ip in ("127.0.0.1", "::1", "localhost", "testclient"):
                     secret_ok = True
 
             bearer_ok = False
+            bearer_invalid = False
             if auth_header.startswith("Bearer "):
                 bearer_token = auth_header[7:].strip()
-                bearer_ok = bool(bearer_token) and verify_token(bearer_token)
+                if bearer_token:
+                    if verify_token(bearer_token):
+                        bearer_ok = True
+                    else:
+                        bearer_invalid = True
             jwt_query_ok = jwt_token and verify_token(jwt_token)
+            if bearer_invalid and not secret_ok and not jwt_query_ok:
+                resp = JSONResponse({"error": "forbidden"}, status_code=403)
+                origin = request.headers.get("origin")
+                if origin and origin in ALLOWED_ORIGINS:
+                    resp.headers["Access-Control-Allow-Origin"] = origin
+                return resp
             if not secret_ok and not bearer_ok and not jwt_query_ok:
                 resp = JSONResponse({"error": "unauthorized"}, status_code=401)
                 origin = request.headers.get("origin")
@@ -914,6 +932,7 @@ async def ws_endpoint(ws: WebSocket):
                 user_id, user_email = user_info
                 # CRITICAL: Fix Signal Theft - verify active subscription
                 from core.user_config import load_user_config
+
                 config = load_user_config(user_id)
                 if config.subscription_status != "active" and user_id != "admin":
                     await ws.close(code=4002, reason="active_subscription_required")
@@ -934,6 +953,7 @@ async def ws_endpoint(ws: WebSocket):
         # Always start on the tier-appropriate default model (Haiku for free/starter)
         from billing.stripe_handler import TIER_LIMITS
         from core.user_config import load_user_config
+
         _cfg = load_user_config(user_id)
         _tier = getattr(_cfg, "subscription_tier", "starter") or "starter"
         _tier_model = TIER_LIMITS.get(_tier, TIER_LIMITS["starter"])["ai_model"]
@@ -1022,7 +1042,9 @@ async def _handle_ws_command(msg: dict):
             bot.add_log("🟢 Bot started", "success")
 
         if not bot_manager.brain_enabled:
-            bot.add_log("⚠️ Brain is currently offline — bot is queued and will trade when admin re-enables the brain", "warning")
+            bot.add_log(
+                "⚠️ Brain is currently offline — bot is queued and will trade when admin re-enables the brain", "warning"
+            )
         await broadcast({"type": "bot_status", "bot_running": True, "brain_enabled": bot_manager.brain_enabled})
 
     elif cmd == "stop_bot":
@@ -1030,10 +1052,10 @@ async def _handle_ws_command(msg: dict):
 
         ws_user_id = msg.get("user_id") or bot.active_user_id
         if ws_user_id:
-            instance = bot_manager.get(ws_user_id)
-            if instance:
-                instance.running = False
-                instance.persist_state()
+            user_instance = bot_manager.get(ws_user_id)
+            if user_instance:
+                user_instance.running = False
+                user_instance.persist_state()
 
         bot.add_log("🔴 Bot stopped", "warning")
         await broadcast({"type": "bot_status", "bot_running": False})
@@ -1062,12 +1084,14 @@ async def _handle_ws_command(msg: dict):
             count = 5
         new_active = bot.set_scan_coin_count(count)
         bot.add_log(f"🔄 Scanning {count} coins: {', '.join(new_active)}", "info")
-        await broadcast({
-            "type": "scan_coins_changed",
-            "scan_coin_count": count,
-            "active_coins": new_active,
-            "max_available_coins": len(bot._all_coins_list),
-        })
+        await broadcast(
+            {
+                "type": "scan_coins_changed",
+                "scan_coin_count": count,
+                "active_coins": new_active,
+                "max_available_coins": len(bot._all_coins_list),
+            }
+        )
         # Trigger price bootstrap for newly added coins
         await bootstrap_prices_async(bot, broadcast_price)
 
@@ -1131,6 +1155,7 @@ async def _handle_ws_command(msg: dict):
 
     elif cmd == "refresh_news":
         from feeds.news_feeds import fetch_latest_news
+
         bot.add_log("📡 Refreshing Institutional Pulse (on-demand)...", "info")
         news = await fetch_latest_news("all")
         if news and not news.get("error"):
@@ -1448,10 +1473,27 @@ if FRONTEND_DIST.exists():
             app.add_api_route(f"/{_name}", _serve_file(_path), methods=["GET"])
 
     _API_PREFIXES = (
-        "/api", "/memory", "/equity", "/trades", "/stats", "/costs",
-        "/account", "/wallet", "/billing", "/auth", "/health", "/readiness",
-        "/metrics", "/ws", "/ask_claude", "/emergency", "/snapshots",
-        "/backtest", "/solver", "/adversary", "/audit",
+        "/api",
+        "/memory",
+        "/equity",
+        "/trades",
+        "/stats",
+        "/costs",
+        "/account",
+        "/wallet",
+        "/billing",
+        "/auth",
+        "/health",
+        "/readiness",
+        "/metrics",
+        "/ws",
+        "/ask_claude",
+        "/emergency",
+        "/snapshots",
+        "/backtest",
+        "/solver",
+        "/adversary",
+        "/audit",
     )
 
     @app.exception_handler(404)
@@ -1464,6 +1506,7 @@ if FRONTEND_DIST.exists():
             return FileResponse(str(FRONTEND_DIST / "index.html"))
 
         from starlette.responses import JSONResponse
+
         return JSONResponse({"error": "not found", "path": path}, status_code=404)
 
 

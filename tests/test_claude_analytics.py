@@ -1,15 +1,13 @@
 """Tests for ai/claude_ai.py — _build_trade_analytics, _extract_json, get_claude_system, _validate_decision."""
 
-from unittest.mock import patch
-
 from ai.claude_ai import (
+    SCOUT_SYSTEM,
+    _build_enhanced_coin_snapshot,
     _build_trade_analytics,
     _extract_json,
     _trade_suggestion,
-    _build_enhanced_coin_snapshot,
-    get_claude_system,
     _validate_decision,
-    SCOUT_SYSTEM,
+    get_claude_system,
 )
 
 
@@ -121,6 +119,7 @@ class TestExtractJson:
 
     def test_invalid_json_raises(self):
         import json
+
         raw = "this is not json at all"
         try:
             result = _extract_json(raw)
@@ -130,6 +129,7 @@ class TestExtractJson:
 
     def test_empty_string_raises(self):
         import json
+
         try:
             _extract_json("")
         except json.JSONDecodeError:
@@ -173,6 +173,7 @@ class TestGetClaudeSystem:
 class TestBuildEnhancedCoinSnapshot:
     def test_returns_dict_with_expected_keys(self):
         from types import SimpleNamespace
+
         cs = SimpleNamespace(
             price=65000,
             price_change24h=2.5,
@@ -181,7 +182,9 @@ class TestBuildEnhancedCoinSnapshot:
             raw_prices=[65000 + i for i in range(100)],
             volumes=[100.0] * 100,
             indicators={
-                "rsi": 55, "ema9": 64000, "atr": 500,
+                "rsi": 55,
+                "ema9": 64000,
+                "atr": 500,
                 "stoch_rsi": {"k": 60, "d": 55},
                 "obv": {"value": 1000000, "trend": "up"},
                 "ichimoku": {"signal": "above_cloud"},

@@ -81,13 +81,17 @@ class TestGetFernetKey:
             assert result.decode() == valid_key
 
     def test_invalid_explicit_key_falls_through(self):
-        with patch.dict(os.environ, {"EXCHANGE_KEYS_ENCRYPTION_KEY": "bad-key", "BOT_API_SECRET": "a_long_enough_secret_for_deriv"}):
+        with patch.dict(
+            os.environ, {"EXCHANGE_KEYS_ENCRYPTION_KEY": "bad-key", "BOT_API_SECRET": "a_long_enough_secret_for_deriv"}
+        ):
             enc._ENCRYPTION_KEY = None
             result = enc._get_fernet_key()
             assert result is not None  # falls back to PBKDF2
 
     def test_pbkdf2_fallback_from_bot_secret(self):
-        with patch.dict(os.environ, {"EXCHANGE_KEYS_ENCRYPTION_KEY": "", "BOT_API_SECRET": "my_secret_is_at_least_16_chars"}):
+        with patch.dict(
+            os.environ, {"EXCHANGE_KEYS_ENCRYPTION_KEY": "", "BOT_API_SECRET": "my_secret_is_at_least_16_chars"}
+        ):
             enc._ENCRYPTION_KEY = None
             result = enc._get_fernet_key()
             assert result is not None

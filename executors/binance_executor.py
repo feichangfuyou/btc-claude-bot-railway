@@ -4,7 +4,6 @@ Handles order execution, status tracking, and balance fetching for Binance.
 """
 
 import logging
-from typing import Optional
 
 from api.binance_api import (
     add_market_order_by_quote,
@@ -19,7 +18,7 @@ logger = logging.getLogger("claudebot.executor.binance")
 class BinanceExecutor:
     """Executor for Binance Spot exchange."""
 
-    def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None):
+    def __init__(self, api_key: str | None = None, api_secret: str | None = None):
         self.api_key = api_key
         self.api_secret = api_secret
 
@@ -31,7 +30,7 @@ class BinanceExecutor:
             logger.error(f"Failed to get Binance balance: {e}")
             return 0.0
 
-    async def execute_trade(self, symbol: str, side: str, usd_size: float) -> Optional[dict]:
+    async def execute_trade(self, symbol: str, side: str, usd_size: float) -> dict | None:
         """Execute a market order on Binance."""
         if not is_configured() and not (self.api_key and self.api_secret):
             logger.error("Binance executor not configured with API keys")
@@ -39,9 +38,7 @@ class BinanceExecutor:
 
         try:
             # Binance supports quoteOrderQty for market orders (easier for USD-based sizing)
-            order = await add_market_order_by_quote(
-                symbol, side, usd_size, self.api_key, self.api_secret
-            )
+            order = await add_market_order_by_quote(symbol, side, usd_size, self.api_key, self.api_secret)
             if not order or "orderId" not in order:
                 logger.error(f"Binance order failed: {order}")
                 return None
@@ -50,9 +47,7 @@ class BinanceExecutor:
             # Status: NEW, PARTIALLY_FILLED, FILLED, CANCELED, REJECTED, EXPIRED
             executed_qty = float(order.get("executedQty", 0))
             cummulative_quote_qty = float(order.get("cummulativeQuoteQty", 0))
-            avg_price = (
-                cummulative_quote_qty / executed_qty if executed_qty > 0 else 0.0
-            )
+            avg_price = cummulative_quote_qty / executed_qty if executed_qty > 0 else 0.0
 
             return {
                 "id": str(order["orderId"]),
@@ -68,7 +63,7 @@ class BinanceExecutor:
             logger.error(f"Binance trade error: {e}")
             return None
 
-    async def get_order_status(self, symbol: str, order_id: str) -> Optional[str]:
+    async def get_order_status(self, symbol: str, order_id: str) -> str | None:
         """Check status of an existing order."""
         try:
             params = {"symbol": f"{symbol.upper()}USDT", "orderId": order_id}
@@ -76,7 +71,7 @@ class BinanceExecutor:
                 "/api/v3/order", params=params, api_key=self.api_key, api_secret=self.api_secret
             )
             if res and "status" in res:
-                return res["status"].lower()
+                return str(res["status"]).lower()
             return None
         except Exception:
             return None

@@ -181,7 +181,6 @@ def _set_kraken_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, de
     )
 
 
-
 class KrakenExecutor:
     """Executor for Kraken Spot exchange."""
 
@@ -201,11 +200,11 @@ class KrakenExecutor:
                 "exchange": "kraken",
                 "symbol": symbol,
                 "side": side,
-                "status": "filled", # Kraken market orders are usually instant
+                "status": "filled",  # Kraken market orders are usually instant
                 "usd_size": usd_size,
             }
         except Exception as e:
             from core.database import file_log
+
             file_log(f"KrakenExecutor trade error: {e}", "error")
             return None
-

@@ -36,12 +36,13 @@ class TestAnalyzeChartVision:
             result = await vf.analyze_chart_vision("BTC", "buy")
             assert isinstance(result, dict)
             assert "confirms_trade" in result
-            assert "Vision skipped" in result.get("key_observation", "") or "vision disabled" in result.get("key_observation", "")
+            assert "Vision skipped" in result.get("key_observation", "") or "vision disabled" in result.get(
+                "key_observation", ""
+            )
 
     @pytest.mark.asyncio
     async def test_no_api_key_returns_default_result(self):
-        with patch.object(vf, "ENABLE_VISION", True), \
-             patch.object(vf, "ANTHROPIC_API_KEY", ""):
+        with patch.object(vf, "ENABLE_VISION", True), patch.object(vf, "ANTHROPIC_API_KEY", ""):
             result = await vf.analyze_chart_vision("BTC", "buy")
             assert isinstance(result, dict)
             assert "no API key" in result.get("key_observation", "")
@@ -70,6 +71,7 @@ class TestEncodeImage:
         result = vf._encode_image(img)
         assert isinstance(result, str)
         import base64
+
         assert base64.b64decode(result) == img
 
 

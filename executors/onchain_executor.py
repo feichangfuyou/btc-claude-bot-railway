@@ -234,5 +234,3 @@ def _set_onchain_position(
         f"Wallet: {(agentkit.wallet_address or '')[:10]}...",
         "success" if action == "buy" else "sell",
     )
-
-

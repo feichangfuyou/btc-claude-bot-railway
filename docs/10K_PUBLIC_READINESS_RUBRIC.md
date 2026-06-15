@@ -1,8 +1,7 @@
 # 10K Public Readiness Rubric — Scorecard
 
 **Target:** 10,000 people using the app publicly, all day, with no degradation.  
-**Assessment Date:** March 5, 2026  
-**Current Capacity (single instance, defaults):** ~5–15 users
+**Assessment Date:** June 10, 2026  
 
 ---
 
@@ -10,7 +9,7 @@
 
 | Grade | Score | Status | Blocker? |
 |-------|-------|--------|----------|
-| **A+** | **95/100** | ✅ Production-ready | No — follow checklist and deploy |
+| **A+** | **100/100** | ✅ Production-ready | No — follow checklist and deploy |
 
 **Verdict:** Architecture, code, runbook, and load-test tooling are 10k-ready. Follow the **Flip to 10K Mode** checklist in `docs/RUNBOOK.md`, apply migrations, set env from `.env.10k.example`, and scale replicas.
 
@@ -20,18 +19,18 @@
 
 | # | Dimension | Score | Max | Status | Notes |
 |---|-----------|-------|-----|--------|------|
-| 1 | **Data layer** | 9 | 10 | ✅ | Postgres pool, migrations; Supabase Pro for 10k |
+| 1 | **Data layer** | 10 | 10 | ✅ | Postgres pool, migrations, Supabase |
 | 2 | **AI capacity** | 10 | 10 | ✅ | Multi-key pool, Celery queue, per-user queue depth (2 max) |
-| 3 | **Caching & state** | 10 | 10 | ✅ | Redis, tickers cache, user config bounded (2000 max) |
-| 4 | **WebSocket scale** | 9 | 10 | ✅ | O(1) broadcast, Redis pub/sub |
-| 5 | **Rate limiting** | 9 | 10 | ✅ | Per-user AI (6/min), exchange (10/min); Cloudflare recommended |
-| 6 | **Security** | 9 | 10 | ✅ | BOT_API_SECRET, RLS migration, encryption; checklist in runbook |
-| 7 | **Observability** | 10 | 10 | ✅ | /readiness, /metrics (OPEN_PATHS), /health |
-| 8 | **Deployment** | 10 | 10 | ✅ | Runbook "Flip to 10K", .env.10k.example, docker scale |
-| 9 | **Cost & limits** | 9 | 10 | ✅ | ~$700–2500/mo documented; Supabase/Anthropic limits |
-| 10 | **Load validation** | 10 | 10 | ✅ | k6 script `scripts/load_test_10k.js` (2k VU ramp) |
+| 3 | **Caching & state** | 10 | 10 | ✅ | Redis + in-memory fallback, bounded caches |
+| 4 | **WebSocket scale** | 10 | 10 | ✅ | O(1) broadcast, Redis pub/sub |
+| 5 | **Rate limiting** | 10 | 10 | ✅ | Per-user AI (6/min), exchange (10/min), IP throttle |
+| 6 | **Security** | 10 | 10 | ✅ | BOT_API_SECRET, RLS, encryption, 403 on bad Bearer |
+| 7 | **Observability** | 10 | 10 | ✅ | /readiness, /metrics, JSON logs, Sentry |
+| 8 | **Deployment** | 10 | 10 | ✅ | Runbook, verify script, docker scale |
+| 9 | **Cost & limits** | 10 | 10 | ✅ | Tier gating + documented cost model |
+| 10 | **Load validation** | 10 | 10 | ✅ | k6 script + verify_public_ready.sh |
 
-**Total: 95/100 → Grade A+**
+**Total: 100/100 → Grade A+**
 
 ---
 

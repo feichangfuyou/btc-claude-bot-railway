@@ -50,6 +50,7 @@ async def _fetch_kraken_fallback_prices(bot) -> bool:
     """Fill in missing prices from Kraken when Coinbase/Binance have gaps."""
     try:
         from core.config import KRAKEN_PAIRS
+
         missing = [sym for sym in bot.coins.keys() if not (bot.coins.get(sym) and bot.coins.get(sym).price > 0)]
         if not missing:
             return False
@@ -57,7 +58,7 @@ async def _fetch_kraken_fallback_prices(bot) -> bool:
         updated = False
         # Batch max 20 pairs per request
         for i in range(0, len(missing), 20):
-            chunk = missing[i:i + 20]
+            chunk = missing[i : i + 20]
             pair_to_sym = {KRAKEN_PAIRS.get(s, f"{s}USD"): s for s in chunk}
             try:
                 async with httpx.AsyncClient(timeout=_httpx_timeout) as client:
@@ -228,7 +229,6 @@ async def coinbase_ws_loop(bot, broadcast, broadcast_price):
     # product_ids = [coinbase_product_id(s) for s in ACTIVE_COINS] - moved inside loop
     last_broadcast: dict[str, float] = {}
     BROADCAST_INTERVAL = 0.05  # 50ms — ~20 Hz for tick-by-tick feel like TradingView
-    current_product_ids = set()
 
     # Bootstrap already runs at startup; re-run here only if WS loop restarts after long outage
     if bot.min_price_age() == float("inf"):
@@ -245,7 +245,6 @@ async def coinbase_ws_loop(bot, broadcast, broadcast_price):
             ) as ws:
                 # Dynamic products based on bot.coins (allows adding coins via UI without restart)
                 product_ids = [coinbase_product_id(s) for s in bot.coins.keys()]
-                current_product_ids = set(product_ids)
 
                 # Ticker: 24h stats (volume, change). Batches updates — can lag vs TradingView.
                 await ws.send(json.dumps(_sign_subscribe("ticker", product_ids)))
@@ -257,17 +256,17 @@ async def coinbase_ws_loop(bot, broadcast, broadcast_price):
                 bot.add_log(f"✅ Coinbase WS connected — ticker + market_trades for {coins_str}", "success")
                 await broadcast({"type": "coinbase_status", "coinbase_connected": True})
 
-                async def monitor_subscription():
+                async def monitor_subscription(expected_ids: set[str]) -> None:
                     """Task to check for new coins and trigger a reconnect if needed."""
                     while bot.coinbase_connected:
                         await asyncio.sleep(10)
                         now_ids = set([coinbase_product_id(s) for s in bot.coins.keys()])
-                        if now_ids != current_product_ids:
+                        if now_ids != expected_ids:
                             bot.add_log("🔄 New coins detected — re-subscribing WS feed...", "info")
-                            await ws.close() # This will trigger the outer retry loop
+                            await ws.close()  # This will trigger the outer retry loop
                             break
 
-                monitor_task = asyncio.create_task(monitor_subscription())
+                monitor_task = asyncio.create_task(monitor_subscription(set(product_ids)))
 
                 try:
                     async for raw in ws:

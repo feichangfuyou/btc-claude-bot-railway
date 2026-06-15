@@ -9,7 +9,6 @@ Signals flow over WebSocket or are polled from the database.
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Optional
 
 
 @dataclass
@@ -19,11 +18,11 @@ class TradeSignal:
     signal_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     action: str = "buy"  # buy | sell | close | close_all
     symbol: str = "BTC"
-    exchange: Optional[str] = None  # target exchange or None for router to decide
+    exchange: str | None = None  # target exchange or None for router to decide
     size_pct: float = 0.15  # % of balance
-    price_target: Optional[float] = None
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    price_target: float | None = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
     confidence: float = 0.0
     reasoning: str = ""
     product_type: str = "spot"  # spot | futures | onchain
@@ -46,12 +45,12 @@ class ExecutionResult:
     signal_id: str
     status: str = "executed"  # executed | rejected | failed | expired
     exchange: str = ""
-    fill_price: Optional[float] = None
-    fill_size: Optional[float] = None
-    fill_usd: Optional[float] = None
+    fill_price: float | None = None
+    fill_size: float | None = None
+    fill_usd: float | None = None
     fees: float = 0.0
-    order_id: Optional[str] = None
-    error: Optional[str] = None
+    order_id: str | None = None
+    error: str | None = None
     executed_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
     def to_dict(self) -> dict:

@@ -1,6 +1,5 @@
-import { colors, radii, typography } from "../theme.js";
+import { colors, radii, typography, liquidGlass, buttonSizes } from "../theme.js";
 
-/** Shared button — variants: primary | secondary | danger | ghost */
 export default function Button({
   children,
   variant = "primary",
@@ -12,20 +11,24 @@ export default function Button({
 }) {
   const base = {
     fontFamily: typography.fontButton,
-    fontSize: variant === "ghost" ? typography.sizeBase : typography.sizeLg,
-    fontWeight: 600,
-    letterSpacing: 2,
+    fontSize: buttonSizes.fontSize,
+    fontWeight: 500,
+    letterSpacing: buttonSizes.letterSpacing,
     textTransform: "uppercase",
-    padding: "10px 24px",
+    padding: `${buttonSizes.paddingY}px ${buttonSizes.paddingX}px`,
     border: "none",
-    borderRadius: radii.lg,
+    borderRadius: buttonSizes.radius,
     cursor: disabled ? "not-allowed" : "pointer",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-    minHeight: 44,
+    gap: 5,
+    position: "relative",
+    overflow: "hidden",
+    minHeight: buttonSizes.height,
+    lineHeight: 1.2,
+    boxSizing: "border-box",
+    ...liquidGlass.button,
     ...style,
   };
 
@@ -33,36 +36,42 @@ export default function Button({
     primary: {
       background: `linear-gradient(180deg, ${colors.gold}, ${colors.goldDark})`,
       color: colors.dark,
-      boxShadow: "0 4px 20px rgba(212,175,55,0.2)",
+      boxShadow: [
+        "0 3px 12px rgba(212,175,55,0.16)",
+        "0 1px 3px rgba(0,0,0,0.18)",
+        "inset 0 1px 0 rgba(255,255,255,0.20)",
+      ].join(", "),
     },
     success: {
       background: `linear-gradient(180deg, ${colors.success}, #00C853)`,
       color: "#fff",
-      boxShadow: "0 4px 20px rgba(0,230,118,0.2)",
+      boxShadow: [
+        "0 3px 12px rgba(0,230,118,0.14)",
+        "0 1px 3px rgba(0,0,0,0.18)",
+        "inset 0 1px 0 rgba(255,255,255,0.16)",
+      ].join(", "),
     },
     secondary: {
       background: "rgba(255,255,255,0.03)",
-      backdropFilter: "blur(8px)",
-      WebkitBackdropFilter: "blur(8px)",
+      ...liquidGlass.button,
       border: `1px solid ${colors.inputBorder}`,
       color: colors.muted,
     },
     danger: {
       background: "rgba(255,23,68,0.85)",
-      backdropFilter: "blur(8px)",
-      WebkitBackdropFilter: "blur(8px)",
+      ...liquidGlass.button,
       color: "#fff",
-      boxShadow: "0 4px 16px rgba(255,23,68,0.15)",
+      boxShadow: [
+        "0 3px 12px rgba(255,23,68,0.14)",
+        "0 1px 3px rgba(0,0,0,0.18)",
+        "inset 0 1px 0 rgba(255,255,255,0.12)",
+      ].join(", "),
     },
     ghost: {
       background: "rgba(255,255,255,0.03)",
-      backdropFilter: "blur(8px)",
-      WebkitBackdropFilter: "blur(8px)",
+      ...liquidGlass.button,
       border: `1px solid ${colors.inputBorder}`,
       color: colors.muted,
-      fontSize: typography.sizeBase,
-      padding: "6px 12px",
-      minHeight: 36,
     },
   };
 
@@ -80,23 +89,36 @@ export default function Button({
       disabled={disabled || loading}
       {...props}
     >
-      {loading ? (
-        <>
-          <span
-            style={{
-              width: 16,
-              height: 16,
-              border: "2px solid rgba(255,255,255,0.2)",
-              borderTopColor: variant === "primary" || variant === "success" ? colors.dark : "#fff",
-              borderRadius: "50%",
-              animation: "theme-spin 0.6s linear infinite",
-            }}
-          />
-          {children}
-        </>
-      ) : (
-        children
-      )}
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: "inherit",
+          background: "linear-gradient(176deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 42%, transparent 54%)",
+          pointerEvents: "none",
+          zIndex: 1,
+        }}
+      />
+      <span style={{ position: "relative", zIndex: 2, display: "inline-flex", alignItems: "center", gap: 8 }}>
+        {loading ? (
+          <>
+            <span
+              style={{
+                width: 16,
+                height: 16,
+                border: "2px solid rgba(255,255,255,0.2)",
+                borderTopColor: variant === "primary" || variant === "success" ? colors.dark : "#fff",
+                borderRadius: "50%",
+                animation: "theme-spin 0.6s linear infinite",
+              }}
+            />
+            {children}
+          </>
+        ) : (
+          children
+        )}
+      </span>
     </button>
   );
 }

@@ -1,36 +1,53 @@
-import { colors, radii } from "../theme.js";
+import { liquidGlass } from "../theme.js";
+import { useLiquidSpecular } from "../hooks/useLiquidSpecular.js";
 
-/** Shared glass card — use for sections, modals, content blocks */
-export default function Card({ children, className = "", style = {}, variant = "default" }) {
-  const base = {
-    background: "rgba(17,17,17,0.55)",
-    backdropFilter: "blur(20px) saturate(1.4)",
-    WebkitBackdropFilter: "blur(20px) saturate(1.4)",
-    border: `1px solid ${colors.glassBorder}`,
-    borderRadius: radii.xxl,
-    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
-    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
-  };
-
+export default function Card({ children, className = "", style = {}, variant = "default", reactive = false }) {
   const variants = {
-    default: {},
-    heavy: {
-      background: "rgba(17,17,17,0.72)",
-      backdropFilter: "blur(40px) saturate(1.6)",
-      WebkitBackdropFilter: "blur(40px) saturate(1.6)",
-      boxShadow: "0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
-    },
-    light: {
-      background: "rgba(17,17,17,0.35)",
-      backdropFilter: "blur(12px) saturate(1.2)",
-      WebkitBackdropFilter: "blur(12px) saturate(1.2)",
-      borderRadius: radii.xl,
-    },
+    default: liquidGlass.surface,
+    heavy: liquidGlass.heavy,
+    light: liquidGlass.light,
   };
+
+  const base = variants[variant] || variants.default;
+  const { glareRef, specularRef, glareStyle, specularStyle, onMouseMove, onMouseLeave } = useLiquidSpecular();
 
   return (
-    <div className={className} style={{ ...base, ...variants[variant], ...style }}>
-      {children}
+    <div
+      className={`${className}`}
+      style={{ position: "relative", ...base, ...style }}
+      onMouseMove={reactive ? onMouseMove : undefined}
+      onMouseLeave={reactive ? onMouseLeave : undefined}
+    >
+      {/* Static specular highlight — curved convex resin shine on top half */}
+      <div
+        ref={reactive ? specularRef : undefined}
+        aria-hidden
+        style={specularStyle}
+      />
+      {/* Interactive glare — mouse-tracking spotlight with overlay blend */}
+      {reactive && (
+        <div
+          ref={glareRef}
+          aria-hidden
+          style={glareStyle}
+        />
+      )}
+      {/* Gold caustic refraction */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: "inherit",
+          background: "radial-gradient(ellipse at 20% 10%, rgba(212,175,55,0.08) 0%, rgba(212,175,55,0.025) 35%, transparent 60%)",
+          pointerEvents: "none",
+          zIndex: 1,
+          opacity: 0.55,
+        }}
+      />
+      <div style={{ position: "relative", zIndex: 3 }}>
+        {children}
+      </div>
     </div>
   );
 }

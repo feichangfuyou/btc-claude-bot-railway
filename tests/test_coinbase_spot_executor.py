@@ -20,10 +20,12 @@ def mock_bot():
     bot.broadcast_trade_update = AsyncMock()
     bot.persist_position = MagicMock()
     bot.persist_account = MagicMock()
-    bot.set_paper_position = MagicMock(side_effect=lambda *args, **kwargs: (
-        bot.open_positions.append({"symbol": args[1], "side": args[0], "usd_size": args[6]}),
-        bot.open_positions[-1]
-    )[1])
+    bot.set_paper_position = MagicMock(
+        side_effect=lambda *args, **kwargs: (
+            bot.open_positions.append({"symbol": args[1], "side": args[0], "usd_size": args[6]}),
+            bot.open_positions[-1],
+        )[1]
+    )
     bot.remove_position = MagicMock(side_effect=lambda p: bot.open_positions.remove(p))
     bot.finalize_paper_close = MagicMock(return_value=0.0)
     bot._track_consecutive = MagicMock()

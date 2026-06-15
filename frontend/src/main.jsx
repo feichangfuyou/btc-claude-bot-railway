@@ -24,12 +24,15 @@ import "./suppress-warnings.js";
 import "./fetchWithAuth.js";
 import "./capacitor-init.js";
 import "./global.css";
+import "./styles/mobile-app.css";
+import "./styles/spacing.css";
 import "./styles/auth.css";
+import "./styles/pages.css";
 
 // Minimal Suspense fallback — dark background, no flash
 function PageFallback() {
   return (
-    <div style={{ background: "#0A0A0A", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", fontFamily: "'Space Mono',monospace", fontSize: "11px", letterSpacing: "1px", color: "#5C5C5C" }}>
+    <div style={{ background: "#050505", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", fontFamily: "'Space Mono',monospace", fontSize: "11px", letterSpacing: "1px", color: "#5C5C5C" }}>
       <span style={{ display: "inline-block", width: "20px", height: "20px", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "#D4AF37", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} />
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>

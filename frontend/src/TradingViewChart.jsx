@@ -35,7 +35,7 @@ function getSymbol(symbol) {
   return VALID_SYMBOLS.has(s) ? (SYMBOL_MAP[s] || `COINBASE:${s}USD`) : "COINBASE:BTCUSD";
 }
 
-function TradingViewChart({ symbol = "BTC" }) {
+function TradingViewChart({ symbol = "BTC", minimal = false }) {
   const containerRef = useRef(null);
 
   useEffect(() => {
@@ -47,8 +47,8 @@ function TradingViewChart({ symbol = "BTC" }) {
     const rafId = requestAnimationFrame(() => {
       timeoutId = setTimeout(() => {
         if (!container.isConnected) return;
-        
-        const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+        const clean = minimal;
 
         const script = document.createElement("script");
         script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
@@ -63,30 +63,29 @@ function TradingViewChart({ symbol = "BTC" }) {
           locale: "en",
           backgroundColor: "rgba(10, 10, 10, 1)",
           gridColor: "rgba(30, 30, 30, 0.3)",
-          allow_symbol_change: true,
+          allow_symbol_change: !clean,
           withdateranges: true,
-          hide_side_toolbar: isMobile,
-          details: !isMobile,
-          hotlist: !isMobile,
+          hide_side_toolbar: clean,
+          hide_top_toolbar: false,
+          hide_legend: clean,
+          details: !clean,
+          hotlist: !clean,
           calendar: false,
-          hide_volume: false,
+          hide_volume: clean,
           support_host: "https://www.tradingview.com",
-          studies: isMobile ? [
-            "STD;EMA",
-            "STD;Bollinger_Bands",
-          ] : [
+          studies: clean ? [] : [
             "STD;EMA",
             "STD;RSI",
             "STD;MACD",
             "STD;Bollinger_Bands",
             "STD;VWAP",
           ],
-          show_popup_button: true,
+          show_popup_button: !clean,
           popup_width: "1400",
           popup_height: "900",
           width: "100%",
           height: "100%",
-          save_image: true,
+          save_image: !clean,
           enable_publishing: false,
           overrides: {
             "paneProperties.backgroundType": "solid",
@@ -122,7 +121,7 @@ function TradingViewChart({ symbol = "BTC" }) {
       cancelAnimationFrame(rafId);
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [symbol]);
+  }, [symbol, minimal]);
 
   return (
     <div

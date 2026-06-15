@@ -10,7 +10,7 @@ describe("Terms page", () => {
         <Terms />
       </MemoryRouter>
     );
-    expect(screen.getByText("Terms of Service")).toBeInTheDocument();
+    expect(screen.getByText("TERMS OF SERVICE")).toBeInTheDocument();
   });
 
   it("displays the effective date", () => {

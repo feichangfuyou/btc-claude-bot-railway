@@ -27,7 +27,7 @@ export function PositionsPanel({
           )}
         </div>
         {positions.length > 1 && (
-          <button className="btn btn-d" onClick={() => handleClose()} style={{ padding: "4px 10px", fontSize: "9px", color: "#ff9900", borderColor: "#ff990033" }}>CLOSE ALL</button>
+          <button className="btn btn-d" onClick={() => handleClose()} style={{ color: "#ff9900", borderColor: "#ff990033" }}>CLOSE ALL</button>
         )}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -44,7 +44,7 @@ export function PositionsPanel({
             progress = Math.max(0, Math.min(100, progress));
           }
           return (
-            <div key={pos.id || pos.symbol} className="card fadein" style={{ border: `1px solid ${pos.side === "buy" ? "#00E67622" : "#FF174422"}`, boxShadow: `0 0 20px ${pos.side === "buy" ? "#00E67611" : "#FF174411"}` }}>
+            <div key={pos.id || pos.symbol} className="card fadein" style={{ border: `1px solid ${pos.side === "buy" ? "#00E67622" : "#FF174422"}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <span className="dot pulse" style={{ background: pos.side === "buy" ? "#00E676" : "#FF1744" }} />
@@ -60,7 +60,7 @@ export function PositionsPanel({
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <span style={{ fontSize: "9px", color: "#3a3a3a" }}>since {pos.open_ts}</span>
-                  <button className="btn btn-d" onClick={() => handleClose(pos)} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "4px 8px", fontSize: "9px", color: "#ff9900", borderColor: "#ff990033" }}><X size={10} /></button>
+                  <button className="btn btn-d btn-icon" onClick={() => handleClose(pos)} style={{ color: "#ff9900", borderColor: "#ff990033" }} aria-label="Close position"><X size={12} /></button>
                 </div>
               </div>
               <div className="pos-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "8px" }}>
@@ -71,7 +71,7 @@ export function PositionsPanel({
                   { label: "SIZE", num: pos.usd_size || 0, fmt: (v) => `$${v.toFixed(2)}`, color: "#D4AF37" },
                   { label: "UNREALIZED", num: posUnrealized, fmt: (v) => `${v >= 0 ? "+" : ""}$${v.toFixed(2)}`, color: posUnrealized >= 0 ? "#00E676" : "#FF1744" },
                 ].map(s => (
-                  <div key={s.label} style={{ background: "#0A0A0A", borderRadius: "5px", padding: "8px 6px", textAlign: "center" }}>
+                  <div key={s.label} style={{ background: "rgba(6,6,6,0.6)", borderRadius: "6px", padding: "8px 6px", textAlign: "center", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03)" }}>
                     <div style={{ fontSize: "8px", color: "#3a3a3a", marginBottom: "3px" }}>{s.label}</div>
                     <div style={{ fontSize: "10px", fontWeight: "700", color: s.color }}>
                       <AnimatedNumber value={s.num} format={s.fmt} duration={180} />

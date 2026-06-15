@@ -35,16 +35,19 @@ def _make_mock_bot(trades=None, positions=None, can_trade=True):
 
 class TestBuildAiState:
     def test_basic_state_structure(self):
-        with patch("core.ai_state_builder._build_enhanced_coin_snapshot") as mock_snap, \
-             patch("core.ai_state_builder._build_trade_analytics") as mock_analytics, \
-             patch("core.ai_state_builder.build_memory_briefing") as mock_memory, \
-             patch("core.ai_state_builder.get_pattern_verdict") as mock_pv:
+        with (
+            patch("core.ai_state_builder._build_enhanced_coin_snapshot") as mock_snap,
+            patch("core.ai_state_builder._build_trade_analytics") as mock_analytics,
+            patch("core.ai_state_builder.build_memory_briefing") as mock_memory,
+            patch("core.ai_state_builder.get_pattern_verdict") as mock_pv,
+        ):
             mock_snap.return_value = {"price": 65000, "rsi": 55}
             mock_analytics.return_value = {"win_rate": 0.6}
             mock_memory.return_value = "Memory: 10 trades analyzed"
             mock_pv.return_value = {"verdict": "neutral"}
 
             from core.ai_state_builder import build_ai_state
+
             bot = _make_mock_bot()
             state = build_ai_state(bot)
 
@@ -64,16 +67,19 @@ class TestBuildAiState:
             assert "mission" in state
 
     def test_anti_overtrade_losing_streak(self):
-        with patch("core.ai_state_builder._build_enhanced_coin_snapshot") as mock_snap, \
-             patch("core.ai_state_builder._build_trade_analytics") as mock_analytics, \
-             patch("core.ai_state_builder.build_memory_briefing") as mock_memory, \
-             patch("core.ai_state_builder.get_pattern_verdict") as mock_pv:
+        with (
+            patch("core.ai_state_builder._build_enhanced_coin_snapshot") as mock_snap,
+            patch("core.ai_state_builder._build_trade_analytics") as mock_analytics,
+            patch("core.ai_state_builder.build_memory_briefing") as mock_memory,
+            patch("core.ai_state_builder.get_pattern_verdict") as mock_pv,
+        ):
             mock_snap.return_value = {"price": 65000}
             mock_analytics.return_value = {}
             mock_memory.return_value = ""
             mock_pv.return_value = {"verdict": "neutral"}
 
             from core.ai_state_builder import build_ai_state
+
             trades = [{"pnl": -10}, {"pnl": -20}, {"pnl": -30}, {"pnl": 100}]
             bot = _make_mock_bot(trades=trades)
             state = build_ai_state(bot)
@@ -84,47 +90,56 @@ class TestBuildAiState:
             assert "required_min_signals" in ao
 
     def test_progress_in_mission(self):
-        with patch("core.ai_state_builder._build_enhanced_coin_snapshot") as mock_snap, \
-             patch("core.ai_state_builder._build_trade_analytics") as mock_analytics, \
-             patch("core.ai_state_builder.build_memory_briefing") as mock_memory, \
-             patch("core.ai_state_builder.get_pattern_verdict") as mock_pv:
+        with (
+            patch("core.ai_state_builder._build_enhanced_coin_snapshot") as mock_snap,
+            patch("core.ai_state_builder._build_trade_analytics") as mock_analytics,
+            patch("core.ai_state_builder.build_memory_briefing") as mock_memory,
+            patch("core.ai_state_builder.get_pattern_verdict") as mock_pv,
+        ):
             mock_snap.return_value = {"price": 65000}
             mock_analytics.return_value = {}
             mock_memory.return_value = ""
             mock_pv.return_value = {"verdict": "neutral"}
 
             from core.ai_state_builder import build_ai_state
+
             bot = _make_mock_bot()
             state = build_ai_state(bot)
             assert "PROFIT GOAL" in state["mission"]
             assert "$500" in state["mission"]  # total_pnl
 
     def test_no_trades_zero_streak(self):
-        with patch("core.ai_state_builder._build_enhanced_coin_snapshot") as mock_snap, \
-             patch("core.ai_state_builder._build_trade_analytics") as mock_analytics, \
-             patch("core.ai_state_builder.build_memory_briefing") as mock_memory, \
-             patch("core.ai_state_builder.get_pattern_verdict") as mock_pv:
+        with (
+            patch("core.ai_state_builder._build_enhanced_coin_snapshot") as mock_snap,
+            patch("core.ai_state_builder._build_trade_analytics") as mock_analytics,
+            patch("core.ai_state_builder.build_memory_briefing") as mock_memory,
+            patch("core.ai_state_builder.get_pattern_verdict") as mock_pv,
+        ):
             mock_snap.return_value = {"price": 65000}
             mock_analytics.return_value = {}
             mock_memory.return_value = ""
             mock_pv.return_value = {"verdict": "neutral"}
 
             from core.ai_state_builder import build_ai_state
+
             bot = _make_mock_bot(trades=[])
             state = build_ai_state(bot)
             assert state["anti_overtrade"]["current_losing_streak"] == 0
 
     def test_cannot_trade_block_reason(self):
-        with patch("core.ai_state_builder._build_enhanced_coin_snapshot") as mock_snap, \
-             patch("core.ai_state_builder._build_trade_analytics") as mock_analytics, \
-             patch("core.ai_state_builder.build_memory_briefing") as mock_memory, \
-             patch("core.ai_state_builder.get_pattern_verdict") as mock_pv:
+        with (
+            patch("core.ai_state_builder._build_enhanced_coin_snapshot") as mock_snap,
+            patch("core.ai_state_builder._build_trade_analytics") as mock_analytics,
+            patch("core.ai_state_builder.build_memory_briefing") as mock_memory,
+            patch("core.ai_state_builder.get_pattern_verdict") as mock_pv,
+        ):
             mock_snap.return_value = {"price": 65000}
             mock_analytics.return_value = {}
             mock_memory.return_value = ""
             mock_pv.return_value = {"verdict": "neutral"}
 
             from core.ai_state_builder import build_ai_state
+
             bot = _make_mock_bot(can_trade=False)
             state = build_ai_state(bot)
             assert state["can_trade"] is False
