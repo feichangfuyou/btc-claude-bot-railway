@@ -35,6 +35,13 @@ jobs:
         run: python -m pytest tests/ -v --cov --cov-report=term-missing
         env:
           ANTHROPIC_API_KEY: "test-key-for-ci"
+          BOT_API_SECRET: "test-secret-for-ci"
+
+      - name: Red team security tests
+        run: python -m pytest tests/test_red_team_bottleneck.py -v --tb=short
+        env:
+          ANTHROPIC_API_KEY: "test-key-for-ci"
+          BOT_API_SECRET: "test-secret-for-ci"
 
   frontend:
     runs-on: ubuntu-latest

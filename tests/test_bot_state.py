@@ -107,6 +107,86 @@ async def test_finalize_paper_close_short(bot):
     assert net > 0
 
 
+def test_resolve_close_price_uses_entry_when_feed_missing(bot):
+    pos = {"symbol": "BTC", "side": "sell", "entry": 73305.94, "usd_size": 250.0}
+    assert bot._resolve_close_price(pos, quoted_price=0.0) == 73305.94
+
+
+def test_resolve_close_price_prefers_live_quote(bot):
+    from core.coin_state import CoinState
+
+    bot.coins["BTC"] = CoinState("BTC")
+    bot.coins["BTC"].price = 74000.0
+    pos = {"symbol": "BTC", "side": "sell", "entry": 73305.94, "usd_size": 250.0}
+    assert bot._resolve_close_price(pos, quoted_price=0.0) == 74000.0
+
+
+def test_close_single_position_blocks_when_no_valid_price(bot):
+    pos = {
+        "id": 99,
+        "symbol": "BTC",
+        "side": "sell",
+        "entry": 0.0,
+        "coin_size": 0.00341,
+        "btc_size": 0.00341,
+        "usd_size": 250.0,
+        "open_ts": "2020-01-01 00:00:00",
+    }
+    bot.open_positions.append(pos)
+    initial_balance = bot.account["balance"]
+
+    bot._close_single_position(pos, reason="⚡ FORCE CLOSE")
+
+    assert len(bot.open_positions) == 1
+    assert len(bot.trades) == 0
+    assert bot.account["balance"] == initial_balance
+
+
+@pytest.mark.asyncio
+async def test_close_single_position_short_uses_entry_not_zero(bot):
+    pos = {
+        "id": 100,
+        "symbol": "LINK",
+        "side": "sell",
+        "entry": 9.431,
+        "coin_size": 13.25,
+        "btc_size": 13.25,
+        "usd_size": 125.0,
+        "open_ts": "2020-01-01 00:00:00",
+    }
+    bot.open_positions.append(pos)
+
+    with patch.object(bot, "_capture_screenshot_bg"):
+        bot._close_single_position(pos, reason="⚡ FORCE CLOSE")
+    await asyncio.sleep(0)
+
+    assert len(bot.open_positions) == 0
+    assert len(bot.trades) == 1
+    trade = bot.trades[0]
+    assert trade["exit"] == 9.431
+    assert trade["exit"] > 0
+    assert trade["pnl"] < 5  # break-even minus fees, not +123 fake profit
+
+
+def test_finalize_paper_close_rejects_zero_without_entry(bot):
+    pos = {
+        "id": 101,
+        "symbol": "BTC",
+        "side": "sell",
+        "entry": 0.0,
+        "coin_size": 1.0,
+        "btc_size": 1.0,
+        "usd_size": 100.0,
+    }
+    bot.open_positions.append(pos)
+
+    result = bot.finalize_paper_close(pos, current_price=0.0, reason="BAD CLOSE")
+
+    assert result == 0.0
+    assert len(bot.open_positions) == 1
+    assert len(bot.trades) == 0
+
+
 @pytest.mark.asyncio
 async def test_broadcast_trade_update_calls_fn(bot):
     mock_fn = AsyncMock()

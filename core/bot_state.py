@@ -280,6 +280,16 @@ class BotState:
         cs = self.coins.get(symbol.upper())
         return cs.price if cs else 0.0
 
+    def _resolve_close_price(self, pos: dict, quoted_price: float | None = None) -> float | None:
+        """Resolve a non-zero exit price. Never book P&L at price 0 (inflates short P&L)."""
+        symbol = pos.get("symbol", "BTC")
+        for candidate in (quoted_price, self.price_for(symbol), pos.get("entry")):
+            if candidate is not None:
+                price = float(candidate)
+                if price > 0:
+                    return price
+        return None
+
     def min_price_age(self) -> float:
         ages = [cs.price_age() for cs in self.coins.values() if cs.price > 0]
         return min(ages) if ages else 999999.0
@@ -588,6 +598,14 @@ class BotState:
         """Public API for executors: close a position using paper-style accounting.
         Runs the full close path including memory, learning, notifications, and kill switch."""
         pos_symbol = pos.get("symbol", "BTC")
+        resolved = self._resolve_close_price(pos, current_price)
+        if resolved is None:
+            self.add_log(
+                f"Close blocked [{pos_symbol}] — no valid price (feed down, entry missing)",
+                "warning",
+            )
+            return 0.0
+        current_price = resolved
         coin_size = pos.get("coin_size", pos.get("btc_size", 0))
         if pos["side"] == "buy":
             pnl = (current_price - pos["entry"]) * coin_size
@@ -1045,9 +1063,13 @@ class BotState:
     def _close_single_position(self, pos: dict, reason: str = "⚡ FORCE CLOSE"):
         if pos.get("product_type") == "futures":
             pos_symbol = pos.get("symbol", "BTC")
-            current_price = self.price_for(pos_symbol)
-            if current_price <= 0:
-                current_price = pos.get("entry", 0)
+            current_price = self._resolve_close_price(pos)
+            if current_price is None:
+                self.add_log(
+                    f"Force close blocked [{pos_symbol}] — no valid price (feed down, entry missing)",
+                    "warning",
+                )
+                return
             from executors.futures_executor import close_futures_position
 
             close_futures_position(self, pos, current_price, reason)
@@ -1091,7 +1113,13 @@ class BotState:
                 pass
         pos_symbol = pos.get("symbol", "BTC")
         coin_size = pos.get("coin_size", pos.get("btc_size", 0))
-        current_price = self.price_for(pos_symbol)
+        current_price = self._resolve_close_price(pos)
+        if current_price is None:
+            self.add_log(
+                f"Force close blocked [{pos_symbol}] — no valid price (feed down, entry missing)",
+                "warning",
+            )
+            return
 
         if not PAPER_TRADING and agentkit.ready and pos.get("onchain"):
             from executors.onchain_executor import close_onchain

@@ -3,7 +3,7 @@ import os
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 
-from core.auth import AuthenticatedUser, get_current_user
+from core.auth import AuthenticatedUser, get_active_user, get_current_user
 from core.bot_manager import bot_manager
 from core.config import (
     ANTHROPIC_API_KEY,
@@ -469,6 +469,67 @@ async def admin_start_user_bot(target_user_id: str, user: AuthenticatedUser = De
     instance.running = True
     _log_admin_action(user.email, f"Started bot for user {target_user_id[:8]}")
     return {"ok": True, "user_id": target_user_id, "running": True}
+
+
+@router.post("/api/bot/start")
+async def start_my_bot(user: AuthenticatedUser = Depends(get_active_user)):
+    """Start paper/live trading for the authenticated user."""
+    if bot_manager.global_pause:
+        raise HTTPException(status_code=503, detail="Trading globally paused by admin")
+    bot.bot_running = True
+    bot.countdown = 5
+    bot.active_user_id = user.id
+    bot.active_user_email = user.email or ""
+    instance = await bot_manager.get_or_create(user.id)
+    instance.running = True
+    bot.add_log(
+        f"🟢 Bot started via API ({getattr(instance.config, 'subscription_tier', 'starter')} tier)",
+        "success",
+    )
+    return {
+        "ok": True,
+        "bot_running": True,
+        "paper_trading": PAPER_TRADING,
+        "brain_enabled": bot_manager.brain_enabled,
+        "balance": bot.account.get("balance"),
+    }
+
+
+@router.post("/api/bot/stop")
+async def stop_my_bot(user: AuthenticatedUser = Depends(get_active_user)):
+    """Pause trading for the authenticated user."""
+    bot.bot_running = False
+    instance = bot_manager.get(user.id)
+    if instance:
+        instance.running = False
+        instance.persist_state()
+    bot.add_log("🔴 Bot stopped via API", "warning")
+    return {"ok": True, "bot_running": False}
+
+
+@router.get("/api/bot/status")
+async def bot_status(user: AuthenticatedUser = Depends(get_active_user)):
+    """Current bot run state + paper P&L for this user."""
+    instance = bot_manager.get(user.id)
+    trades = instance.trades if instance else []
+    pnls = [t["pnl"] for t in trades]
+    wins = [p for p in pnls if p > 0]
+    losses = [p for p in pnls if p < 0]
+    account = instance.account_snapshot() if instance else bot.account
+    return {
+        "bot_running": bot.bot_running and bool(instance and instance.running),
+        "paper_trading": PAPER_TRADING,
+        "brain_enabled": bot_manager.brain_enabled,
+        "global_pause": bot_manager.global_pause,
+        "balance": account.get("balance", 0),
+        "total_pnl": account.get("total_pnl", 0),
+        "daily_pnl": account.get("daily_pnl", 0),
+        "total_trades": len(trades),
+        "win_rate": round(len(wins) / len(pnls) * 100, 1) if pnls else 0,
+        "profit_factor": round(abs(sum(wins) / sum(losses)), 2) if losses and sum(losses) != 0 else 0,
+        "open_positions": len(instance.open_positions) if instance else 0,
+        "price_age_sec": bot.min_price_age(),
+    }
 
 
 @router.post("/api/admin/users/{target_user_id}/set-tier")

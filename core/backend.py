@@ -864,13 +864,13 @@ if API_SECRET:
     app.add_middleware(AuthMiddleware)
 
 
-# ─── Global IP rate limiter (120 req/min per IP) ─────────────────────────────
+# ─── Global IP rate limiter (500 req/min per remote IP) ─────────────────────
 
 
 class IPRateLimitMiddleware(BaseHTTPMiddleware):
     """Blanket per-IP throttle — prevents abuse before auth even runs.
     Localhost is exempt (can't be an external abuser — it's the dashboard/dev machine).
-    Remote IPs: 300 req/min (raised from 120 to support multi-tab dashboard + price feed)."""
+    Remote IPs: 500 req/min (mitigates key-spray / flood abuse per red-team report)."""
 
     EXEMPT = {"/health", "/readiness", "/metrics"}
     # Localhost IPs are always exempt — the dashboard, bot, and scripts all run here
@@ -897,8 +897,8 @@ class IPRateLimitMiddleware(BaseHTTPMiddleware):
         if is_local and not request.headers.get("x-forwarded-for"):
             return await call_next(request)
 
-        # Remote IPs: 300 req/min (up from 120 — supports multi-tab usage without false 429s)
-        if not rate_limit_check(f"global_ip:{client_ip}", 300, 60):
+        # Remote IPs: 500 req/min (key-spray mitigation; multi-tab dashboard still fits)
+        if not rate_limit_check(f"global_ip:{client_ip}", 500, 60):
             resp = JSONResponse(
                 {"error": "rate limited", "retry_after": 60},
                 status_code=429,

@@ -144,7 +144,7 @@ k6 run scripts/load_test_10k.js
 
 ### 8. DDoS / Rate Limit (Production)
 
-For public exposure, add Cloudflare (or similar) in front of the app. Protects against IP-based abuse; app rate limits (120 req/min, 6 AI/min per user) handle per-user fairness.
+For public exposure, add Cloudflare (or similar) in front of the app. Protects against IP-based abuse; app rate limits (500 req/min per IP, 6 AI/min per user) handle per-user fairness.
 
 ### 9. Beyond 10k (20k, 50k+)
 

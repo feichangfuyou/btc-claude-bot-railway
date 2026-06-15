@@ -70,7 +70,7 @@ Before deploying to a public host, see **[docs/PRODUCTION_CHECKLIST.md](docs/PRO
 - **Emergency stop:** When secret is unset, `/emergency/stop` only accepts requests from localhost.
 - **Exchange keys:** Stored encrypted in Supabase; frontend never fetches key columns.
 - **RLS:** Supabase `user_exchanges` uses Row Level Security so users only access their own rows.
-- **Rate limiting:** 120 req/min per IP; exchange validate limited to 10/min per user.
+- **Rate limiting:** 500 req/min per remote IP; exchange validate limited to 10/min per user; AI calls 6/min per user.
 
 ---
 
