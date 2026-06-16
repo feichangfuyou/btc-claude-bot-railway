@@ -750,7 +750,9 @@ async def _deferred_startup():
     asyncio.create_task(news_pulse_cycle(bot, broadcast))
     asyncio.create_task(bot_running_watchdog())
 
-    if AUTO_START_BOT and bot.bot_running:
+    if AUTO_START_BOT:
+        if not bot.bot_running:
+            bot.set_running(True)
         await _auto_start_bot(source="startup")
         _coins = bot.active_coin_list
         bot.add_log(
