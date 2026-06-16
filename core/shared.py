@@ -16,7 +16,20 @@ from .supabase_client import get_supabase
 init_db()
 bot = BotState()
 bot.trades = db_load_trades()
-supabase = get_supabase()
+
+
+class _LazySupabase:
+    """Defer Supabase client creation until first use (avoids startup crash when env vars missing)."""
+
+    _client = None
+
+    def __getattr__(self, item):
+        if self._client is None:
+            self._client = get_supabase()
+        return getattr(self._client, item)
+
+
+supabase = _LazySupabase()
 
 _pending_ai_tasks: dict[str, asyncio.Future] = {}
 _ws_to_user: dict = {}
