@@ -10,7 +10,7 @@ import httpx
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from core.supabase_client import SUPABASE_ANON_KEY, SUPABASE_URL
+from core.supabase_client import SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, SUPABASE_URL
 
 logger = logging.getLogger("claudebot.auth")
 _bearer = HTTPBearer(auto_error=False)
@@ -71,14 +71,17 @@ def lookup_user_via_auth_api(token: str) -> dict | None:
     sb.auth.get_user() locally decodes the JWT payload and can fail when Google
     OAuth names contain control characters in user_metadata claims.
     """
-    if not token or not SUPABASE_URL or not SUPABASE_ANON_KEY:
+    if not token or not SUPABASE_URL:
+        return None
+    apikey = SUPABASE_ANON_KEY or SUPABASE_SERVICE_KEY
+    if not apikey:
         return None
     try:
         resp = httpx.get(
             f"{SUPABASE_URL.rstrip('/')}/auth/v1/user",
             headers={
                 "Authorization": f"Bearer {token}",
-                "apikey": SUPABASE_ANON_KEY,
+                "apikey": apikey,
             },
             timeout=10.0,
         )
