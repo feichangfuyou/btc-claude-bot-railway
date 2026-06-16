@@ -28,7 +28,7 @@ from starlette.responses import JSONResponse, Response
 from ai.claude_ai import call_claude
 from api.agentkit_provider import agentkit
 from core.ai_state_builder import build_ai_state
-from core.auth import get_user_from_token, verify_token
+from core.auth import get_user_from_token, is_admin_email, verify_token
 from core.bot_manager import bot_manager
 from core.config import (
     API_SECRET,
@@ -1043,7 +1043,11 @@ async def ws_endpoint(ws: WebSocket):
                 from core.user_config import load_user_config
 
                 config = load_user_config(user_id)
-                if config.subscription_status != "active" and user_id != "admin":
+                if (
+                    config.subscription_status != "active"
+                    and user_id != "admin"
+                    and not is_admin_email(user_email or "")
+                ):
                     await ws.close(code=4002, reason="active_subscription_required")
                     return
         else:

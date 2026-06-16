@@ -6,10 +6,11 @@ Replaces the old shared-secret AuthMiddleware with JWT-based per-user auth.
 import hmac
 import logging
 
+import httpx
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from core.supabase_client import get_supabase
+from core.supabase_client import SUPABASE_ANON_KEY, SUPABASE_URL
 
 logger = logging.getLogger("claudebot.auth")
 _bearer = HTTPBearer(auto_error=False)
@@ -64,6 +65,53 @@ def resolve_role(email: str, profile_role: str = "authenticated") -> str:
     return profile_role or "authenticated"
 
 
+def lookup_user_via_auth_api(token: str) -> dict | None:
+    """Validate a user JWT via Supabase Auth REST (not the Python SDK).
+
+    sb.auth.get_user() locally decodes the JWT payload and can fail when Google
+    OAuth names contain control characters in user_metadata claims.
+    """
+    if not token or not SUPABASE_URL or not SUPABASE_ANON_KEY:
+        return None
+    try:
+        resp = httpx.get(
+            f"{SUPABASE_URL.rstrip('/')}/auth/v1/user",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "apikey": SUPABASE_ANON_KEY,
+            },
+            timeout=10.0,
+        )
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        return data if data.get("id") else None
+    except Exception as e:
+        logger.warning("Supabase auth lookup failed: %s", e)
+        return None
+
+
+def _authenticated_user_from_token(token: str) -> AuthenticatedUser:
+    user = lookup_user_via_auth_api(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    from core.user_config import load_user_config
+
+    config = load_user_config(user["id"])
+    email = user.get("email") or ""
+    profile_role = config.role if hasattr(config, "role") else "authenticated"
+    role = resolve_role(email, profile_role)
+
+    return AuthenticatedUser(
+        user_id=user["id"],
+        email=email,
+        role=role,
+        tier=config.subscription_tier,
+        status=config.subscription_status,
+    )
+
+
 async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
@@ -97,32 +145,11 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Missing authentication token")
 
     try:
-        sb = get_supabase()
-        user_resp = sb.auth.get_user(token)
-        user = user_resp.user
-        if not user:
-            raise HTTPException(status_code=401, detail="Invalid token")
-
-        # Load config using the cached helper
-        from core.user_config import load_user_config
-
-        config = load_user_config(user.id)
-
-        email = user.email or ""
-        profile_role = config.role if hasattr(config, "role") else "authenticated"
-        role = resolve_role(email, profile_role)
-
-        return AuthenticatedUser(
-            user_id=user.id,
-            email=email,
-            role=role,
-            tier=config.subscription_tier,
-            status=config.subscription_status,
-        )
+        return _authenticated_user_from_token(token)
     except HTTPException:
         raise
     except Exception as e:
-        logger.warning(f"Auth verification failed: {e}")
+        logger.warning("Auth verification failed: %s", e)
         raise HTTPException(status_code=401, detail="Invalid or expired token") from e
 
 
@@ -151,22 +178,12 @@ async def get_optional_user(
 
 def verify_token(token: str) -> bool:
     """Verify a Supabase JWT and return True if valid."""
-    try:
-        sb = get_supabase()
-        user_resp = sb.auth.get_user(token)
-        return user_resp.user is not None
-    except Exception:
-        return False
+    return lookup_user_via_auth_api(token) is not None
 
 
 def get_user_from_token(token: str) -> tuple[str, str] | None:
     """Extract (user_id, email) from a Supabase JWT if valid."""
-    try:
-        sb = get_supabase()
-        user_resp = sb.auth.get_user(token)
-        user = user_resp.user
-        if user:
-            return user.id, user.email or ""
-        return None
-    except Exception:
-        return None
+    user = lookup_user_via_auth_api(token)
+    if user:
+        return user["id"], user.get("email") or ""
+    return None
