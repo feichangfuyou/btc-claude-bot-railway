@@ -226,3 +226,10 @@ class TestMultiModelFallback:
         assert fb.is_defensive() is False
         assert fb.primary_failures == 0
         assert fb.current_model_idx == 0
+
+    def test_account_error_enters_defensive_immediately(self):
+        fb = kya.MultiModelFallback()
+        next_model = fb.record_failure("claude-haiku-4-5-20251001", "credit balance is too low")
+        assert next_model is None
+        assert fb.is_defensive() is True
+        assert "credit balance" in fb.defensive_reason().lower()

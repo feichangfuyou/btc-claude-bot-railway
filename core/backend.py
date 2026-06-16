@@ -588,6 +588,20 @@ async def _deferred_startup():
     )
     bot.add_log(f"  Models:   {_claude_status}", "info")
 
+    if _key_count:
+        try:
+            from ai.claude_ai import verify_brain
+            from safety.kya_compliance import model_fallback
+
+            model_fallback.reset()
+            brain = await verify_brain()
+            if brain.get("ok"):
+                bot.add_log(f"  Brain:    ✅ API verified ({brain.get('model', 'Claude')})", "success")
+            else:
+                bot.add_log(f"  Brain:    ❌ {brain.get('error', 'API check failed')[:100]}", "error")
+        except Exception as e:
+            bot.add_log(f"  Brain:    ❌ startup check failed: {str(e)[:100]}", "error")
+
     if COINBASE_API_KEY and COINBASE_API_SECRET:
         bot.add_log("  Coinbase: ✅ authenticated WS", "info")
     elif COINBASE_API_KEY:

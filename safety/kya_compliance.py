@@ -221,6 +221,23 @@ def build_audit_entry(
     return entry
 
 
+def _is_account_level_error(error: str) -> bool:
+    """True when the failure is account-wide (billing, auth) — switching models won't help."""
+    lower = error.lower()
+    return any(
+        phrase in lower
+        for phrase in (
+            "credit balance",
+            "balance is zero",
+            "balance is too low",
+            "no anthropic api key",
+            "invalid api key",
+            "authentication",
+            "permission denied",
+        )
+    )
+
+
 class MultiModelFallback:
     """Handles graceful degradation when the primary AI model is unavailable.
 
@@ -239,6 +256,7 @@ class MultiModelFallback:
     def __init__(self):
         self.primary_failures: int = 0
         self.last_failure_ts: float = 0
+        self.last_error: str = ""
         self.current_model_idx: int = 0
         self.defensive_mode: bool = False
         self._failure_window_sec = 300  # 5 min window for counting failures
@@ -257,9 +275,16 @@ class MultiModelFallback:
         if now - self.last_failure_ts > self._failure_window_sec:
             self.primary_failures = 0
         self.last_failure_ts = now
+        self.last_error = error
         self.primary_failures += 1
 
         logger.warning(f"Model {model} failed ({self.primary_failures}x): {error[:60]}")
+
+        # Billing/auth errors affect every model — don't waste calls cycling the fallback chain.
+        if _is_account_level_error(error):
+            self.defensive_mode = True
+            logger.error("Account-level API error — entering DEFENSIVE MODE: %s", error[:80])
+            return None
 
         if self.primary_failures >= self._defensive_threshold:
             self.defensive_mode = True
@@ -286,12 +311,19 @@ class MultiModelFallback:
         """True if all models have failed and bot should enter defensive mode."""
         return self.defensive_mode
 
+    def defensive_reason(self) -> str:
+        """Human-readable reason defensive mode was entered."""
+        if self.last_error:
+            return self.last_error
+        return "All AI models failed"
+
     def reset(self) -> None:
         """Clear defensive mode and failure counters. Use after adding Anthropic credits."""
         self.primary_failures = 0
         self.current_model_idx = 0
         self.defensive_mode = False
         self.last_failure_ts = 0
+        self.last_error = ""
         logger.info("Model fallback reset — brain ready for new API calls")
 
     def snapshot(self) -> dict:
@@ -302,6 +334,7 @@ class MultiModelFallback:
             if self.current_model_idx < len(self.FALLBACK_CHAIN)
             else "none",
             "defensive_mode": self.defensive_mode,
+            "last_error": self.last_error or None,
             "last_failure_age_sec": round(time.time() - self.last_failure_ts, 1) if self.last_failure_ts else None,
         }
 

@@ -630,7 +630,7 @@ async def _api_call(model: str, system: Any, user_msg: Any, max_tokens: int = 80
     model = normalize_model_id(model)
     effective_model = normalize_model_id(model_fallback.get_current_model(model))
     if model_fallback.is_defensive():
-        raise Exception("All AI models failed — defensive mode active. No new trades.")
+        raise Exception(f"{model_fallback.defensive_reason()} — defensive mode active. No new trades.")
 
     api_key = get_next_key()
     if not api_key:
