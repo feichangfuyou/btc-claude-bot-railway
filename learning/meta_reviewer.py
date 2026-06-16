@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 import httpx
 
 from core.database import (
+    db_get_shadow_stats,
     db_load_state,
     db_save_state,
     get_conn,
@@ -119,6 +120,7 @@ def _get_review_stats(days: int) -> dict:
             "total_trades": total_trades,
             "qualitative_samples": [dict(t) for t in trades],
             "sessions": [dict(s) for s in sessions],
+            "shadow_analytics": db_get_shadow_stats(),
         }
     finally:
         conn.close()

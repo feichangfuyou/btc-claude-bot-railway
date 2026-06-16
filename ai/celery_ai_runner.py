@@ -28,7 +28,9 @@ from core.config import (
 )
 from learning.memory_compactor import get_compacted_wisdom
 
-SCOUT_MODEL = "claude-3-haiku-20240307"
+from ai.claude_ai import DEFAULT_HAIKU_MODEL
+
+SCOUT_MODEL = DEFAULT_HAIKU_MODEL
 logger = logging.getLogger("claudebot.celery_ai")
 
 
@@ -130,7 +132,7 @@ async def run_ai_analysis_from_state(state: dict, skip_scout: bool = False) -> d
             f"  Regime: {scout_result.get('regime', '?')}\n"
         )
 
-    compacted_wisdom = get_compacted_wisdom()
+    compacted_wisdom = state.get("compacted_wisdom") or get_compacted_wisdom()
     compacted_section = f"\n\n{compacted_wisdom}\n" if compacted_wisdom else ""
 
     snap = {
@@ -147,6 +149,9 @@ async def run_ai_analysis_from_state(state: dict, skip_scout: bool = False) -> d
         "anti_overtrade": anti_overtrade,
         "memory_briefing": memory_briefing,
         "pattern_verdicts": pattern_verdicts,
+        "compacted_wisdom": compacted_wisdom,
+        "shadow_analytics": state.get("shadow_analytics", {}),
+        "trading_preset_name": state.get("trading_preset_name", ""),
         "mission": state.get("mission", "Trade when edge exists. Preserve capital."),
     }
 

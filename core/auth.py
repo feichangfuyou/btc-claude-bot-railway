@@ -42,6 +42,28 @@ class AuthenticatedUser:
         return f"<User {self.email} ({self.id[:8]}...) - {self.subscription_tier}:{self.subscription_status}>"
 
 
+def parse_admin_emails() -> list[str]:
+    from core.config import ADMIN_EMAILS
+
+    return [e.strip().lower() for e in ADMIN_EMAILS.split(",") if e.strip()]
+
+
+def is_admin_email(email: str) -> bool:
+    """True only for emails on the ADMIN_EMAILS allowlist."""
+    if not email:
+        return False
+    return email.strip().lower() in parse_admin_emails()
+
+
+def resolve_role(email: str, profile_role: str = "authenticated") -> str:
+    """Admin role is granted only via ADMIN_EMAILS — never from profile.role alone."""
+    if is_admin_email(email):
+        return "admin"
+    if profile_role == "admin":
+        return "authenticated"
+    return profile_role or "authenticated"
+
+
 async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
@@ -87,14 +109,8 @@ async def get_current_user(
         config = load_user_config(user.id)
 
         email = user.email or ""
-        # Role should come from the user's profile/config, not hardcoded emails
-        role = config.role if hasattr(config, "role") else "authenticated"
-
-        # Check for admin emails in environment if role is not already admin
-        from core.config import ADMIN_EMAILS
-
-        if role != "admin" and email.lower() in [e.strip().lower() for e in ADMIN_EMAILS.split(",") if e.strip()]:
-            role = "admin"
+        profile_role = config.role if hasattr(config, "role") else "authenticated"
+        role = resolve_role(email, profile_role)
 
         return AuthenticatedUser(
             user_id=user.id,

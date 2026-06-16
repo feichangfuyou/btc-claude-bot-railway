@@ -13,9 +13,11 @@ function readChartViewMode() {
   }
 }
 
+import { localPaperSecret } from "../utils/localDevAuth.js";
+
 const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL
   || (import.meta.env.DEV ? "http://localhost:8000" : "");
-const API_SECRET = import.meta.env.DEV ? (import.meta.env.VITE_BOT_API_SECRET || "") : "";
+const API_SECRET = localPaperSecret();
 
 export const ChartSection = memo(function ChartSection({
   chartSymbol, setChartSymbol, selectedCoin, positions, price,

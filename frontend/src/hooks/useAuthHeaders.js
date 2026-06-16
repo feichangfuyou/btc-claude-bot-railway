@@ -1,9 +1,8 @@
 import { useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext.jsx";
+import { localPaperSecret } from "../utils/localDevAuth.js";
 
-// VITE_BOT_API_SECRET is a dev-only shortcut for local single-user testing.
-// In production multi-user deployments, leave it unset — Supabase JWT handles auth.
-const API_SECRET = import.meta.env.DEV ? (import.meta.env.VITE_BOT_API_SECRET || "") : "";
+const API_SECRET = localPaperSecret();
 
 /** Returns headers for backend API calls. Uses Bearer token when user is logged in; falls back to x-bot-secret in dev. */
 export function useAuthHeaders() {

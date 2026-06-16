@@ -8,6 +8,7 @@ import logging
 import os
 import sqlite3
 import threading
+import time
 from collections import deque
 from datetime import datetime, timedelta
 from logging.handlers import RotatingFileHandler
@@ -372,10 +373,41 @@ def init_db():
                 ts TEXT
             )""")
 
+        # ── Shadow decisions: counterfactual AI decision tracking ───────
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS shadow_decisions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts REAL,
+                symbol TEXT,
+                proposed_action TEXT,
+                final_action TEXT,
+                confidence REAL,
+                confluence_score INTEGER,
+                regime TEXT,
+                gate_action TEXT,
+                gate_reasons TEXT,
+                gate_checks TEXT,
+                executed INTEGER DEFAULT 0,
+                blocked_by_gate INTEGER DEFAULT 0,
+                entry_price REAL,
+                price_1h REAL,
+                price_4h REAL,
+                counterfactual_pnl_1h REAL,
+                counterfactual_pnl_4h REAL,
+                fingerprint TEXT,
+                adversary_verdict TEXT
+            )""")
+
         for col, sql_type in [
             ("product_type", "TEXT DEFAULT 'spot'"),
             ("onchain", "INTEGER DEFAULT 0"),
             ("leverage", "INTEGER DEFAULT 1"),
+            ("reasoning", "TEXT"),
+            ("key_signals_json", "TEXT"),
+            ("trading_preset", "TEXT"),
+            ("adversary_verdict", "TEXT"),
+            ("exit_reason", "TEXT"),
+            ("meta_json", "TEXT"),
         ]:
             try:
                 c.execute(f"ALTER TABLE trade_context ADD COLUMN {col} {sql_type}")
@@ -595,6 +627,20 @@ def db_load_all_trades(
 # ── Trade context (full snapshot at trade time) ───────────────────────────────
 
 
+def _parse_trade_context_row(row) -> dict:
+    d = dict(row)
+    for json_col, key in (("patterns_json", "patterns"), ("key_signals_json", "key_signals"), ("meta_json", "meta")):
+        raw = d.pop(json_col, None)
+        if raw:
+            try:
+                d[key] = json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                d[key] = [] if key != "meta" else {}
+        else:
+            d[key] = [] if key != "meta" else {}
+    return d
+
+
 def db_save_trade_context(ctx: dict):
     conn = get_conn()
     try:
@@ -602,14 +648,20 @@ def db_save_trade_context(ctx: dict):
         product_type = ctx.get("product_type", "spot")
         onchain = int(ctx.get("onchain", False))
         leverage = ctx.get("leverage", 1) or 1
+        meta = ctx.get("meta") or {}
+        if not meta:
+            for k in ("model_used", "reasons_to_trade", "reasons_to_wait", "news_sentiment", "gate_action"):
+                if ctx.get(k) is not None:
+                    meta[k] = ctx.get(k)
         conn.execute(
             """INSERT INTO trade_context
             (trade_id, symbol, side, entry_price, exit_price, pnl, win,
              confidence, confluence_score, regime, patterns_json,
              indicators_json, fear_greed, size_pct, rr_ratio,
              hold_duration_sec, hour_of_day, day_of_week, ts,
-             product_type, onchain, leverage)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             product_type, onchain, leverage, reasoning, key_signals_json,
+             trading_preset, adversary_verdict, exit_reason, meta_json)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 ctx.get("trade_id"),
                 ctx.get("symbol", "BTC"),
@@ -633,6 +685,12 @@ def db_save_trade_context(ctx: dict):
                 product_type,
                 onchain,
                 leverage,
+                (ctx.get("reasoning") or "")[:500],
+                json.dumps(ctx.get("key_signals", [])),
+                ctx.get("trading_preset", ""),
+                ctx.get("adversary_verdict", ""),
+                ctx.get("exit_reason", ""),
+                json.dumps(meta) if meta else None,
             ),
         )
         conn.commit()
@@ -927,9 +985,92 @@ def db_get_recent_trade_contexts(limit: int = 20) -> list[dict]:
             """SELECT symbol, side, entry_price, exit_price, pnl, win,
                 confidence, confluence_score, regime, patterns_json,
                 fear_greed, size_pct, rr_ratio, hold_duration_sec,
-                hour_of_day, ts
+                hour_of_day, ts, reasoning, key_signals_json, trading_preset,
+                adversary_verdict, exit_reason, meta_json
             FROM trade_context
             ORDER BY id DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [_parse_trade_context_row(r) for r in rows]
+
+
+def db_get_preset_performance(min_samples: int = 3) -> list[dict]:
+    """Win rate and P&L grouped by trading preset used at entry."""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT trading_preset AS preset,
+                      COUNT(*) AS total,
+                      SUM(win) AS wins,
+                      ROUND(AVG(pnl), 2) AS avg_pnl,
+                      ROUND(SUM(pnl), 2) AS total_pnl
+               FROM trade_context
+               WHERE trading_preset IS NOT NULL AND trading_preset != ''
+               GROUP BY trading_preset
+               HAVING COUNT(*) >= ?
+               ORDER BY avg_pnl DESC""",
+            (min_samples,),
+        ).fetchall()
+    finally:
+        conn.close()
+    result = []
+    for r in rows:
+        d = dict(r)
+        total = d.get("total") or 0
+        wins = d.get("wins") or 0
+        d["win_rate"] = round(wins / total * 100, 1) if total else 0
+        result.append(d)
+    return result
+
+
+def db_get_exit_reason_stats(min_samples: int = 3) -> list[dict]:
+    """How TP hits vs SL hits vs other exits perform."""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT
+                 CASE
+                   WHEN exit_reason LIKE '%TP%' OR exit_reason LIKE '%take%profit%' THEN 'tp_hit'
+                   WHEN exit_reason LIKE '%SL%' OR exit_reason LIKE '%stop%' THEN 'sl_hit'
+                   WHEN exit_reason LIKE '%Stale%' THEN 'stale_exit'
+                   WHEN exit_reason LIKE '%AI%' OR exit_reason LIKE '%close%' THEN 'ai_close'
+                   ELSE 'other'
+                 END AS exit_type,
+                 COUNT(*) AS total,
+                 SUM(win) AS wins,
+                 ROUND(AVG(pnl), 2) AS avg_pnl
+               FROM trade_context
+               WHERE exit_reason IS NOT NULL AND exit_reason != ''
+               GROUP BY exit_type
+               HAVING COUNT(*) >= ?""",
+            (min_samples,),
+        ).fetchall()
+    finally:
+        conn.close()
+    result = []
+    for r in rows:
+        d = dict(r)
+        total = d.get("total") or 0
+        wins = d.get("wins") or 0
+        d["win_rate"] = round(wins / total * 100, 1) if total else 0
+        result.append(d)
+    return result
+
+
+def db_get_shadow_learning_rows(limit: int = 100) -> list[dict]:
+    """Blocked/executed shadow rows with 1h counterfactual outcomes for learning."""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT symbol, proposed_action, final_action, confidence,
+                      confluence_score, regime, gate_action, gate_reasons,
+                      executed, blocked_by_gate, counterfactual_pnl_1h,
+                      adversary_verdict, fingerprint
+               FROM shadow_decisions
+               WHERE counterfactual_pnl_1h IS NOT NULL
+               ORDER BY id DESC LIMIT ?""",
             (limit,),
         ).fetchall()
     finally:
@@ -937,10 +1078,12 @@ def db_get_recent_trade_contexts(limit: int = 20) -> list[dict]:
     result = []
     for r in rows:
         d = dict(r)
-        try:
-            d["patterns"] = json.loads(d.pop("patterns_json", "[]"))
-        except Exception:
-            d["patterns"] = []
+        raw = d.get("gate_reasons")
+        if raw and isinstance(raw, str):
+            try:
+                d["gate_reasons"] = json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                d["gate_reasons"] = [raw]
         result.append(d)
     return result
 
@@ -1441,6 +1584,289 @@ def db_get_adversary_stats() -> dict:
         return {"total_vetoes": 0, "total_reduces": 0, "latest_vetoes": []}
     finally:
         conn.close()
+
+
+# ── Shadow decision log (counterfactual tracking) ────────────────────────────
+
+
+def db_save_shadow_decision(row: dict) -> int | None:
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            """INSERT INTO shadow_decisions
+            (ts, symbol, proposed_action, final_action, confidence, confluence_score,
+             regime, gate_action, gate_reasons, gate_checks, executed, blocked_by_gate,
+             entry_price, fingerprint, adversary_verdict)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                row.get("ts", time.time()),
+                row.get("symbol", "BTC"),
+                row.get("proposed_action", "wait"),
+                row.get("final_action", "wait"),
+                row.get("confidence", 0),
+                row.get("confluence_score", 0),
+                row.get("regime", ""),
+                row.get("gate_action", "pass"),
+                json.dumps(row.get("gate_reasons", [])),
+                json.dumps(row.get("gate_checks", [])),
+                1 if row.get("executed") else 0,
+                1 if row.get("blocked_by_gate") else 0,
+                row.get("entry_price"),
+                row.get("fingerprint", ""),
+                row.get("adversary_verdict", "none"),
+            ),
+        )
+        conn.commit()
+        return cur.lastrowid
+    except Exception:
+        return None
+    finally:
+        conn.close()
+
+
+def db_get_pending_shadow_updates(now: float | None = None) -> list[dict]:
+    """Rows needing 1h or 4h outcome prices."""
+    now = now or time.time()
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT * FROM shadow_decisions
+            WHERE proposed_action IN ('buy', 'sell')
+              AND entry_price > 0
+              AND (
+                (ts <= ? AND price_1h IS NULL)
+                OR (ts <= ? AND price_4h IS NULL)
+              )
+            ORDER BY ts ASC
+            LIMIT 200""",
+            (now - 3600, now - 14400),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
+
+def db_update_shadow_outcome(row_id: int, updates: dict) -> None:
+    if not updates:
+        return
+    allowed = {
+        "price_1h",
+        "price_4h",
+        "counterfactual_pnl_1h",
+        "counterfactual_pnl_4h",
+    }
+    sets = []
+    vals = []
+    for key, val in updates.items():
+        if key in allowed:
+            sets.append(f"{key} = ?")
+            vals.append(val)
+    if not sets:
+        return
+    vals.append(row_id)
+    conn = get_conn()
+    try:
+        conn.execute(f"UPDATE shadow_decisions SET {', '.join(sets)} WHERE id = ?", vals)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def db_get_shadow_stats() -> dict:
+    conn = get_conn()
+    try:
+        total = conn.execute("SELECT COUNT(*) FROM shadow_decisions").fetchone()[0]
+        blocked = conn.execute(
+            "SELECT COUNT(*) FROM shadow_decisions WHERE blocked_by_gate = 1"
+        ).fetchone()[0]
+        executed = conn.execute(
+            "SELECT COUNT(*) FROM shadow_decisions WHERE executed = 1"
+        ).fetchone()[0]
+        with_1h = conn.execute(
+            "SELECT COUNT(*) FROM shadow_decisions WHERE counterfactual_pnl_1h IS NOT NULL"
+        ).fetchone()[0]
+
+        blocked_saved = conn.execute(
+            """SELECT AVG(counterfactual_pnl_1h) FROM shadow_decisions
+            WHERE blocked_by_gate = 1 AND counterfactual_pnl_1h IS NOT NULL
+              AND counterfactual_pnl_1h < 0"""
+        ).fetchone()[0]
+
+        missed_gain = conn.execute(
+            """SELECT AVG(counterfactual_pnl_1h) FROM shadow_decisions
+            WHERE blocked_by_gate = 1 AND counterfactual_pnl_1h IS NOT NULL
+              AND counterfactual_pnl_1h > 0"""
+        ).fetchone()[0]
+
+        executed_avg = conn.execute(
+            """SELECT AVG(counterfactual_pnl_1h) FROM shadow_decisions
+            WHERE executed = 1 AND counterfactual_pnl_1h IS NOT NULL"""
+        ).fetchone()[0]
+
+        recent = conn.execute(
+            """SELECT symbol, proposed_action, gate_action, gate_reasons,
+                      blocked_by_gate, executed, counterfactual_pnl_1h, ts
+            FROM shadow_decisions ORDER BY id DESC LIMIT 10"""
+        ).fetchall()
+
+        return {
+            "total_logged": total,
+            "blocked_by_gate": blocked,
+            "executed": executed,
+            "with_1h_outcome": with_1h,
+            "blocked_avg_loss_avoided_pct": round(blocked_saved or 0, 3),
+            "blocked_avg_opportunity_cost_pct": round(missed_gain or 0, 3),
+            "executed_avg_1h_move_pct": round(executed_avg or 0, 3),
+            "recent": [dict(r) for r in recent],
+        }
+    except Exception:
+        return {"total_logged": 0, "blocked_by_gate": 0, "executed": 0, "recent": []}
+    finally:
+        conn.close()
+
+
+def db_get_shadow_report(days: int = 7) -> dict:
+    """
+    Detailed shadow analytics for a rolling window (default 7 days).
+    Used by scripts/shadow_weekly_report.py and optional API export.
+    """
+    since = time.time() - days * 86400
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT * FROM shadow_decisions
+            WHERE ts >= ?
+            ORDER BY ts DESC""",
+            (since,),
+        ).fetchall()
+        all_rows = [dict(r) for r in rows]
+    except Exception:
+        return {"error": "shadow_decisions table missing — run bot with SHADOW_MODE_ENABLED=true"}
+    finally:
+        conn.close()
+
+    if not all_rows:
+        return {
+            "days": days,
+            "since_ts": since,
+            "total_logged": 0,
+            "message": "No shadow decisions in window — keep paper trading running",
+        }
+
+    def _parse_reasons(raw) -> list[str]:
+        if not raw:
+            return []
+        if isinstance(raw, list):
+            return raw
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, list) else [str(parsed)]
+        except (json.JSONDecodeError, TypeError):
+            return [str(raw)]
+
+    def _category(reason: str) -> str:
+        r = reason.lower()
+        if "kill switch" in r or "semantic" in r:
+            return "semantic_kill_switch"
+        if "adversary" in r:
+            return "adversary"
+        if "learned rule" in r or "memory avoid" in r:
+            return "learned_rule"
+        if "confidence" in r:
+            return "min_confidence"
+        if "spread" in r:
+            return "spread"
+        if "circuit breaker" in r or "cooldown" in r or "daily loss" in r:
+            return "can_trade"
+        return "other"
+
+    proposed_trades = [r for r in all_rows if r.get("proposed_action") in ("buy", "sell")]
+    blocked = [r for r in proposed_trades if r.get("blocked_by_gate")]
+    executed = [r for r in proposed_trades if r.get("executed")]
+    with_1h = [r for r in proposed_trades if r.get("counterfactual_pnl_1h") is not None]
+    pending_1h = [r for r in proposed_trades if r.get("counterfactual_pnl_1h") is None]
+
+    blocked_with_1h = [r for r in blocked if r.get("counterfactual_pnl_1h") is not None]
+    saves = [r for r in blocked_with_1h if r["counterfactual_pnl_1h"] < 0]
+    missed = [r for r in blocked_with_1h if r["counterfactual_pnl_1h"] > 0]
+    flat = [r for r in blocked_with_1h if r["counterfactual_pnl_1h"] == 0]
+
+    executed_with_1h = [r for r in executed if r.get("counterfactual_pnl_1h") is not None]
+    exec_wins = [r for r in executed_with_1h if r["counterfactual_pnl_1h"] > 0]
+    exec_losses = [r for r in executed_with_1h if r["counterfactual_pnl_1h"] < 0]
+
+    save_pct_sum = sum(abs(r["counterfactual_pnl_1h"]) for r in saves)
+    missed_pct_sum = sum(r["counterfactual_pnl_1h"] for r in missed)
+    net_gate_value = round(save_pct_sum - missed_pct_sum, 3)
+
+    reason_counts: dict[str, int] = {}
+    for r in blocked:
+        reasons = _parse_reasons(r.get("gate_reasons"))
+        cat = _category(reasons[0]) if reasons else "unknown"
+        reason_counts[cat] = reason_counts.get(cat, 0) + 1
+
+    def _top(rows, key, n=5):
+        sorted_rows = sorted(rows, key=lambda x: abs(x.get(key) or 0), reverse=True)
+        out = []
+        for r in sorted_rows[:n]:
+            reasons = _parse_reasons(r.get("gate_reasons"))
+            out.append(
+                {
+                    "symbol": r.get("symbol"),
+                    "action": r.get("proposed_action"),
+                    "pnl_1h_pct": r.get("counterfactual_pnl_1h"),
+                    "pnl_4h_pct": r.get("counterfactual_pnl_4h"),
+                    "reason": reasons[0][:80] if reasons else "",
+                    "confidence": r.get("confidence"),
+                }
+            )
+        return out
+
+    save_rate = round(100 * len(saves) / len(blocked_with_1h), 1) if blocked_with_1h else 0
+    exec_win_rate = round(100 * len(exec_wins) / len(executed_with_1h), 1) if executed_with_1h else 0
+
+    if len(with_1h) < 5:
+        verdict = "INSUFFICIENT DATA — need 5+ decisions with 1h outcomes (run bot longer)"
+    elif net_gate_value > 2 and save_rate >= 55:
+        verdict = "GO — risk gate is net positive; blocks saving more than they cost"
+    elif net_gate_value > 0:
+        verdict = "CAUTION — gate slightly positive; tune block reasons with low save rate"
+    elif net_gate_value < -2:
+        verdict = "NO-GO — gate blocking winners; loosen RISK_GATE_MIN_CONFIDENCE or review rules"
+    else:
+        verdict = "NEUTRAL — gate roughly break-even; collect more data"
+
+    return {
+        "days": days,
+        "since_ts": since,
+        "total_logged": len(all_rows),
+        "proposed_trades": len(proposed_trades),
+        "blocked_by_gate": len(blocked),
+        "executed": len(executed),
+        "with_1h_outcome": len(with_1h),
+        "pending_1h_outcome": len(pending_1h),
+        "blocked_with_1h": len(blocked_with_1h),
+        "saves_count": len(saves),
+        "missed_count": len(missed),
+        "flat_blocked_count": len(flat),
+        "save_rate_pct": save_rate,
+        "loss_avoided_pct_sum": round(save_pct_sum, 3),
+        "opportunity_cost_pct_sum": round(missed_pct_sum, 3),
+        "net_gate_value_pct": net_gate_value,
+        "executed_with_1h": len(executed_with_1h),
+        "executed_win_rate_1h_pct": exec_win_rate,
+        "executed_avg_1h_pct": round(
+            sum(r["counterfactual_pnl_1h"] for r in executed_with_1h) / len(executed_with_1h), 3
+        )
+        if executed_with_1h
+        else 0,
+        "block_reasons": dict(sorted(reason_counts.items(), key=lambda x: -x[1])),
+        "top_saves": _top(saves, "counterfactual_pnl_1h"),
+        "top_missed": _top(missed, "counterfactual_pnl_1h"),
+        "verdict": verdict,
+    }
 
 
 # ─── 10k scale: Postgres router ─────────────────────────────────────────────

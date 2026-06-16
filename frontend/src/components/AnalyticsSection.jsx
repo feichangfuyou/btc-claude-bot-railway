@@ -68,12 +68,14 @@ export function AnalyticsSection({ connected, log, lossToast, news, send }) {
         const d = await safeFetch(`/memory/calibration`);
         setCalibrationData(d);
       } else if (tab === "news") {
-        const [n, a] = await Promise.all([
-          safeFetch(`/api/market/news?symbol=all`),
-          safeFetch(`/api/analytics/adversary`),
-        ]);
-        setNewsData(n);
-        setAdversaryStats(a);
+        const newsPromise = safeFetch(`/api/market/news?symbol=all`).then(setNewsData).catch((e) => {
+          log?.(`News: ${e.message}`, "error");
+          setNewsData({ error: e.message, headlines: [] });
+        });
+        const adversaryPromise = safeFetch(`/api/analytics/adversary`).then(setAdversaryStats).catch((e) => {
+          log?.(`Adversary stats: ${e.message}`, "warning");
+        });
+        await Promise.all([newsPromise, adversaryPromise]);
       }
     } catch (e) {
       log?.(`Analytics: ${e.message}`, "error");

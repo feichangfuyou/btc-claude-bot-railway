@@ -67,6 +67,19 @@ class UserBotInstance:
             self.trades = udb_load_trades(self.user_id, limit=50)
         except Exception as e:
             logger.warning(f"Failed to load state for user {self.user_id[:8]}: {e}")
+        self._sync_from_paper_engine()
+
+    def _sync_from_paper_engine(self):
+        """Paper trades run on the global bot — keep per-user view in sync."""
+        from core.config import PAPER_TRADING
+
+        if not PAPER_TRADING:
+            return
+        from core.shared import bot
+
+        self.balance = bot.account["balance"]
+        self.daily_pnl = bot.account["daily_pnl"]
+        self.total_pnl = bot.account["total_pnl"]
 
     def persist_state(self):
         """Save current state to Supabase and broadcast to other instances (10k scale)."""

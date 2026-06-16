@@ -6,7 +6,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from ai.claude_ai import call_claude, get_cost_tracker
 from api.agentkit_provider import agentkit
 from core.ai_state_builder import build_ai_state
-from core.auth import AuthenticatedUser, get_active_user
+from core.auth import AuthenticatedUser, get_active_user, is_admin_email
 from core.bot_manager import bot_manager
 from core.config import (
     USE_CELERY_AI,
@@ -24,6 +24,8 @@ from core.shared import (
     AI_STATE_TTL,
     _pending_ai_tasks,
     bot,
+    resolve_account_snapshot,
+    resolve_user_trades,
 )
 from core.user_database import (
     udb_get_equity_curve,
@@ -175,7 +177,7 @@ async def get_trade_history(
 @router.get("/account")
 async def get_account(user: AuthenticatedUser = Depends(get_active_user)):
     instance = await bot_manager.get_or_create(user.id)
-    snap = instance.account_snapshot()
+    snap = resolve_account_snapshot(user.id, instance)
     return {
         **snap,
         "trading_preset": instance.config.trading_preset,
@@ -226,8 +228,8 @@ async def set_preset(body: dict = Body(default={}), user: AuthenticatedUser = De
 @router.get("/stats")
 async def get_stats(user: AuthenticatedUser = Depends(get_active_user)):
     instance = await bot_manager.get_or_create(user.id)
-    trades = instance.trades
-    account = instance.account_snapshot()
+    trades = resolve_user_trades(instance)
+    account = resolve_account_snapshot(user.id, instance)
     pnls = [t["pnl"] for t in trades]
     wins = [p for p in pnls if p > 0]
     losses = [p for p in pnls if p < 0]
@@ -255,6 +257,14 @@ async def get_adversary_analytics(user: AuthenticatedUser = Depends(get_active_u
     from core.database import db_get_adversary_stats
 
     return db_get_adversary_stats()
+
+
+@router.get("/api/analytics/shadow")
+async def get_shadow_analytics(user: AuthenticatedUser = Depends(get_active_user)):
+    """Counterfactual decision analytics — did risk gate blocks save or cost money?"""
+    from safety.shadow_logger import get_shadow_analytics as _shadow_stats
+
+    return _shadow_stats()
 
 
 @router.get("/wallet")
@@ -286,7 +296,7 @@ async def get_equity(user: AuthenticatedUser = Depends(get_active_user)):
 @router.post("/emergency/stop")
 async def emergency_stop(request: Request, user: AuthenticatedUser = Depends(get_active_user)):
     # Admin only or localhost check
-    if user.role != "admin":
+    if not is_admin_email(user.email):
         host = request.client.host if request.client else ""
         if host not in ("127.0.0.1", "::1", "localhost"):
             raise HTTPException(status_code=403, detail="Emergency stop restricted to admins")

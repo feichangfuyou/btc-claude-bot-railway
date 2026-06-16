@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
+import { isAdminEmail } from "../utils/adminEmails.js";
 import { colors, typography } from "../theme.js";
 import { ArrowLeft, Check, X, ExternalLink, RefreshCw, ShieldAlert } from "lucide-react";
 
 const BACKEND_BASE = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || (import.meta.env.DEV ? "http://localhost:8000" : "");
 
 export default function AdminManualPayments() {
-  const { profile } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const getAuthHeaders = useAuthHeaders();
   const [payments, setPayments] = useState([]);
@@ -16,13 +17,13 @@ export default function AdminManualPayments() {
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState("pending");
 
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = isAdminEmail(user?.email);
 
   useEffect(() => {
-    if (profile && !isAdmin) {
+    if (user && !isAdmin) {
       navigate("/dashboard");
     }
-  }, [profile, isAdmin, navigate]);
+  }, [user, isAdmin, navigate]);
 
   const fetchPayments = useCallback(async () => {
     setLoading(true);

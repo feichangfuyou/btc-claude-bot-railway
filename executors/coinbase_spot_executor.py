@@ -11,7 +11,7 @@ from api.coinbase_api import create_spot_market_order, is_configured
 from core.config import AI_COST_PER_TRADE, ROUND_TRIP_FEE
 from core.database import db_save_trade, file_log
 from core.key_resolution import resolve_exchange_keys
-from learning.trade_memory import record_trade_memory, run_learning_cycle
+from learning.trade_memory import record_trade_memory, trigger_post_trade_learning
 from utils.notifications import send_notification
 
 
@@ -132,15 +132,20 @@ async def close_coinbase_spot(bot, pos: dict, reason: str = "⚡ COINBASE CLOSE"
         db_save_trade(trade)
         coin_state = bot.coins.get(pos_symbol)
         try:
-            record_trade_memory(trade, pos, coin_state, bot.fear_greed.get("value", 50), bot.account["balance"])
+            record_trade_memory(
+                trade,
+                pos,
+                coin_state,
+                bot.fear_greed.get("value", 50),
+                bot.account["balance"],
+                trading_preset=getattr(bot, "trading_preset", ""),
+            )
         except Exception as e:
             file_log(f"Trade memory record error [{pos_symbol}]: {e}", "warning")
-        if net <= 0:
-            try:
-                run_learning_cycle()
-                bot.add_log("📉 Loss recorded — learning cycle run", "dim")
-            except Exception as e:
-                file_log(f"Post-loss learning cycle error [{pos_symbol}]: {e}", "warning")
+        try:
+            trigger_post_trade_learning(net, pos_symbol)
+        except Exception as e:
+            file_log(f"Post-trade learning cycle error [{pos_symbol}]: {e}", "warning")
         bot.remove_position(pos)
         bot.persist_position()
         bot.persist_account()
@@ -176,8 +181,7 @@ def _set_coinbase_position(bot, action, symbol, entry, tp, sl, coin_sz, usd_sz, 
         "btc_size": coin_sz,
         "usd_size": usd_sz,
         "open_ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "confidence": decision.get("confidence", 0),
-        "patterns": decision.get("patterns_detected", []),
+        **bot._decision_context_for_position(decision),
         "exchange": "coinbase",
         "order_id": order_id,
     }

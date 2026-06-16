@@ -8,6 +8,9 @@ Usage:
 import os
 import sys
 
+# Reduce glibc arena fragmentation (helps avoid OOM on long-running local dev)
+os.environ.setdefault("MALLOC_ARENA_MAX", "2")
+
 import uvicorn
 
 from core.config import ANTHROPIC_API_KEY, API_SECRET

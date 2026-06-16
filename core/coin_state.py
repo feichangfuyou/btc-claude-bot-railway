@@ -71,6 +71,11 @@ class CoinState:
         """Update 24h change without affecting price/history (used by stats refresh)."""
         self.price_change24h = change24h
 
+    def touch_price_freshness(self):
+        """Mark price as live without changing value (WS ticker heartbeat)."""
+        if self.price > 0:
+            self._last_price_ts = time.time()
+
     def backfill_prices(self, prices: list[float], volumes: list[float] | None = None):
         """Warm indicators with historical price series. Used on cold start."""
         if not prices:

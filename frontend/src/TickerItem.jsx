@@ -72,26 +72,31 @@ function TickerItem({
     }
   }, [chg24h]);
 
+  const sideBorderColor = isSelected
+    ? `${colors.gold}55`
+    : hasPosition
+      ? `${colors.success}33`
+      : "transparent";
+
   return (
     <button
       className={`coin-btn ticker-text ${isSelected ? "selected" : ""}`}
       onClick={onClick}
       style={{
         cursor: "pointer",
-        border: isSelected
-          ? `1px solid ${colors.gold}55`
-          : hasPosition
-            ? `1px solid ${colors.success}33`
-            : "1px solid transparent",
+        borderTop: `1px solid ${sideBorderColor}`,
+        borderLeft: `1px solid ${sideBorderColor}`,
+        borderRight: `1px solid ${sideBorderColor}`,
+        borderBottom: isSelected ? `2px solid ${colors.gold}` : `1px solid ${sideBorderColor}`,
         background: isSelected ? "rgba(212,175,55,0.08)" : "transparent",
         color: isSelected ? "#fff" : colors.text,
-        borderBottom: isSelected ? `2px solid ${colors.gold}` : "none",
         boxShadow: isSelected
           ? "0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -1px 0 rgba(0,0,0,0.12), 0 0 12px rgba(212,175,55,0.06)"
           : "none",
         backdropFilter: isSelected ? "blur(12px) saturate(1.3)" : "none",
         WebkitBackdropFilter: isSelected ? "blur(12px) saturate(1.3)" : "none",
-        transition: "border-color 0.3s, background 0.3s, color 0.15s, box-shadow 0.35s",
+        transition:
+          "border-color 0.3s, border-bottom-color 0.3s, background 0.3s, color 0.15s, box-shadow 0.35s",
         position: "relative",
         whiteSpace: "nowrap",
       }}

@@ -12,7 +12,7 @@ from billing.manual_handler import (
     verify_payment_admin,
 )
 from billing.stripe_handler import create_checkout_session, handle_webhook
-from core.auth import AuthenticatedUser, get_current_user
+from core.auth import AuthenticatedUser, get_current_user, is_admin_email
 from core.shared import _io_executor
 
 router = APIRouter(prefix="/billing", tags=["billing"])
@@ -24,7 +24,7 @@ async def admin_get_payments(
     user: AuthenticatedUser = Depends(get_current_user),
 ):
     """List all manual payments (Admin only)."""
-    if user.role != "admin":
+    if not is_admin_email(user.email):
         raise HTTPException(status_code=403, detail="Admin access required.")
 
     loop = asyncio.get_event_loop()
@@ -40,7 +40,7 @@ async def admin_verify_payment(
     user: AuthenticatedUser = Depends(get_current_user),
 ):
     """Approve or reject a manual payment (Admin only)."""
-    if user.role != "admin":
+    if not is_admin_email(user.email):
         raise HTTPException(status_code=403, detail="Admin access required.")
 
     body = await request.json()

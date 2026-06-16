@@ -18,8 +18,10 @@ import httpx
 from core.config import ANTHROPIC_API_KEY
 from core.database import (
     db_get_active_rules,
+    db_get_preset_performance,
     db_get_recent_trade_contexts,
     db_get_regime_performance,
+    db_get_shadow_stats,
     db_get_total_trade_count,
     db_load_state,
     db_save_state,
@@ -93,6 +95,8 @@ def _build_synthesis_prompt(recent_trades: list, existing_rules: list, regime_pe
             "recent_trades": trades_summary,
             "existing_learned_rules": rules_summary,
             "regime_performance": regime_perf,
+            "preset_performance": db_get_preset_performance(min_samples=2),
+            "shadow_analytics": db_get_shadow_stats(),
             "current_strategy_drive": current_drive[:3000] if current_drive else "(empty — first synthesis)",
         }
     )

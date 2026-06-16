@@ -1,7 +1,19 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { supabase } from "../supabaseClient.js";
+import { isAdminEmail } from "../utils/adminEmails.js";
+import { localPaperSecret } from "../utils/localDevAuth.js";
+
+const LOCAL_PAPER_KEY = "btcBot.localPaper";
 
 const AuthContext = createContext(null);
+
+const LOCAL_DEV_USER = { id: "local-paper", email: "dev@localhost" };
+const LOCAL_DEV_PROFILE = {
+  onboarding_complete: true,
+  subscription_status: "active",
+  subscription_tier: "pro",
+  role: "admin",
+};
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -9,8 +21,40 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mfaChallenge, setMfaChallenge] = useState(null);
+  const [localPaper, setLocalPaper] = useState(() => {
+    try {
+      return !!localPaperSecret() && localStorage.getItem(LOCAL_PAPER_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  const enterLocalPaper = useCallback(() => {
+    if (!localPaperSecret()) return;
+    try { localStorage.setItem(LOCAL_PAPER_KEY, "1"); } catch { /* ignore */ }
+    setLocalPaper(true);
+    setUser(LOCAL_DEV_USER);
+    setProfile(LOCAL_DEV_PROFILE);
+    setSession(null);
+    setLoading(false);
+  }, []);
+
+  const exitLocalPaper = useCallback(() => {
+    try { localStorage.removeItem(LOCAL_PAPER_KEY); } catch { /* ignore */ }
+    setLocalPaper(false);
+    setUser(null);
+    setProfile(null);
+    setSession(null);
+  }, []);
 
   useEffect(() => {
+    if (localPaper) {
+      setUser(LOCAL_DEV_USER);
+      setProfile(LOCAL_DEV_PROFILE);
+      setLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       setUser(s?.user ?? null);
@@ -19,6 +63,7 @@ export function AuthProvider({ children }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (localPaper) return;
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
@@ -31,7 +76,7 @@ export function AuthProvider({ children }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [localPaper]);
 
   async function fetchProfile(userId) {
     try {
@@ -40,7 +85,18 @@ export function AuthProvider({ children }) {
         .select("*")
         .eq("id", userId)
         .single();
-      setProfile(data);
+      let profileData = data;
+      if (profileData && profileData.subscription_status !== "active") {
+        const email = profileData.email || "";
+        if (isAdminEmail(email)) {
+          profileData = {
+            ...profileData,
+            subscription_status: "active",
+            subscription_tier: profileData.subscription_tier || "pro",
+          };
+        }
+      }
+      setProfile(profileData);
     } catch {
       // Profile may not exist yet on first signup
     } finally {
@@ -61,6 +117,11 @@ export function AuthProvider({ children }) {
     // Supabase returns a session if no MFA, or an empty session with mfa metadata if MFA is required
     if (data?.session) {
       return data;
+    }
+
+    // Login MFA is only for allowlisted admin emails — regular users never see this screen
+    if (!isAdminEmail(email)) {
+      throw new Error("Sign-in failed. Please check your email and password.");
     }
 
     // MFA required — get the TOTP factor and create a challenge
@@ -131,6 +192,7 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
+    exitLocalPaper();
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
@@ -148,6 +210,9 @@ export function AuthProvider({ children }) {
     profile,
     loading,
     mfaChallenge,
+    localPaper,
+    enterLocalPaper,
+    exitLocalPaper,
     signUp,
     signIn,
     verifyMfa,

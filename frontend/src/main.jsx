@@ -1,6 +1,6 @@
 import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 import { isAdminEmail } from "./utils/adminEmails.js";
 
@@ -40,7 +40,7 @@ function PageFallback() {
 }
 
 function ProtectedRoute({ children }) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, localPaper } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -52,12 +52,12 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  if (!user) return <Navigate to="/login" replace />;
-  if (profile && !profile.onboarding_complete) return <Navigate to="/onboarding" replace />;
+  if (!user && !localPaper) return <Navigate to="/login" replace />;
+  if (profile && !profile.onboarding_complete && !localPaper) return <Navigate to="/onboarding" replace />;
 
-  const isActive = profile?.subscription_status === "active";
+  const isActive = profile?.subscription_status === "active" || localPaper;
   const isBilling = location.pathname === "/billing";
-  const isAdmin = isAdminEmail(user?.email);
+  const isAdmin = isAdminEmail(user?.email) || localPaper;
 
   if (!isActive && !isBilling && !isAdmin) {
     return <Navigate to="/billing" replace />;
@@ -66,14 +66,27 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function RootRoute() {
+  const [searchParams] = useSearchParams();
+  const code = searchParams.get("code");
+  const oauthErr = searchParams.get("error");
+  if (code || oauthErr) {
+    return <Navigate to={`/oauth/callback?${searchParams.toString()}`} replace />;
+  }
+  return (
+    <PublicRoute>
+      <Login />
+    </PublicRoute>
+  );
+}
+
 function PublicRoute({ children }) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, localPaper } = useAuth();
   if (loading) return null;
-  if (user && profile?.onboarding_complete) return <Navigate to="/dashboard" replace />;
+  if (localPaper || (user && profile?.onboarding_complete)) return <Navigate to="/dashboard" replace />;
   if (user && !profile?.onboarding_complete) return <Navigate to="/onboarding" replace />;
   return children;
 }
-
 function OnboardingRoute() {
   const { user, profile, loading } = useAuth();
   if (loading) return null;
@@ -110,7 +123,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/market/:coin" element={<MarketIndex />} />
-            <Route path="/" element={<PublicRoute><Login /></PublicRoute>} />
+            <Route path="/" element={<RootRoute />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

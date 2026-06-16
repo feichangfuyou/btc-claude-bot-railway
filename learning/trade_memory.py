@@ -18,16 +18,20 @@ from core.database import (
     db_get_confidence_calibration,
     db_get_confluence_analysis,
     db_get_dow_performance,
+    db_get_exit_reason_stats,
     db_get_fear_greed_performance,
     db_get_hold_duration_analysis,
     db_get_hourly_performance,
     db_get_pattern_stats,
+    db_get_preset_performance,
     db_get_recent_losses,
     db_get_recent_trade_contexts,
     db_get_recent_wins,
     db_get_regime_performance,
     db_get_rr_analysis,
     db_get_session_history,
+    db_get_shadow_learning_rows,
+    db_get_shadow_stats,
     db_get_size_analysis,
     db_get_strategy_stats,
     db_get_total_trade_count,
@@ -41,7 +45,39 @@ from core.database import (
 )
 
 
-def record_trade_memory(trade: dict, position: dict, coin_state, fear_greed: int, balance: float):
+def extract_decision_metadata(decision: dict | None, trading_preset: str = "") -> dict:
+    """Pull every learnable field from an AI trade decision."""
+    if not decision:
+        return {}
+    adv = decision.get("_adversary") or {}
+    return {
+        "reasoning": (decision.get("reasoning") or "")[:500],
+        "key_signals": decision.get("key_signals") or decision.get("patterns_detected") or [],
+        "trading_preset": trading_preset or decision.get("trading_preset", ""),
+        "adversary_verdict": adv.get("verdict", ""),
+        "confluence_score": decision.get("confluence_score", 0),
+        "market_condition": decision.get("market_condition", ""),
+        "reasons_to_trade": (decision.get("reasons_to_trade") or [])[:5],
+        "reasons_to_wait": (decision.get("reasons_to_wait") or [])[:5],
+        "model_used": decision.get("_model_used", ""),
+        "gate_action": decision.get("_gate_action", ""),
+    }
+
+
+def trigger_post_trade_learning(pnl: float, symbol: str = "") -> None:
+    """Run full learning cycle after every closed trade — wins AND losses teach."""
+    run_learning_cycle()
+    _ = symbol  # reserved for future per-coin learning hooks
+
+
+def record_trade_memory(
+    trade: dict,
+    position: dict,
+    coin_state,
+    fear_greed: int,
+    balance: float,
+    trading_preset: str = "",
+):
     """Record full context of a completed trade for learning."""
     symbol = trade.get("symbol", "BTC")
     side = trade.get("side", "buy")
@@ -60,19 +96,38 @@ def record_trade_memory(trade: dict, position: dict, coin_state, fear_greed: int
 
     entry = trade.get("entry", 0)
     exit_p = trade.get("exit", 0)
-    tp = position.get("tp", 0) if position else 0
-    sl = position.get("sl", 0) if position else 0
+    tp = (position or {}).get("tp", 0)
+    sl = (position or {}).get("sl", 0)
     reward = abs(tp - entry) if tp and entry else 0
     risk = abs(entry - sl) if sl and entry else 1
     rr_ratio = round(reward / max(risk, 0.01), 2)
 
-    patterns = position.get("patterns", []) if position else []
-    confidence = position.get("confidence", 0) if position else 0
+    patterns = (position or {}).get("patterns", [])
+    confidence = (position or {}).get("confidence", 0)
     regime = coin_state.market_cond if coin_state else "unknown"
     indicators = dict(coin_state.indicators) if coin_state else {}
     indicators.pop("_price", None)
     confluence = indicators.get("confluence", {})
-    confluence_score = confluence.get("strength", 0)
+    confluence_score = (position or {}).get("confluence_score") or confluence.get("strength", 0)
+
+    decision_meta = (position or {}).get("decision_meta") or {}
+    if not decision_meta and position:
+        decision_meta = {
+            k: position.get(k)
+            for k in (
+                "reasoning",
+                "key_signals",
+                "trading_preset",
+                "adversary_verdict",
+                "reasons_to_trade",
+                "reasons_to_wait",
+                "model_used",
+            )
+            if position.get(k)
+        }
+
+    preset = trading_preset or decision_meta.get("trading_preset") or (position or {}).get("trading_preset", "")
+    exit_reason = trade.get("reason", "")
 
     usd_size = trade.get("usd_size", 0)
     size_pct = round((usd_size / max(balance, 1)) * 100, 1) if balance > 0 else 0
@@ -101,6 +156,17 @@ def record_trade_memory(trade: dict, position: dict, coin_state, fear_greed: int
         "product_type": product_type,
         "onchain": onchain,
         "leverage": leverage,
+        "reasoning": decision_meta.get("reasoning", ""),
+        "key_signals": decision_meta.get("key_signals", []),
+        "trading_preset": preset,
+        "adversary_verdict": decision_meta.get("adversary_verdict", ""),
+        "exit_reason": exit_reason,
+        "meta": {
+            "model_used": decision_meta.get("model_used", ""),
+            "reasons_to_trade": decision_meta.get("reasons_to_trade", []),
+            "reasons_to_wait": decision_meta.get("reasons_to_wait", []),
+            "gate_action": decision_meta.get("gate_action", ""),
+        },
     }
     db_save_trade_context(ctx)
 
@@ -147,6 +213,123 @@ def run_learning_cycle():
     _learn_from_rr_ratio()
     _learn_from_confidence_calibration()
     _learn_from_recent_wins()
+    _learn_from_shadow_outcomes()
+    _learn_from_preset_performance()
+    _learn_from_exit_reasons()
+
+
+def _learn_from_shadow_outcomes():
+    """Learn whether risk-gate blocks saved capital or cost opportunity."""
+    rows = db_get_shadow_learning_rows(limit=80)
+    if len(rows) < 5:
+        return
+
+    blocked = [r for r in rows if r.get("blocked_by_gate")]
+    if len(blocked) < 3:
+        return
+
+    saves = [r for r in blocked if (r.get("counterfactual_pnl_1h") or 0) < -0.001]
+    missed = [r for r in blocked if (r.get("counterfactual_pnl_1h") or 0) > 0.001]
+    save_rate = len(saves) / len(blocked) * 100 if blocked else 0
+    miss_rate = len(missed) / len(blocked) * 100 if blocked else 0
+
+    if save_rate >= 55:
+        desc = (
+            f"GATE VALIDATED: {save_rate:.0f}% of blocked trades would have lost at 1h "
+            f"(n={len(blocked)}). Trust risk gate blocks — they save capital."
+        )
+        db_save_learned_rule(
+            "shadow", "shadow|gate_saves", desc, min(0.85, 0.5 + len(blocked) / 50), len(blocked), save_rate, 0
+        )
+    elif miss_rate >= 55:
+        desc = (
+            f"GATE TOO TIGHT: {miss_rate:.0f}% of blocked trades would have won at 1h "
+            f"(n={len(blocked)}). Raise bar carefully — don't over-filter A+ setups."
+        )
+        db_save_learned_rule(
+            "shadow", "shadow|gate_too_tight", desc, min(0.8, 0.5 + len(blocked) / 40), len(blocked), miss_rate, 0
+        )
+
+    # Per-regime block quality
+    regime_blocks: dict[str, list] = {}
+    for r in blocked:
+        regime_blocks.setdefault(r.get("regime") or "unknown", []).append(r)
+    for regime, rlist in regime_blocks.items():
+        if len(rlist) < 3:
+            continue
+        regime_saves = sum(1 for r in rlist if (r.get("counterfactual_pnl_1h") or 0) < 0)
+        wr = regime_saves / len(rlist) * 100
+        if wr >= 65:
+            key = f"shadow|regime_block|{regime}"
+            desc = (
+                f"BLOCK WISELY in {regime}: {wr:.0f}% of gate blocks in {regime} avoided losses "
+                f"(n={len(rlist)}). Keep filtering marginal {regime} setups."
+            )
+            db_save_learned_rule("shadow", key, desc, 0.7, len(rlist), wr, 0)
+
+
+def _learn_from_preset_performance():
+    """Which trader preset actually performs best for this bot."""
+    perf = db_get_preset_performance(min_samples=3)
+    if not perf:
+        return
+
+    best = max(perf, key=lambda p: p.get("avg_pnl", 0))
+    worst = min(perf, key=lambda p: p.get("avg_pnl", 0))
+
+    if best.get("avg_pnl", 0) > 0 and best.get("win_rate", 0) >= 50:
+        key = f"preset|{best['preset']}"
+        desc = (
+            f"BEST PRESET: '{best['preset']}' — {best['win_rate']}% win rate, "
+            f"avg ${best['avg_pnl']}, n={best['total']}. Favor this strategy philosophy."
+        )
+        db_save_learned_rule("preset", key, desc, 0.75, best["total"], best["win_rate"], best["avg_pnl"])
+
+    if worst.get("avg_pnl", 0) < 0 and worst.get("win_rate", 0) <= 45 and worst["preset"] != best.get("preset"):
+        key = f"preset|{worst['preset']}|weak"
+        desc = (
+            f"WEAK PRESET: '{worst['preset']}' — only {worst['win_rate']}% win rate, "
+            f"avg ${worst['avg_pnl']}, n={worst['total']}. Consider switching preset or tightening entries."
+        )
+        db_save_learned_rule("preset", key, desc, 0.7, worst["total"], worst["win_rate"], worst["avg_pnl"])
+
+
+def _learn_from_exit_reasons():
+    """Learn from how trades actually closed — TP discipline vs premature exits."""
+    stats = db_get_exit_reason_stats(min_samples=3)
+    labels = {
+        "tp_hit": "Take-profit hits",
+        "sl_hit": "Stop-loss hits",
+        "stale_exit": "Stale position exits",
+        "ai_close": "AI-initiated closes",
+        "other": "Other exits",
+    }
+    for s in stats:
+        exit_type = s.get("exit_type", "other")
+        total = s.get("total", 0)
+        win_rate = s.get("win_rate", 0)
+        avg_pnl = s.get("avg_pnl", 0)
+        label = labels.get(exit_type, exit_type)
+        key = f"exit|{exit_type}"
+
+        if exit_type == "sl_hit" and win_rate <= 10 and avg_pnl < 0:
+            desc = (
+                f"STOP OUTS: {label} — {win_rate}% win rate, avg ${avg_pnl}, n={total}. "
+                f"Review entry quality before SL hits. Tighten filters or widen stops in volatile regimes."
+            )
+            db_save_learned_rule("exit", key, desc, 0.75, total, win_rate, avg_pnl)
+        elif exit_type == "tp_hit" and win_rate >= 90 and avg_pnl > 0:
+            desc = (
+                f"WINNER PATH: {label} — {win_rate}% win rate, avg ${avg_pnl}, n={total}. "
+                f"Replicate the entry conditions that reach TP."
+            )
+            db_save_learned_rule("exit", key, desc, 0.8, total, win_rate, avg_pnl)
+        elif exit_type == "stale_exit" and avg_pnl > 0 and win_rate >= 60:
+            desc = (
+                f"STALE WORKS: {label} — {win_rate}% win rate, avg ${avg_pnl}, n={total}. "
+                f"Taking small wins on dead trades preserves capital."
+            )
+            db_save_learned_rule("exit", key, desc, 0.65, total, win_rate, avg_pnl)
 
 
 def _learn_from_patterns():
@@ -641,12 +824,20 @@ def build_memory_briefing() -> dict:
 
     if total < 5:
         briefing["message"] = (
-            f"Only {total} trades recorded — need 5+ for pattern learning. Trade normally and memory will activate."
+            f"Only {total} trades recorded — need 5+ for full pattern learning. "
+            "Every trade (win or loss) is captured. Shadow mode learns from blocked decisions too."
         )
+        shadow = db_get_shadow_stats()
+        if shadow.get("total_logged", 0) >= 5:
+            briefing["shadow_bootstrap"] = {
+                "total_shadow_decisions": shadow.get("total_logged", 0),
+                "blocked_by_gate": shadow.get("blocked_by_gate", 0),
+                "hint": "Shadow counterfactuals active — gate quality learning in progress.",
+            }
         briefing["memory_dimensions_when_active"] = (
             "wins, losses, lessons_from_everything, patterns, regimes, strategy combos, "
             "fear_greed, dow, hour, confluence, confidence_calibration, hold_duration, "
-            "rr_ratio, volatility, momentum, top_setups"
+            "rr_ratio, volatility, momentum, top_setups, shadow_outcomes, preset_performance, exit_reasons"
         )
         return briefing
 
@@ -866,6 +1057,47 @@ def build_memory_briefing() -> dict:
             "total_days": len(sessions),
             "weekly_pnl": round(sum(s["total_pnl"] for s in sessions), 2),
         }
+
+    preset_perf = db_get_preset_performance(min_samples=2)
+    if preset_perf:
+        briefing["preset_performance"] = [
+            {
+                "preset": p["preset"],
+                "win_rate": p["win_rate"],
+                "avg_pnl": p["avg_pnl"],
+                "total": p["total"],
+            }
+            for p in preset_perf[:5]
+        ]
+
+    exit_stats = db_get_exit_reason_stats(min_samples=2)
+    if exit_stats:
+        briefing["exit_reason_insights"] = {
+            s["exit_type"]: {"win_rate": s["win_rate"], "avg_pnl": s["avg_pnl"], "total": s["total"]}
+            for s in exit_stats
+        }
+
+    shadow_stats = db_get_shadow_stats()
+    if shadow_stats.get("total_logged", 0) >= 3:
+        briefing["shadow_insights"] = {
+            "total_logged": shadow_stats.get("total_logged", 0),
+            "blocked_by_gate": shadow_stats.get("blocked_by_gate", 0),
+            "executed": shadow_stats.get("executed", 0),
+            "blocked_saved_pct": shadow_stats.get("blocked_avg_loss_avoided_pct"),
+            "blocked_missed_pct": shadow_stats.get("blocked_avg_opportunity_cost_pct"),
+            "lesson": (
+                "Gate blocks that saved losses = trust filters. "
+                "Blocks that missed gains = don't over-filter A+ setups."
+            ),
+        }
+
+    shadow_rules = [r for r in (db_get_active_rules() or []) if r.get("rule_type") == "shadow"]
+    if shadow_rules:
+        briefing["shadow_learned_rules"] = [r["description"] for r in shadow_rules[:3]]
+
+    preset_rules = [r for r in (db_get_active_rules() or []) if r.get("rule_type") == "preset"]
+    if preset_rules:
+        briefing["preset_learned_rules"] = [r["description"] for r in preset_rules[:3]]
 
     return briefing
 

@@ -2,15 +2,25 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useAuthHeaders } from "../hooks/useAuthHeaders.js";
+import { isAdminEmail } from "../utils/adminEmails.js";
 import { colors, typography } from "../theme.js";
 import { PageShell } from "../components/PageShell.jsx";
+import { getBackendBase } from "../utils/backendUrl.js";
 import {
   Shield, ShieldCheck, Lock, AlertTriangle, RefreshCw, QrCode,
   Copy, Check, Users, Zap, Activity, Radio, BarChart2,
   DollarSign, Terminal, ClipboardList, ChevronDown, X, Play, Square, ExternalLink
 } from "lucide-react";
 
-const BASE = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "");
+const BASE = getBackendBase();
+
+function parseApiError(body, status) {
+  if (!body || typeof body !== "object") return `Request failed (${status})`;
+  if (typeof body.detail === "string") return body.detail;
+  if (Array.isArray(body.detail) && body.detail[0]?.msg) return body.detail[0].msg;
+  if (typeof body.error === "string") return body.error;
+  return `Request failed (${status})`;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const pnlColor = (v) => (v >= 0 ? colors.success : colors.error);
@@ -37,9 +47,23 @@ function TwoFactorGate({ onVerified }) {
   const [showSetup, setShowSetup] = useState(false);
   const [qrData, setQrData] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [serverConfigured, setServerConfigured] = useState(null); // null=checking, true/false
   const inputRefs = useRef([]);
 
   useEffect(() => { inputRefs.current[0]?.focus(); }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`${BASE}/api/admin/2fa-qr`, { headers: getAuthHeaders() }).catch(() => null);
+      if (cancelled) return;
+      if (!res) { setServerConfigured(false); return; }
+      if (res.status === 503) { setServerConfigured(false); return; }
+      if (res.ok) { setServerConfigured(true); return; }
+      setServerConfigured(true); // auth/other errors — let normal flow handle
+    })();
+    return () => { cancelled = true; };
+  }, [getAuthHeaders]);
 
   const triggerShake = () => { setShake(true); setTimeout(() => setShake(false), 600); };
 
@@ -86,7 +110,11 @@ function TwoFactorGate({ onVerified }) {
       if (res.ok) { onVerified(); }
       else {
         const d = await res.json().catch(() => ({}));
-        setError(d.detail || "Invalid code. Try again.");
+        const msg = parseApiError(d, res.status);
+        if (res.status === 503) setServerConfigured(false);
+        setError(res.status === 503
+          ? `${msg} Add ADMIN_TOTP_SECRET in Railway → Variables, redeploy, then scan the QR below.`
+          : msg || "Invalid code. Try again.");
         triggerShake();
         setCode(["", "", "", "", "", ""]);
         setTimeout(() => inputRefs.current[0]?.focus(), 50);
@@ -97,7 +125,12 @@ function TwoFactorGate({ onVerified }) {
 
   const fetchQR = async () => {
     const res = await fetch(`${BASE}/api/admin/2fa-qr`, { headers: getAuthHeaders() }).catch(() => null);
-    if (res?.ok) { const d = await res.json(); setQrData(d); setShowSetup(true); }
+    if (res?.ok) { const d = await res.json(); setQrData(d); setShowSetup(true); setServerConfigured(true); }
+    else if (res?.status === 503) {
+      const d = await res.json().catch(() => ({}));
+      setServerConfigured(false);
+      setError(parseApiError(d, 503));
+    }
   };
 
   const qrUrl = qrData ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData.uri)}&margin=8&bgcolor=0a0a0a&color=D4AF37` : null;
@@ -108,9 +141,31 @@ function TwoFactorGate({ onVerified }) {
       <div style={gs.card} className={`tfa-card${shake ? " tfa-shake" : ""}`}>
         <div style={gs.iconRing}><Lock size={28} color={colors.gold} strokeWidth={1.5} /></div>
         <h1 style={gs.title}>ADMIN VERIFICATION</h1>
-        <p style={gs.sub}>Enter your 6-digit authenticator code</p>
 
-        {!showSetup ? (<>
+        {serverConfigured === false ? (
+          <div style={{ width: "100%", textAlign: "left" }}>
+            <p style={{ ...gs.sub, color: colors.error, marginBottom: 12 }}>
+              Admin 2FA is not configured on the server (503).
+            </p>
+            <div style={{ fontSize: 11, color: colors.muted, lineHeight: 1.6, background: "rgba(6,6,6,0.6)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "12px 14px" }}>
+              <strong style={{ color: colors.gold }}>Fix on Railway:</strong>
+              <ol style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+                <li>Open Railway → <code>BTC-Claude-bot</code> → <strong>Variables</strong></li>
+                <li>Add <code>ADMIN_TOTP_SECRET</code> (generate: <code>python -c &quot;import pyotp; print(pyotp.random_base32())&quot;</code>)</li>
+                <li>Ensure <code>ADMIN_EMAILS</code> includes your login email</li>
+                <li>Redeploy, then return here and tap <strong>Set up Authenticator</strong></li>
+              </ol>
+            </div>
+            {error && <div style={{ ...gs.err, marginTop: 12 }}><AlertTriangle size={12} style={{ marginRight: 6 }} />{error}</div>}
+            <button style={{ ...gs.btn, marginTop: 16, opacity: 0.45 }} className="tfa-submit" disabled>
+              Waiting for server configuration…
+            </button>
+            <button style={gs.link} onClick={fetchQR} className="tfa-link">
+              <RefreshCw size={12} style={{ marginRight: 5 }} />Retry after redeploy
+            </button>
+          </div>
+        ) : !showSetup ? (<>
+          <p style={gs.sub}>Enter your 6-digit authenticator code</p>
           <div style={gs.row} onPaste={handlePaste}>
             {code.map((d, i) => (
               <input key={i} ref={el => inputRefs.current[i] = el} type="text" inputMode="numeric"
@@ -408,6 +463,13 @@ export default function Admin() {
     finally { setActionLoading(false); }
   };
 
+  useEffect(() => {
+    if (user && !isAdminEmail(user.email)) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, navigate]);
+
+  if (!user || !isAdminEmail(user.email)) return null;
   if (!verified) return <TwoFactorGate onVerified={() => setVerified(true)} />;
 
   const sessionLeft = Math.max(0, SESSION_TIMEOUT - sessionAge);

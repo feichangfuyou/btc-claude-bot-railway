@@ -58,13 +58,15 @@ class ErrorBoundary extends Component {
 
 // ─── Unique ID generator for logs ─────────────────────────────────────────────
 let _logSeq = 0;
+import { localPaperSecret } from "./utils/localDevAuth.js";
+import { getBackendBase, getWsBase } from "./utils/backendUrl.js";
+
 function logId() { return `log_${Date.now()}_${++_logSeq}`; }
 
-// Dev-only shortcut; production uses Supabase JWT (VITE_BOT_API_SECRET is never bundled in prod builds)
-const API_SECRET = import.meta.env.DEV ? (import.meta.env.VITE_BOT_API_SECRET || "") : "";
+const API_SECRET = localPaperSecret();
 
 // Direct backend connection: in development, use relative paths to leverage Vite proxy (eliminates CORS issues)
-const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL || "";
+const BACKEND_BASE = getBackendBase();
 
 function getBackendWsUrl(accessToken) {
   // Prefer JWT when logged in so backend can resolve per-user keys (dev vs user_exchanges)
@@ -73,15 +75,7 @@ function getBackendWsUrl(accessToken) {
     : API_SECRET
       ? `?secret=${encodeURIComponent(API_SECRET)}`
       : "";
-  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL + auth;
-  if (BACKEND_BASE) {
-    try {
-      const u = new URL(BACKEND_BASE.replace(/\/$/, ""));
-      const proto = u.protocol === "https:" ? "wss:" : "ws:";
-      return `${proto}//${u.host}/ws` + auth;
-    } catch { }
-  }
-  return (window.location.protocol === "https:" ? "wss:" : "ws:") + "//" + window.location.host + "/ws" + auth;
+  return getWsBase() + auth;
 }
 const DEFAULT_ROUND_TRIP_FEE = 0.012;  // fallback: 0.6% taker × 2 sides
 const DEFAULT_COINS = ["BTC", "ETH", "SOL", "DOGE", "LINK", "AVAX", "UNI", "AAVE"];
@@ -257,6 +251,7 @@ function Dashboard() {
   const [lastAiBlockReason, setLastAiBlockReason] = useState(null);
   const [thinking, setThinking] = useState(false);
   const [botOn, setBotOn] = useState(false);
+  const wantBotOnRef = useRef(false);
   const [lastCall, setLastCall] = useState("--");
   const [countdown, setCountdown] = useState(180);
   const [priceAge, setPriceAge] = useState(0);
@@ -374,6 +369,9 @@ function Dashboard() {
 
   // ── Refs (always current, no stale closures) ─────────────────────────────────
   const wsRef = useRef(null);
+  const accessTokenRef = useRef(accessToken);
+  const tokenInitRef = useRef(true);
+  accessTokenRef.current = accessToken;
   const priceRef = useRef(price);
   const accountRef = useRef(account);
   const posRef = useRef(position);
@@ -395,6 +393,8 @@ function Dashboard() {
   const lastStaggeredLogsRef = useRef(0);
   const lastStaggeredTradesRef = useRef(0);
   const pulseInfinite = useRef(null);
+
+  useEffect(() => { wantBotOnRef.current = botOn; }, [botOn]);
 
   priceRef.current = price;
   accountRef.current = account;
@@ -421,7 +421,9 @@ function Dashboard() {
     let lastMessageAt = Date.now();
     let retryDelay = 2000;
     const MAX_RETRY = 30000;
+    const FAST_RETRY_MS = 500;
     let hadConnection = false;
+    let reconnectAttempts = 0;
 
     function connect() {
       if (disposed) return;
@@ -429,12 +431,14 @@ function Dashboard() {
         try { ws.close(); } catch { }
       }
       setWsRetrying(true);
-      ws = new WebSocket(getBackendWsUrl(accessToken));
+      ws = new WebSocket(getBackendWsUrl(accessTokenRef.current));
       wsRef.current = ws;
 
       ws.onopen = () => {
         if (disposed) { ws.close(); return; }
+        const isReconnect = reconnectAttempts > 0;
         retryDelay = 2000;
+        reconnectAttempts = 0;
         hadConnection = true;
         setConnected(true);
         setWsRetrying(false);
@@ -442,7 +446,20 @@ function Dashboard() {
         if (botTimerRef.current) { clearInterval(botTimerRef.current); botTimerRef.current = null; }
         if (priceAgeRef.current) { clearInterval(priceAgeRef.current); priceAgeRef.current = null; }
         priceAgeRef.current = setInterval(() => setPriceAge(p => p + 1), 1000);
-        log("Backend connected — real-time analysis active", "success");
+        log(isReconnect ? "Backend reconnected" : "Backend connected — real-time analysis active", "success");
+        if (wantBotOnRef.current) {
+          const apiBase = BACKEND_BASE;
+          const startUrl = apiBase ? `${apiBase.replace(/\/$/, "")}/api/bot/start` : "/api/bot/start";
+          fetch(startUrl, { method: "POST", headers: getAuthHeaders() })
+            .then(r => (r.ok ? r.json() : null))
+            .then(d => {
+              if (d?.bot_running) {
+                setBotOn(true);
+                log("Bot resumed after reconnect", "success");
+              }
+            })
+            .catch(() => { });
+        }
         if (pingTimer) clearInterval(pingTimer);
         pingTimer = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
@@ -453,7 +470,7 @@ function Dashboard() {
         if (watchdogTimer) clearInterval(watchdogTimer);
         lastMessageAt = Date.now();
         watchdogTimer = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN && Date.now() - lastMessageAt > 45000) {
+          if (ws.readyState === WebSocket.OPEN && Date.now() - lastMessageAt > 75000) {
             console.warn("Backend WS watchdog timeout - reconnecting");
             ws.close();
           }
@@ -464,7 +481,7 @@ function Dashboard() {
         lastMessageAt = Date.now();
         try {
           const m = JSON.parse(e.data);
-          if (m.type === "pong") return;
+          if (m.type === "pong" || m.type === "heartbeat") return;
           if (m.coins) {
             setCoins(prev => {
               const updated = { ...prev };
@@ -585,6 +602,7 @@ function Dashboard() {
           if (m.logs) setLogs(m.logs.map((l, i) => ({ ...l, id: l.id || `srv_${i}` })));
           if (m.type === "wallet_status") setAgentKit(prev => ({ ...prev, ...m }));
           if (m.type === "news_update" && m.news) setNewsData(m.news);
+          if (m.type === "news_error") setNewsData({ error: m.error || "News unavailable", headlines: [] });
           if (m.type === "log" && m.entry) setLogs(prev => [{ ...m.entry, id: logId() }, ...prev].slice(0, 60));
         } catch { /* ignore parse errors */ }
       };
@@ -599,12 +617,16 @@ function Dashboard() {
         setCbLive(false);
         setKrakenEnabled(false);
         setWsRetrying(true);
+        reconnectAttempts += 1;
         if (hadConnection) {
-          log("Backend disconnected — reconnecting...", "warning");
+          if (reconnectAttempts === 1) {
+            log("Backend disconnected — reconnecting...", "warning");
+          }
         } else {
           log("Backend offline — start backend.py for live trading.", "warning");
         }
-        retryTimer = setTimeout(connect, retryDelay);
+        const delay = hadConnection && reconnectAttempts === 1 ? FAST_RETRY_MS : retryDelay;
+        retryTimer = setTimeout(connect, delay);
         retryDelay = Math.min(retryDelay * 1.5, MAX_RETRY);
       };
     }
@@ -626,7 +648,19 @@ function Dashboard() {
       }
       wsRef.current = null;
     };
-  }, [log, accessToken]);
+  }, []); // mount once — auth changes handled below
+
+  // Reconnect WS when login token changes (login / logout / Supabase refresh)
+  useEffect(() => {
+    if (tokenInitRef.current) {
+      tokenInitRef.current = false;
+      return;
+    }
+    const ws = wsRef.current;
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      try { ws.close(); } catch { }
+    }
+  }, [accessToken]);
 
   // ── Periodic account sync (failsafe so balance/P&L always reflect backend) ───
   useEffect(() => {

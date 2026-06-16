@@ -9,7 +9,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
-from core.config import ADMIN_EMAILS
+from core.auth import is_admin_email, resolve_role
 from core.encryption import (
     decrypt_ciphertext,
     decrypt_with_key,
@@ -198,12 +198,11 @@ def load_user_config(user_id: str) -> UserConfig:
     pr = prefs.data or {}
 
     email = p.get("email", "")
-    role = p.get("role", "authenticated")
+    role = resolve_role(email, p.get("role", "authenticated"))
     tier = p.get("subscription_tier", "none")
     status = p.get("subscription_status", "inactive")
 
-    if email.lower() in [e.strip().lower() for e in ADMIN_EMAILS.split(",") if e.strip()]:
-        role = "admin"
+    if is_admin_email(email):
         tier = "elite"
         status = "active"
 

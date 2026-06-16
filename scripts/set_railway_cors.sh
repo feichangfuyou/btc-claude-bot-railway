@@ -6,7 +6,7 @@
 set -e
 
 CORS="https://doyou.trade,https://www.doyou.trade"
-BACKEND_URL="${1:-https://btc-claude-bot-production.up.railway.app}"
+BACKEND_URL="${1:-https://api.doyou.trade}"
 
 echo "Setting Railway variables..."
 echo "  CORS_ORIGINS=$CORS"

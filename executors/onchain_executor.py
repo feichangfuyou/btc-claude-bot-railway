@@ -11,7 +11,7 @@ from functools import partial
 from api.agentkit_provider import agentkit
 from core.config import AI_COST_PER_TRADE, GAS_COST_USD, MIN_ETH_GAS, ONCHAIN_SLIPPAGE, ROUND_TRIP_FEE
 from core.database import db_save_trade
-from learning.trade_memory import record_trade_memory, run_learning_cycle
+from learning.trade_memory import record_trade_memory, trigger_post_trade_learning
 from utils.notifications import send_notification
 
 
@@ -158,15 +158,14 @@ async def close_onchain(bot, pos: dict, reason: str = "⚡ ON-CHAIN CLOSE"):
                 coin_state,
                 bot.fear_greed.get("value", 50),
                 bot.account["balance"],
+                trading_preset=getattr(bot, "trading_preset", ""),
             )
         except Exception:
             pass
-        if net <= 0:
-            try:
-                run_learning_cycle()
-                bot.add_log("📉 Loss recorded — learning cycle run to internalize mistake", "dim")
-            except Exception:
-                pass
+        try:
+            trigger_post_trade_learning(net, pos_symbol)
+        except Exception:
+            pass
         bot.remove_position(pos)
         bot.persist_position()
         bot.persist_account()
@@ -219,8 +218,7 @@ def _set_onchain_position(
         "btc_size": coin_sz,
         "usd_size": usd_sz,
         "open_ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "confidence": decision.get("confidence", 0),
-        "patterns": decision.get("patterns_detected", []),
+        **bot._decision_context_for_position(decision),
         "onchain": True,
         "swap_result": swap_result,
     }

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { colors } from "../theme.js";
+import { localPaperSecret } from "../utils/localDevAuth.js";
 import { PublicNav } from "../components/PublicNav.jsx";
 import { PublicFooter } from "../components/PublicFooter.jsx";
 import { Cpu, Shield, Zap, ArrowUp, ArrowRight } from "lucide-react";
@@ -67,7 +68,7 @@ function LandingTicker() {
 }
 
 export default function Login() {
-  const { user, signIn, signInWithGoogle, signInWithApple, mfaChallenge, verifyMfa, cancelMfa } = useAuth();
+  const { user, signIn, signInWithGoogle, signInWithApple, mfaChallenge, verifyMfa, cancelMfa, enterLocalPaper } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [email, setEmail] = useState("");
@@ -291,6 +292,17 @@ export default function Login() {
                   <div className="auth-alert auth-alert--success">
                     Password reset link sent — check your inbox.
                   </div>
+                )}
+
+                {localPaperSecret() && (
+                  <button
+                    type="button"
+                    className="auth-oauth"
+                    style={{ marginBottom: 12, borderColor: "rgba(0,230,118,0.35)" }}
+                    onClick={() => { enterLocalPaper(); navigate("/dashboard"); }}
+                  >
+                    Local paper login (no Supabase)
+                  </button>
                 )}
 
                 <button

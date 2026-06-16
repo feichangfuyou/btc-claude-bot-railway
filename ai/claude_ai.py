@@ -36,7 +36,11 @@ from core.config import (
     MIN_PROFIT_AFTER_COSTS,
     MIN_TRADE_USD,
     ONCHAIN_SLIPPAGE,
+    ADVERSARY_MIN_CONFIDENCE,
+    ADVERSARY_PAPER_SOFT,
+    PAPER_RELAX_GATES,
     PAPER_TRADING,
+    PROFIT_MODE,
     PRICE_MAX_AGE_SEC,
     PROFIT_TO_TARGET,
     ROUND_TRIP_FEE,
@@ -45,8 +49,11 @@ from core.config import (
     SCOUT_MIN_SIGNALS,
     START_BALANCE,
     TEST_MODE,
+    STRONG_ESCALATION_MIN_SIGNALS,
+    SL_ATR_WIDEN,
     TRADE_COST_PER_CALL,
 )
+from learning.coin_scorer import sort_coins_for_scan
 from feeds.news_feeds import fetch_latest_news
 from learning.memory_compactor import get_compacted_wisdom
 from learning.meta_reviewer import get_meta_guidance
@@ -57,9 +64,20 @@ from safety.kya_compliance import (
     hash_reasoning,
     model_fallback,
 )
-from strategy.trading_presets import get_preset
+from strategy.trading_presets import get_preset, get_sl_tp_for_regime
 
-SCOUT_MODEL = "claude-3-haiku-20240307"
+DEFAULT_HAIKU_MODEL = "claude-haiku-4-5-20251001"
+SCOUT_MODEL = DEFAULT_HAIKU_MODEL
+
+# Retired model IDs → current replacements (persisted DB / tier configs may still reference these)
+DEPRECATED_MODEL_ALIASES = {
+    "claude-3-haiku-20240307": DEFAULT_HAIKU_MODEL,
+}
+
+
+def normalize_model_id(model_id: str) -> str:
+    return DEPRECATED_MODEL_ALIASES.get(model_id, model_id)
+
 
 ALLOWED_MODELS = {
     "claude-opus-4-6",
@@ -70,7 +88,7 @@ ALLOWED_MODELS = {
     "claude-opus-4-1-20250805",
     "claude-opus-4-20250514",
     "claude-sonnet-4-20250514",
-    "claude-3-haiku-20240307",
+    "claude-3-haiku-20240307",  # alias — normalized to haiku-4-5 at call time
 }
 
 MODEL_DISPLAY_NAMES = {
@@ -82,7 +100,7 @@ MODEL_DISPLAY_NAMES = {
     "claude-opus-4-1-20250805": "Platinum Engine 4.1",
     "claude-opus-4-20250514": "Platinum Engine 4",
     "claude-sonnet-4-20250514": "Gold Engine 4",
-    "claude-3-haiku-20240307": "Base Engine 3",
+    "claude-3-haiku-20240307": "Silver Engine 4.5",
 }
 
 _api_cost_tracker = {
@@ -317,6 +335,21 @@ CLAUDE_LIVE_ADDENDUM = (
     "- If agentkit_ready is false, action MUST be 'wait'\n"
 )
 
+PAPER_RELAX_ADDENDUM = (
+    "\n\n═══ PAPER MODE — TRADE WHEN EDGE EXISTS ═══\n"
+    "- Memory 'avoid' rules from past paper trades are ADVISORY — shrink size, do NOT wait only because of them.\n"
+    "- If scout escalated with 6+ signals and confidence >= 55%, TAKE THE TRADE unless regime is chaotic with <4 signals.\n"
+    "- We need executed trades to validate profitability. Waiting forever teaches nothing.\n"
+)
+
+PROFIT_MODE_ADDENDUM = (
+    "\n\n═══ A+ PROFIT MODE — QUALITY OVER QUANTITY ═══\n"
+    "- PRIORITY COINS: ETH first, then BTC. Skip blocklisted alts (SOL, LINK, etc.).\n"
+    "- BUY only in trending_up OR ranging at BB lower + RSI oversold. Avoid ranging mid-band buys.\n"
+    "- Require confidence >= 55%, R:R >= 2:1, 6+ aligned signals. Extreme Fear (F&G<25) = buy dips, no shorts.\n"
+    "- Take fewer trades but make them count. ETH buy in uptrend = highest-conviction setup.\n"
+)
+
 
 def get_claude_system(preset_id: str | None = None, model_id: str | None = None, news: dict | None = None) -> str:
     """Build system prompt. Injects preset-specific TP/SL guidance when preset_id given.
@@ -328,6 +361,10 @@ def get_claude_system(preset_id: str | None = None, model_id: str | None = None,
     )
     if not PAPER_TRADING and agentkit.ready:
         prompt += CLAUDE_LIVE_ADDENDUM
+    if PAPER_RELAX_GATES:
+        prompt += PAPER_RELAX_ADDENDUM
+    if PROFIT_MODE:
+        prompt += PROFIT_MODE_ADDENDUM
     # Opus emulation: give Haiku/Sonnet the structure to reason like Opus
     if model_id and _use_opus_emulation(model_id):
         prompt += OPUS_EMULATION_ADDENDUM
@@ -530,6 +567,17 @@ def _build_enhanced_coin_snapshot(cs, sym: str) -> dict:
 
 
 _claude_lock: asyncio.Lock | None = None
+_claude_lock_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _get_claude_lock() -> asyncio.Lock:
+    """Lock bound to the current event loop (avoids 'different event loop' errors)."""
+    global _claude_lock, _claude_lock_loop
+    loop = asyncio.get_running_loop()
+    if _claude_lock is None or _claude_lock_loop is not loop:
+        _claude_lock = asyncio.Lock()
+        _claude_lock_loop = loop
+    return _claude_lock
 _api_call_timestamps: list[float] = []
 # Per-key limits: 10/min, 120/hour. Multi-key pool scales capacity.
 MAX_API_CALLS_PER_MINUTE = 10 * pool_size()
@@ -579,7 +627,8 @@ async def _api_call(model: str, system: Any, user_msg: Any, max_tokens: int = 80
         raise Exception("Rate limit reached — too many API calls. Waiting for cooldown.")
     _api_call_timestamps.append(time.time())
 
-    effective_model = model_fallback.get_current_model(model)
+    model = normalize_model_id(model)
+    effective_model = normalize_model_id(model_fallback.get_current_model(model))
     if model_fallback.is_defensive():
         raise Exception("All AI models failed — defensive mode active. No new trades.")
 
@@ -660,12 +709,12 @@ async def verify_brain() -> dict:
         return {"ok": False, "error": "No Anthropic API key configured"}
     try:
         resp = await _api_call(
-            "claude-3-haiku-20240307",
+            DEFAULT_HAIKU_MODEL,
             "You are a health check. Reply with exactly: OK",
             "Reply with exactly: OK",
             max_tokens=10,
         )
-        return {"ok": True, "model": "claude-3-haiku-20240307", "response": (resp or "").strip()[:20]}
+        return {"ok": True, "model": DEFAULT_HAIKU_MODEL, "response": (resp or "").strip()[:20]}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
@@ -770,16 +819,14 @@ def _build_scout_snapshot(bot, coins_snapshot: dict) -> str:
 
 async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_limit: int = 0, tier: str = "starter"):
     """Run AI analysis. skip_scout=True bypasses scout and goes straight to trade model (manual Ask Claude)."""
-    global _claude_lock
-    if _claude_lock is None:
-        _claude_lock = asyncio.Lock()
-
     if not ANTHROPIC_API_KEYS and not ANTHROPIC_API_KEY:
         bot.add_log("No ANTHROPIC_API_KEY or ANTHROPIC_API_KEYS in .env — Claude disabled", "warning")
         return
     if bot.claude_thinking:
         return
-    if _claude_lock.locked():
+
+    claude_lock = _get_claude_lock()
+    if claude_lock.locked():
         return
 
     now = time.time()
@@ -797,7 +844,7 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
         bot.add_log(msg, "warning")
         return
 
-    async with _claude_lock:
+    async with claude_lock:
         bot.claude_thinking = True
         bot._last_claude_ts = now
         bot.last_claude_call = time.strftime("%H:%M:%S")
@@ -818,9 +865,8 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
 
         # Enforce tier-based coin limit if provided
         if coin_limit > 0 and len(coins_snapshot) > coin_limit:
-            # Keep top N based on volume or just first N (usually BTC/ETH/SOL)
-            sorted_syms = sorted(coins_snapshot.keys(), key=lambda x: (x != "BTC", x != "ETH", x))
-            coins_snapshot = {s: coins_snapshot[s] for s in sorted_syms[:coin_limit]}
+            sorted_syms = sort_coins_for_scan(list(coins_snapshot.keys()))[:coin_limit]
+            coins_snapshot = {s: coins_snapshot[s] for s in sorted_syms if s in coins_snapshot}
 
         # ── STAGE 1: Scout scan (cheap Haiku) — skipped when skip_scout=True ──
         scout_raw = ""
@@ -996,14 +1042,24 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
 
         scout_hint = ""
         if scout_result:
+            signals = scout_result.get("signal_count", 0)
+            regime = scout_result.get("regime", "?")
+            strong = signals >= STRONG_ESCALATION_MIN_SIGNALS and regime in (
+                "trending_up",
+                "trending_down",
+            )
+            bias_note = (
+                " STRONG ESCALATION: 6+ signals + trend — default to TRADE (buy/sell) unless chaotic or missing TP/SL."
+                if strong and PROFIT_MODE
+                else " Scout flagged this as worth investigating. Do your OWN full analysis."
+            )
             scout_hint = (
                 f"\n\nSCOUT PRE-ANALYSIS (from fast scanner):\n"
                 f"  Symbol: {scout_result.get('symbol', '?')} | Direction: {scout_result.get('direction', '?')} | "
-                f"Signals: {scout_result.get('signal_count', 0)} | Confidence: {scout_result.get('confidence', 0) * 100:.0f}%\n"
+                f"Signals: {signals} | Confidence: {scout_result.get('confidence', 0) * 100:.0f}%\n"
                 f"  Top signals: {', '.join(scout_result.get('top_signals', []))}\n"
-                f"  Regime: {scout_result.get('regime', '?')}\n"
-                f"  NOTE: Scout flagged this as worth investigating. Do your OWN full analysis. "
-                f"Scout can be wrong — REJECT if your deep analysis disagrees."
+                f"  Regime: {regime}\n"
+                f"  NOTE:{bias_note}"
             )
 
         snap = {
@@ -1154,6 +1210,7 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
                 and dec.get("action") == scout_result.get("direction")
             )
 
+            dec = _apply_escalation_bias(dec, scout_result, bot, coins_snapshot)
             dec = _validate_decision(dec, bot, coins_snapshot, anti_overtrade)
 
             # ── STAGE 3: Adversary Red Team Review (Haiku + Veto Power) ──
@@ -1199,6 +1256,23 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
                         _api_cost_tracker["total_adversary_cost"] += ADVERSARY_COST_PER_CALL
                         dec["_adversary"] = adversary_result
                         adversary_verdict = adversary_result.get("verdict", "pass")
+
+                        # Paper mode: downgrade kill/veto to reduce when confidence meets floor
+                        if ADVERSARY_PAPER_SOFT and adversary_verdict in ("veto", "kill"):
+                            conf = float(dec.get("confidence") or 0)
+                            if conf >= ADVERSARY_MIN_CONFIDENCE:
+                                bot.add_log(
+                                    f"📋 Paper mode: adversary {adversary_verdict} → reduce "
+                                    f"(confidence {conf:.0%} >= {ADVERSARY_MIN_CONFIDENCE:.0%})",
+                                    "dim",
+                                )
+                                adversary_verdict = "reduce"
+                                adversary_result = {
+                                    **adversary_result,
+                                    "verdict": "reduce",
+                                    "size_modifier": 0.65,
+                                }
+                                dec["_adversary"] = adversary_result
 
                         trap_reasons = adversary_result.get("three_trap_reasons", [])
                         if trap_reasons:
@@ -1268,34 +1342,36 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
             # Record decision in semantic kill switch
             bot.semantic_kill_switch.record_trade_decision(dec)
 
-            bot.claude_decision = dec
-            action = dec.get("action", "wait")
+            from core.config import REQUIRE_TRADE_APPROVAL
+
+            pending_approval = dec.get("action") in ("buy", "sell") and REQUIRE_TRADE_APPROVAL
+            final = bot.apply_risk_gate(dec, executed=False if pending_approval else None)
+            bot.claude_decision = final
+            action = final.get("action", "wait")
 
             if action in ("buy", "sell"):
-                from core.config import REQUIRE_TRADE_APPROVAL
-
                 if REQUIRE_TRADE_APPROVAL:
-                    if bot.set_pending_decision(dec):
+                    if bot.set_pending_decision(final):
                         bot.add_log(
-                            f"📋 Pending trade: {action.upper()} {dec.get('symbol', '?')} — awaiting your approval",
+                            f"📋 Pending trade: {action.upper()} {final.get('symbol', '?')} — awaiting your approval",
                             "info",
                         )
                         await bot._broadcast(
                             {
                                 "type": "pending_trade",
-                                "pending_decision": dec,
+                                "pending_decision": final,
                                 "pending_expires_at": bot.pending_expires_at,
                             }
                         )
                     else:
                         bot.add_log("⚠ Previous pending trade still active — skipping", "warning")
                 else:
-                    bot.execute_decision(dec)
+                    bot.execute_decision(final)
             else:
-                bot.execute_decision(dec)
+                bot.execute_decision(final)
 
             if action == "wait":
-                reason_short = dec.get("reasoning", "no edge")[:60]
+                reason_short = final.get("reasoning", "no edge")[:60]
                 bot.add_log(
                     f"⏸ {trade_model_short} → WAIT: {reason_short}",
                     "dim",
@@ -1305,8 +1381,8 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
             await bot._broadcast(
                 {
                     "type": "claude_decision",
-                    "claude_decision": dec,
-                    "analysis_decision": dec,
+                    "claude_decision": final,
+                    "analysis_decision": final,
                     "last_claude_call": bot.last_claude_call,
                     "last_analysis_call": bot.last_claude_call,
                     "cost_tracker": cost_info,
@@ -1335,6 +1411,90 @@ async def call_claude(bot, broadcast_price_fn, skip_scout: bool = False, coin_li
             bot.claude_thinking = False
             await bot._broadcast({"type": "claude_thinking", "claude_thinking": False, "analysis_thinking": False})
             await broadcast_price_fn()
+
+
+def _build_escalation_order(symbol: str, direction: str, bot) -> dict | None:
+    """Build TP/SL order from live price + preset ATR when AI returned wait without order."""
+    cs = bot.coins.get(symbol.upper())
+    if not cs or cs.price <= 0:
+        return None
+    entry = float(cs.price)
+    atr = max(float(cs.indicators.get("atr") or 0), entry * 0.008)
+    regime = cs.market_cond or "ranging"
+    preset = getattr(bot, "trading_preset", "minervini")
+    sl_mult, tp_mult = get_sl_tp_for_regime(preset, regime)
+    sl_mult *= SL_ATR_WIDEN
+    tp_mult *= SL_ATR_WIDEN
+    if direction == "buy":
+        tp = round(entry + atr * tp_mult, 2)
+        sl = round(entry - atr * sl_mult, 2)
+    else:
+        tp = round(entry - atr * tp_mult, 2)
+        sl = round(entry + atr * sl_mult, 2)
+    return {
+        "side": direction,
+        "symbol": symbol.upper(),
+        "size_percent": 18,
+        "entry_price": round(entry, 2),
+        "take_profit": tp,
+        "stop_loss": sl,
+    }
+
+
+def _apply_escalation_bias(
+    dec: dict, scout_result: dict | None, bot, coins_snapshot: dict
+) -> dict:
+    """When scout strongly escalates but trade model WAITs, bias to execute in profit mode."""
+    if not PROFIT_MODE or not scout_result:
+        return dec
+    if dec.get("action") != "wait":
+        return dec
+
+    signals = int(scout_result.get("signal_count") or 0)
+    conf = float(scout_result.get("confidence") or 0)
+    direction = (scout_result.get("direction") or "none").lower()
+    regime = scout_result.get("regime") or ""
+    symbol = (scout_result.get("symbol") or "BTC").upper()
+
+    if signals < STRONG_ESCALATION_MIN_SIGNALS or conf < 0.52:
+        return dec
+    if direction not in ("buy", "sell"):
+        return dec
+    if regime == "chaotic":
+        return dec
+
+    from core.config import COIN_BLOCKLIST, DIRECTION_BIAS
+    from learning.coin_scorer import get_effective_blocklist
+
+    if DIRECTION_BIAS == "long" and direction == "sell":
+        return dec
+    if symbol in get_effective_blocklist(COIN_BLOCKLIST):
+        return dec
+
+    cs = coins_snapshot.get(symbol) or {}
+    coin_regime = cs.get("market_condition") or regime
+    if direction == "buy" and coin_regime == "chaotic":
+        return dec
+
+    order = dec.get("order") or _build_escalation_order(symbol, direction, bot)
+    if not order or not order.get("take_profit") or not order.get("stop_loss"):
+        return dec
+
+    updated = dict(dec)
+    updated["action"] = direction
+    updated["symbol"] = symbol
+    updated["market_condition"] = coin_regime
+    updated["confidence"] = max(conf, float(dec.get("confidence") or 0), 0.55)
+    updated["order"] = order
+    updated["reasoning"] = (
+        f"[STRONG ESCALATION] Scout {signals} signals in {regime} @ {conf:.0%} → {direction.upper()}. "
+        + (dec.get("reasoning") or "")
+    )[:500]
+    bot.add_log(
+        f"⚡ Strong escalation → {direction.upper()} {symbol} ({signals} sig, {coin_regime})",
+        "success",
+    )
+    return updated
 
 
 def _validate_decision(dec: dict, bot, coins_snapshot: dict, anti_overtrade: dict) -> dict:

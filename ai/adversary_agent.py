@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 import httpx
 
 from core.anthropic_keys import get_next_key
-from core.config import ANTHROPIC_API_KEY, ANTHROPIC_API_KEYS
+from core.config import ADVERSARY_MIN_CONFIDENCE, ADVERSARY_PAPER_SOFT, ANTHROPIC_API_KEY, ANTHROPIC_API_KEYS
 
 ADVERSARY_MODEL = "claude-haiku-4-5-20251001"
 ADVERSARY_TIMEOUT = 15
@@ -35,7 +35,15 @@ ADVERSARY_MAX_TOKENS = 600
 
 _veto_history: list[dict] = []
 
-ADVERSARY_SYSTEM = (
+def _adversary_system() -> str:
+    min_conf_pct = int(ADVERSARY_MIN_CONFIDENCE * 100)
+    paper_note = (
+        "\nPAPER MODE: Default to REDUCE (not KILL/VETO) when setup has 3+ signals and "
+        f"confidence >= {min_conf_pct}%. Only VETO on imminent macro (CPI/FOMC within 30 min).\n"
+        if ADVERSARY_PAPER_SOFT
+        else ""
+    )
+    return (
     "You are the ELITE SNIPER ADVERSARY — a hyper-aggressive risk manager whose ONLY mission "
     "is to protect our 90%+ win rate goal by KILLING every trade that isn't a 'Layup'.\n"
     "\n"
@@ -62,7 +70,7 @@ ADVERSARY_SYSTEM = (
     "- High-impact news ('macro_event') active or upcoming within 4 hours.\n"
     "- Composite Sentiment Score contradicts technicals by > 10 points.\n"
     "- Direction fights BOTH 15m and 1H regime.\n"
-    "- Confidence predicted (< 70%). Sniper Mode requires 70%+ confidence for a pass.\n"
+    f"- Confidence predicted (< {min_conf_pct}%). Sniper Mode requires {min_conf_pct}%+ confidence for a pass.\n"
     "- Spread > 0.15% (Guaranteed slippage kills win rate).\n"
     "\n"
     "VERDICTS:\n"
@@ -76,7 +84,11 @@ ADVERSARY_SYSTEM = (
     '"three_trap_reasons": ["sig1", "sig2", "sig3"], "risk_score": 0.0, "size_modifier": 1.0}\n'
     "\n"
     "BE RUTHLESS. We are protecting an Elite equity curve. Only 'Layups' allowed."
-)
+    + paper_note
+    )
+
+
+ADVERSARY_SYSTEM = _adversary_system()
 
 
 def _get_macro_context() -> dict:

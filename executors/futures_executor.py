@@ -18,7 +18,7 @@ from core.config import (
 )
 from core.database import db_save_state, db_save_trade, file_log
 from core.key_resolution import resolve_exchange_keys
-from learning.trade_memory import record_trade_memory, run_learning_cycle
+from learning.trade_memory import record_trade_memory, trigger_post_trade_learning
 from utils.notifications import send_notification
 
 # Futures taker fee ~0.03% per leg (Coinbase INTX) = 0.06% round trip
@@ -68,8 +68,7 @@ async def execute_futures_paper(
         "leverage": leverage,
         "product_id": product_id,
         "open_ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "confidence": decision.get("confidence", 0),
-        "patterns": decision.get("patterns_detected", []),
+        **bot._decision_context_for_position(decision),
     }
     bot.open_positions.append(new_pos)
     bot.persist_position()
@@ -195,6 +194,7 @@ def close_futures_position(bot, pos: dict, exit_price: float, reason: str):
             coin_state,
             bot.fear_greed.get("value", 50),
             bot.account["balance"],
+            trading_preset=getattr(bot, "trading_preset", ""),
         )
     except Exception as e:
         bot.add_log(f"Memory record error: {str(e)[:60]}", "dim")
@@ -205,12 +205,10 @@ def close_futures_position(bot, pos: dict, exit_price: float, reason: str):
     bot._track_consecutive(net)
     bot._trade_just_closed_flag = True
 
-    if net <= 0:
-        try:
-            run_learning_cycle()
-            bot.add_log("📉 Loss recorded — learning cycle run", "dim")
-        except Exception as e:
-            file_log(f"Post-loss learning cycle error: {e}", "warning")
+    try:
+        trigger_post_trade_learning(net, pos_symbol)
+    except Exception as e:
+        file_log(f"Post-trade learning cycle error: {e}", "warning")
 
     color = "success" if net >= 0 else "error"
     bot.add_log(
@@ -297,8 +295,7 @@ async def execute_futures_live(
             "product_id": product_id,
             "order_id": order_id,
             "open_ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "confidence": decision.get("confidence", 0),
-            "patterns": decision.get("patterns_detected", []),
+            **bot._decision_context_for_position(decision),
         }
         bot.open_positions.append(new_pos)
         bot.persist_position()

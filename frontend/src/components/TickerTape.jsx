@@ -35,20 +35,22 @@ export const FALLBACK_SYMBOL_TO_COINGECKO = {
   DOGS: "dogs-2", WEN: "wen", TOSHI: "toshi", NEIRO: "neiro-3",
 };
 
-export const JSDELIVR_CDN = "https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color";
-export const JSDELIVR_CDN_PNG = "https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/128/color";
-export const CRYPTO_ICONS_CDN = "https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color";
+/** Strip exchange prefixes/suffixes so icon URLs stay valid (e.g. 1000PEPE → pepe, SHIB:BTNL → shib). */
+export function normalizeTickerIconSymbol(sym) {
+  return (sym || "")
+    .toLowerCase()
+    .replace(/^1000/, "")
+    .split(":")[0]
+    .split("/")[0]
+    .trim();
+}
+
+// CoinCap covers most tickers; cryptocurrency-icons only ships ~400 legacy symbols and 404s on memecoins.
+const COINCAP_ICON_CDN = "https://assets.coincap.io/assets/icons";
 
 export function getTickerLogoUrl(sym) {
-  return `${JSDELIVR_CDN}/${sym?.toLowerCase?.()}.svg`;
-}
-
-export function getTickerLogoFallback1(sym) {
-  return `${JSDELIVR_CDN_PNG}/${sym?.toLowerCase?.()}.png`;
-}
-
-export function getTickerLogoFallback2(sym) {
-  return `${CRYPTO_ICONS_CDN}/${sym?.toLowerCase?.()}.png`;
+  const slug = normalizeTickerIconSymbol(sym);
+  return slug ? `${COINCAP_ICON_CDN}/${slug}@2x.png` : getTickerLogoPlaceholder(sym);
 }
 
 export function getTickerLogoPlaceholder(sym) {
@@ -138,17 +140,9 @@ export const TickerTape = memo(function TickerTape({ marketTickers, activeCoins,
   const handleImgError = useCallback((e) => {
     const img = e.target;
     const sym = img.dataset.sym;
-    const tier = parseInt(img.dataset.fallbackTier || "0", 10);
-    if (tier === 0) {
-      img.dataset.fallbackTier = "1";
-      img.src = getTickerLogoFallback1(sym);
-    } else if (tier === 1) {
-      img.dataset.fallbackTier = "2";
-      img.src = getTickerLogoFallback2(sym);
-    } else if (tier === 2) {
-      img.dataset.fallbackTier = "3";
-      img.src = getTickerLogoPlaceholder(sym);
-    }
+    if (img.dataset.fallbackTier === "1") return;
+    img.dataset.fallbackTier = "1";
+    img.src = getTickerLogoPlaceholder(sym);
   }, []);
 
   const handleMouseEnter = useCallback(() => { pausedRef.current = true; }, []);

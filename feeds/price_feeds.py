@@ -20,6 +20,8 @@ from core.config import (
     FALLBACK_POLL_SEC,
     FEAR_GREED_URL,
     PRICE_FETCH_TIMEOUT,
+    PRICE_MAX_AGE_SEC,
+    PRICE_STALE_WATCHDOG_SEC,
     coinbase_product_id,
     coingecko_url_for_coins,
 )
@@ -176,6 +178,18 @@ async def _fetch_single_coinbase_stats(client: httpx.AsyncClient, sym: str) -> t
         return (sym, 0.0, 0.0, 0.0)
 
 
+async def _refresh_stale_prices(bot) -> bool:
+    """REST fallback chain — same order as bootstrap, but overwrites stale prices."""
+    updated = await _fetch_coinbase_rest_prices(bot)
+    if not updated:
+        updated = await _fetch_binance_prices(bot)
+    if not updated:
+        updated = await _fetch_kraken_fallback_prices(bot)
+    if not updated:
+        updated = await _fetch_coingecko_fallback_prices(bot)
+    return updated
+
+
 async def _fetch_coinbase_rest_prices(bot) -> bool:
     """Fetch all product stats in parallel — price + 24h change + volume.
     Uses a semaphore to prevent rate-limiting."""
@@ -266,10 +280,29 @@ async def coinbase_ws_loop(bot, broadcast, broadcast_price):
                             await ws.close()  # This will trigger the outer retry loop
                             break
 
+                WS_SILENCE_SEC = 90
+                last_ws_msg_at = time.monotonic()
+
+                async def monitor_ws_silence() -> None:
+                    """Force reconnect when WS is open but stops sending data (zombie connection)."""
+                    nonlocal last_ws_msg_at
+                    while bot.coinbase_connected:
+                        await asyncio.sleep(30)
+                        silence = time.monotonic() - last_ws_msg_at
+                        if silence > WS_SILENCE_SEC:
+                            bot.add_log(
+                                f"Coinbase WS silent {silence:.0f}s — reconnecting",
+                                "warning",
+                            )
+                            await ws.close()
+                            break
+
                 monitor_task = asyncio.create_task(monitor_subscription(set(product_ids)))
+                silence_task = asyncio.create_task(monitor_ws_silence())
 
                 try:
                     async for raw in ws:
+                        last_ws_msg_at = time.monotonic()
                         msg = json.loads(raw)
                         channel = msg.get("channel", "")
 
@@ -329,11 +362,12 @@ async def coinbase_ws_loop(bot, broadcast, broadcast_price):
                                         if p <= 0:
                                             continue
                                         cs = bot.coins.get(symbol)
-                                        # Use ticker price only if no price yet (bootstrap); else market_trades owns price
-                                        if not cs or cs.price <= 0:
+                                        # Use ticker price if no price yet, or if market_trades went quiet
+                                        if not cs or cs.price <= 0 or cs.price_age() > 60:
                                             bot.update_coin_price(symbol, p, vol, chg24)
                                         else:
                                             bot.update_coin_24h_change(symbol, chg24)
+                                            cs.touch_price_freshness()
                                         now = time.monotonic()
                                         if now - last_broadcast.get(symbol, 0) >= BROADCAST_INTERVAL:
                                             last_broadcast[symbol] = now
@@ -353,10 +387,11 @@ async def coinbase_ws_loop(bot, broadcast, broadcast_price):
                                         continue
 
                     # Check if monitor task failed or was triggered
-                    if monitor_task.done():
+                    if monitor_task.done() or silence_task.done():
                         break
                 finally:
                     monitor_task.cancel()
+                    silence_task.cancel()
 
         except (
             websockets.exceptions.ConnectionClosed,
@@ -448,6 +483,36 @@ async def fear_greed_cycle(bot, broadcast):
     while True:
         await fetch_fear_greed(bot, broadcast)
         await asyncio.sleep(3600)
+
+
+async def price_stale_watchdog(bot, broadcast_price):
+    """Refresh via REST when WS is connected but prices stop updating (market_trades quiet)."""
+    STALE_SEC = PRICE_STALE_WATCHDOG_SEC
+    last_fail_log_at = 0.0
+    await asyncio.sleep(15)
+    while True:
+        sleep_sec = max(20, PRICE_STALE_WATCHDOG_SEC)
+        try:
+            age = bot.min_price_age()
+            if age > STALE_SEC:
+                updated = await _refresh_stale_prices(bot)
+                if updated:
+                    await broadcast_price()
+                    if age > PRICE_MAX_AGE_SEC:
+                        bot.add_log(f"🔄 Price watchdog refreshed feed (was {age:.0f}s stale)", "warning")
+                elif age > PRICE_MAX_AGE_SEC:
+                    now = time.time()
+                    if now - last_fail_log_at > 120:
+                        last_fail_log_at = now
+                        bot.add_log(
+                            f"⚠ Price feed refresh failed — prices {age:.0f}s stale (>{PRICE_MAX_AGE_SEC}s)",
+                            "warning",
+                        )
+                if age > PRICE_MAX_AGE_SEC:
+                    sleep_sec = min(10, sleep_sec)
+        except Exception as e:
+            file_log(f"Price watchdog error: {e}", "warning")
+        await asyncio.sleep(sleep_sec)
 
 
 async def stats_refresh_cycle(bot, broadcast_price):
