@@ -178,10 +178,14 @@ def load_user_config(user_id: str) -> UserConfig:
     sb = get_supabase()
 
     def fetch_profile():
-        return sb.table("profiles").select("*").eq("id", user_id).single().execute()
+        r = sb.table("profiles").select("*").eq("id", user_id).limit(1).execute()
+        rows = r.data or []
+        return rows[0] if rows else {}
 
     def fetch_prefs():
-        return sb.table("user_preferences").select("*").eq("user_id", user_id).single().execute()
+        r = sb.table("user_preferences").select("*").eq("user_id", user_id).limit(1).execute()
+        rows = r.data or []
+        return rows[0] if rows else {}
 
     def fetch_exchanges():
         return sb.table("user_exchanges").select("exchange").eq("user_id", user_id).eq("is_active", True).execute()
@@ -190,12 +194,9 @@ def load_user_config(user_id: str) -> UserConfig:
         profile_f = ex.submit(fetch_profile)
         prefs_f = ex.submit(fetch_prefs)
         exchanges_f = ex.submit(fetch_exchanges)
-        profile = profile_f.result()
-        prefs = prefs_f.result()
+        p = profile_f.result()
+        pr = prefs_f.result()
         exchanges = exchanges_f.result()
-
-    p = profile.data or {}
-    pr = prefs.data or {}
 
     email = p.get("email", "")
     role = resolve_role(email, p.get("role", "authenticated"))

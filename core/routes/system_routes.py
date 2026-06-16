@@ -77,6 +77,7 @@ def _readiness_scale_10k() -> dict:
 
 @router.get("/health")
 def health():
+    from core.auth import supabase_auth_configured
     from core.config import AUTO_START_BOT
 
     return {
@@ -90,6 +91,7 @@ def health():
         "auto_start_bot": AUTO_START_BOT,
         "has_claude_key": bool(ANTHROPIC_API_KEY),
         "admin_2fa_configured": bool(os.getenv("ADMIN_TOTP_SECRET", "")),
+        "supabase_auth_configured": supabase_auth_configured(),
         "fear_greed": bot.fear_greed,
         "price_age_sec": min(bot.min_price_age(), 999999.0),
     }

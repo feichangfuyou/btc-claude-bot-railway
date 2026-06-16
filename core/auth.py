@@ -7,13 +7,16 @@ import hmac
 import logging
 
 import httpx
+import jwt
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt import PyJWKClient
 
 from core.supabase_client import SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, SUPABASE_URL
 
 logger = logging.getLogger("claudebot.auth")
 _bearer = HTTPBearer(auto_error=False)
+_jwk_client: PyJWKClient | None = None
 
 
 class AuthenticatedUser:
@@ -65,6 +68,50 @@ def resolve_role(email: str, profile_role: str = "authenticated") -> str:
     return profile_role or "authenticated"
 
 
+def supabase_auth_configured() -> bool:
+    """True when the backend can validate Supabase JWTs (JWKS or REST)."""
+    return bool(SUPABASE_URL)
+
+
+def _get_jwk_client() -> PyJWKClient | None:
+    global _jwk_client
+    if not SUPABASE_URL:
+        return None
+    if _jwk_client is None:
+        try:
+            _jwk_client = PyJWKClient(
+                f"{SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json",
+                cache_keys=True,
+                lifespan=3600,
+            )
+        except Exception as e:
+            logger.warning("JWKS client init failed: %s", e)
+            return None
+    return _jwk_client
+
+
+def _verify_jwt_locally(token: str) -> dict | None:
+    """Verify Supabase JWT signature via JWKS (ES256/RS256). No apikey required."""
+    client = _get_jwk_client()
+    if not client:
+        return None
+    try:
+        signing_key = client.get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["ES256", "RS256", "HS256"],
+            audience="authenticated",
+        )
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        return {"id": user_id, "email": payload.get("email") or ""}
+    except Exception as e:
+        logger.debug("Local JWT verify failed: %s", e)
+        return None
+
+
 def lookup_user_via_auth_api(token: str) -> dict | None:
     """Validate a user JWT via Supabase Auth REST (not the Python SDK).
 
@@ -86,6 +133,7 @@ def lookup_user_via_auth_api(token: str) -> dict | None:
             timeout=10.0,
         )
         if resp.status_code != 200:
+            logger.warning("Supabase /user returned %s: %s", resp.status_code, resp.text[:120])
             return None
         data = resp.json()
         return data if data.get("id") else None
@@ -94,24 +142,51 @@ def lookup_user_via_auth_api(token: str) -> dict | None:
         return None
 
 
+def resolve_user_from_jwt(token: str) -> dict | None:
+    """Validate JWT and return {id, email}. JWKS first, then Supabase Auth REST."""
+    if not token:
+        return None
+    user = _verify_jwt_locally(token)
+    if user:
+        return user
+    return lookup_user_via_auth_api(token)
+
+
 def _authenticated_user_from_token(token: str) -> AuthenticatedUser:
-    user = lookup_user_via_auth_api(token)
+    user = resolve_user_from_jwt(token)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     from core.user_config import load_user_config
 
-    config = load_user_config(user["id"])
+    user_id = user["id"]
     email = user.get("email") or ""
-    profile_role = config.role if hasattr(config, "role") else "authenticated"
-    role = resolve_role(email, profile_role)
+    try:
+        config = load_user_config(user_id)
+    except Exception as e:
+        logger.warning("load_user_config failed for %s: %s", user_id[:8], e)
+        config = None
 
+    if config:
+        profile_role = config.role if hasattr(config, "role") else "authenticated"
+        role = resolve_role(email or config.email, profile_role)
+        return AuthenticatedUser(
+            user_id=user_id,
+            email=email or config.email,
+            role=role,
+            tier=config.subscription_tier,
+            status=config.subscription_status,
+        )
+
+    role = resolve_role(email, "authenticated")
+    tier = "elite" if is_admin_email(email) else "none"
+    status = "active" if is_admin_email(email) else "inactive"
     return AuthenticatedUser(
-        user_id=user["id"],
+        user_id=user_id,
         email=email,
         role=role,
-        tier=config.subscription_tier,
-        status=config.subscription_status,
+        tier=tier,
+        status=status,
     )
 
 
@@ -181,12 +256,12 @@ async def get_optional_user(
 
 def verify_token(token: str) -> bool:
     """Verify a Supabase JWT and return True if valid."""
-    return lookup_user_via_auth_api(token) is not None
+    return resolve_user_from_jwt(token) is not None
 
 
 def get_user_from_token(token: str) -> tuple[str, str] | None:
     """Extract (user_id, email) from a Supabase JWT if valid."""
-    user = lookup_user_via_auth_api(token)
+    user = resolve_user_from_jwt(token)
     if user:
         return user["id"], user.get("email") or ""
     return None

@@ -7,7 +7,7 @@ import AnimatedNumber from "./AnimatedNumber.jsx";
 import FetchingPrice from "./FetchingPrice.jsx";
 import TradingViewChart from "./TradingViewChart.jsx";
 import { staggerIn, slideUp, popIn } from "./animations.js";
-import { useAuthHeaders, useAuthQueryParam } from "./hooks/useAuthHeaders.js";
+import { useAuthHeaders, useAuthQueryParam, useAuthUrl } from "./hooks/useAuthHeaders.js";
 import { colors } from "./theme.js";
 import { TickerTape, FALLBACK_SYMBOL_TO_COINGECKO } from "./components/TickerTape.jsx";
 import { AnalyticsSection } from "./components/AnalyticsSection.jsx";
@@ -196,6 +196,7 @@ const CG_IDS = { BTC: "bitcoin", ETH: "ethereum", SOL: "solana", DOGE: "dogecoin
 function Dashboard() {
   const { user, profile, signOut, accessToken } = useAuth();
   const getAuthHeaders = useAuthHeaders();
+  const getAuthUrl = useAuthUrl();
   const getAuthQueryParam = useAuthQueryParam();
   const navigate = useNavigate();
 
@@ -729,7 +730,7 @@ function Dashboard() {
         const to = setTimeout(() => ctrl.abort(), 5000);
         const headers = getAuthHeaders();
         if (API_SECRET) headers["x-bot-secret"] = API_SECRET;
-        const r = await fetch(`${tickersUrl}?symbols=${encodeURIComponent(activeCoins.join(","))}`, { headers, signal: ctrl.signal });
+        const r = await fetch(getAuthUrl(`${tickersUrl}?symbols=${encodeURIComponent(activeCoins.join(","))}`), { headers, signal: ctrl.signal });
         clearTimeout(to);
         if (r.ok) {
           const d = await r.json();
@@ -769,7 +770,7 @@ function Dashboard() {
       clearInterval(pollId);
       if (staleId) clearInterval(staleId);
     };
-  }, [connected, activeCoins, cbLive, fetchCoinGeckoDirect, getAuthHeaders]);
+  }, [connected, activeCoins, cbLive, fetchCoinGeckoDirect, getAuthHeaders, getAuthUrl]);
 
   // ── Coinbase WebSocket — real-time price stream matching TradingView ─────────
   useEffect(() => {
@@ -862,7 +863,7 @@ function Dashboard() {
       try {
         const ctrl = new AbortController();
         const to = setTimeout(() => ctrl.abort(), 15000);
-        const r = await fetch(`${url}?limit=500`, { headers: getAuthHeaders(), signal: ctrl.signal });
+        const r = await fetch(getAuthUrl(`${url}?limit=500`), { headers: getAuthHeaders(), signal: ctrl.signal });
         clearTimeout(to);
         if (!r.ok) return;
         const arr = await r.json();
@@ -882,7 +883,7 @@ function Dashboard() {
     fetchMarkets();
     const t = setInterval(fetchMarkets, 180000); // 10k scale: 180s (was 120s) — reduces aggregate load
     return () => clearInterval(t);
-  }, [getAuthHeaders]);
+  }, [getAuthHeaders, getAuthUrl]);
 
   // ── Fear & Greed index ─────────────────────────────────────────────────────
   useEffect(() => {

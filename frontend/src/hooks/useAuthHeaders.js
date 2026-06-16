@@ -16,6 +16,26 @@ export function useAuthHeaders() {
   }, [accessToken]);
 }
 
+/** Appends ?token= or ?secret= to API URLs (matches WebSocket auth; helps cross-origin fetch). */
+export function useAuthUrl() {
+  const { session } = useAuth();
+  const accessToken = session?.access_token;
+  return useCallback((url) => {
+    if (!accessToken && !API_SECRET) return url;
+    try {
+      const u = new URL(url, window.location.origin);
+      if (accessToken) u.searchParams.set("token", accessToken);
+      else if (API_SECRET) u.searchParams.set("secret", API_SECRET);
+      return u.toString();
+    } catch {
+      const sep = url.includes("?") ? "&" : "?";
+      if (accessToken) return `${url}${sep}token=${encodeURIComponent(accessToken)}`;
+      if (API_SECRET) return `${url}${sep}secret=${encodeURIComponent(API_SECRET)}`;
+      return url;
+    }
+  }, [accessToken]);
+}
+
 /** Returns auth query string for URLs (e.g. img src) where headers can't be sent. */
 export function useAuthQueryParam() {
   const { session } = useAuth();
