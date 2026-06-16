@@ -3,10 +3,11 @@ import os
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 
-from core.auth import AuthenticatedUser, get_active_user, get_current_user
+from core.auth import AuthenticatedUser, get_active_user, get_current_user, is_admin_email
 from core.bot_manager import bot_manager
 from core.config import (
     ANTHROPIC_API_KEY,
+    LIVE_MIRROR_ENABLED,
     PAPER_TRADING,
 )
 from core.database import (
@@ -14,9 +15,10 @@ from core.database import (
     db_get_admin_logs,
     db_get_total_trade_count,
     db_save_admin_log,
+    db_save_state,
 )
 from core.redis_client import cache_get, cache_set, is_redis_available
-from core.shared import bot
+from core.shared import bot, resolve_account_snapshot, resolve_user_trades
 from strategy.symbol_registry import SYMBOL_TO_COINGECKO
 
 router = APIRouter(tags=["system"])
@@ -25,7 +27,7 @@ router = APIRouter(tags=["system"])
 # ── Admin 2FA enforcement ──────────────────────────────────────────────────
 async def get_verified_admin(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
     """Dependency that ensures the user is an admin AND has verified their 2FA code."""
-    if user.role != "admin":
+    if not is_admin_email(user.email):
         raise HTTPException(status_code=403, detail="Admin privileges required")
 
     totp_secret = os.getenv("ADMIN_TOTP_SECRET", "")
@@ -75,6 +77,8 @@ def _readiness_scale_10k() -> dict:
 
 @router.get("/health")
 def health():
+    from core.config import AUTO_START_BOT
+
     return {
         "status": "ok",
         "bot_running": bot.bot_running,
@@ -82,7 +86,10 @@ def health():
         "coinbase_connected": bot.coinbase_connected,
         "kraken_enabled": getattr(bot, "kraken_enabled", False),
         "paper_trading": PAPER_TRADING,
+        "live_mirror_enabled": LIVE_MIRROR_ENABLED,
+        "auto_start_bot": AUTO_START_BOT,
         "has_claude_key": bool(ANTHROPIC_API_KEY),
+        "admin_2fa_configured": bool(os.getenv("ADMIN_TOTP_SECRET", "")),
         "fear_greed": bot.fear_greed,
         "price_age_sec": min(bot.min_price_age(), 999999.0),
     }
@@ -367,7 +374,7 @@ def verify_admin_2fa(
     Only the admin email can call this. Returns a short-lived session token."""
     import pyotp
 
-    if user.role != "admin":
+    if not is_admin_email(user.email):
         raise HTTPException(status_code=403, detail="Admin privileges required")
 
     totp_secret = os.getenv("ADMIN_TOTP_SECRET", "")
@@ -394,7 +401,7 @@ def get_admin_2fa_qr(user: AuthenticatedUser = Depends(get_current_user)):
     Only callable by the admin."""
     import pyotp
 
-    if user.role != "admin":
+    if not is_admin_email(user.email):
         raise HTTPException(status_code=403, detail="Admin privileges required")
 
     totp_secret = os.getenv("ADMIN_TOTP_SECRET", "")
@@ -406,7 +413,7 @@ def get_admin_2fa_qr(user: AuthenticatedUser = Depends(get_current_user)):
         name=user.email,
         issuer_name="DOYOU.TRADE Admin",
     )
-    return {"uri": uri}
+    return {"uri": uri, "secret": totp_secret}
 
 
 # ─── Admin: Users List ────────────────────────────────────────────────────────
@@ -476,10 +483,10 @@ async def start_my_bot(user: AuthenticatedUser = Depends(get_active_user)):
     """Start paper/live trading for the authenticated user."""
     if bot_manager.global_pause:
         raise HTTPException(status_code=503, detail="Trading globally paused by admin")
-    bot.bot_running = True
-    bot.countdown = 5
+    bot.set_running(True)
     bot.active_user_id = user.id
     bot.active_user_email = user.email or ""
+    db_save_state("active_user_id", user.id)
     instance = await bot_manager.get_or_create(user.id)
     instance.running = True
     bot.add_log(
@@ -498,7 +505,7 @@ async def start_my_bot(user: AuthenticatedUser = Depends(get_active_user)):
 @router.post("/api/bot/stop")
 async def stop_my_bot(user: AuthenticatedUser = Depends(get_active_user)):
     """Pause trading for the authenticated user."""
-    bot.bot_running = False
+    bot.set_running(False)
     instance = bot_manager.get(user.id)
     if instance:
         instance.running = False
@@ -511,11 +518,13 @@ async def stop_my_bot(user: AuthenticatedUser = Depends(get_active_user)):
 async def bot_status(user: AuthenticatedUser = Depends(get_active_user)):
     """Current bot run state + paper P&L for this user."""
     instance = bot_manager.get(user.id)
-    trades = instance.trades if instance else []
+    if not instance:
+        instance = await bot_manager.get_or_create(user.id)
+    trades = resolve_user_trades(instance)
     pnls = [t["pnl"] for t in trades]
     wins = [p for p in pnls if p > 0]
     losses = [p for p in pnls if p < 0]
-    account = instance.account_snapshot() if instance else bot.account
+    account = resolve_account_snapshot(user.id, instance)
     return {
         "bot_running": bot.bot_running and bool(instance and instance.running),
         "paper_trading": PAPER_TRADING,
@@ -527,7 +536,7 @@ async def bot_status(user: AuthenticatedUser = Depends(get_active_user)):
         "total_trades": len(trades),
         "win_rate": round(len(wins) / len(pnls) * 100, 1) if pnls else 0,
         "profit_factor": round(abs(sum(wins) / sum(losses)), 2) if losses and sum(losses) != 0 else 0,
-        "open_positions": len(instance.open_positions) if instance else 0,
+        "open_positions": len(bot.open_positions) if PAPER_TRADING else (len(instance.open_positions) if instance else 0),
         "price_age_sec": bot.min_price_age(),
     }
 

@@ -32,6 +32,8 @@ from core.auth import get_user_from_token, verify_token
 from core.bot_manager import bot_manager
 from core.config import (
     API_SECRET,
+    AUTO_START_BOT,
+    BOT_RUNNING_WATCHDOG_SEC,
     CLAUDE_INTERVAL,
     COINBASE_API_KEY,
     COINBASE_API_SECRET,
@@ -39,11 +41,15 @@ from core.config import (
     ENABLE_FUTURES,
     ENABLE_KRAKEN,
     FUTURES_LIVE,
+    KEEP_RUNNING_ON_DISCONNECT,
     LIVE_MIN_BALANCE,
+    LIVE_MIRROR_ENABLED,
     LIVE_START_BALANCE,
     PAPER_TRADING,
     PERPETUALS_PORTFOLIO_UUID,
+    PRIMARY_SCAN_TIER,
     REQUIRE_TRADE_APPROVAL,
+    SPEED_MODE,
     START_BALANCE,
     TARGET_BALANCE,
     USE_CELERY_AI,
@@ -77,6 +83,7 @@ from feeds.price_feeds import (
     bootstrap_prices_async,
     coinbase_ws_loop,
     fear_greed_cycle,
+    price_stale_watchdog,
     stats_refresh_cycle,
 )
 from learning.memory_compactor import run_synthesis_loop, should_compact
@@ -253,16 +260,15 @@ def _apply_celery_decision(data: dict):
     dec = data.get("decision")
     if not dec:
         return
-    bot.claude_decision = dec
+    final = bot.process_ai_decision(dec)
     bot.claude_thinking = False
-    bot.execute_decision(dec)
     cost_info = data.get("cost_tracker", {})
     asyncio.create_task(
         broadcast(
             {
                 "type": "claude_decision",
-                "claude_decision": dec,
-                "analysis_decision": dec,
+                "claude_decision": final,
+                "analysis_decision": final,
                 "last_claude_call": bot.last_claude_call,
                 "last_analysis_call": bot.last_claude_call,
                 "cost_tracker": cost_info,
@@ -312,13 +318,20 @@ async def hub_scan_cycle(tier: str):
                 1 for i in bot_manager._instances.values() if i.running and i.config.subscription_tier == tier
             )
             shared_bot_active = bot.bot_running
+            runs_for_shared_bot = shared_bot_active and (
+                (SPEED_MODE and tier == PRIMARY_SCAN_TIER)
+                or (not SPEED_MODE and tier == "starter")
+            )
 
-            if active_users > 0 or (tier == "starter" and shared_bot_active):
+            if active_users > 0 or runs_for_shared_bot:
                 skip_scout = False
                 bot.claude_model = model
 
                 adaptive_int = _adaptive_interval()
-                final_interval = max(interval, adaptive_int)
+                if SPEED_MODE:
+                    final_interval = min(interval, adaptive_int, CLAUDE_INTERVAL)
+                else:
+                    final_interval = max(interval, adaptive_int)
 
                 await call_claude(bot, broadcast_price, skip_scout=skip_scout, coin_limit=coin_limit, tier=tier)
 
@@ -414,6 +427,9 @@ async def compaction_cycle():
     await asyncio.sleep(120)
     while True:
         try:
+            if bot.claude_thinking:
+                await asyncio.sleep(15)
+                continue
             if should_compact():
                 bot.add_log("🧬 Running memory compaction (synthesis loop)...", "info")
                 result = await run_synthesis_loop()
@@ -430,6 +446,18 @@ async def compaction_cycle():
         except Exception as e:
             bot.add_log(f"Compaction cycle error: {str(e)[:60]}", "dim")
             await asyncio.sleep(600)
+
+
+async def ws_client_heartbeat():
+    """Keep dashboard WebSocket watchdogs alive during quiet periods (heavy AI work, etc.)."""
+    await asyncio.sleep(15)
+    while True:
+        try:
+            if bot.clients:
+                await broadcast({"type": "heartbeat"})
+        except Exception as e:
+            file_log(f"WS heartbeat error: {e}", "warning")
+        await asyncio.sleep(25)
 
 
 async def status_heartbeat():
@@ -489,6 +517,59 @@ async def news_pulse_cycle(bot, broadcast):
         await asyncio.sleep(300)  # 5 minutes
 
 
+async def _resume_user_instances(user_id: str | None = None) -> None:
+    """Re-register user instance(s) after auto-resume so hub scans stay active."""
+    uid = user_id or bot.active_user_id
+    if not uid and PAPER_TRADING:
+        uid = "dev"
+    if not uid:
+        return
+    instance = await bot_manager.get_or_create(uid)
+    instance.running = True
+    bot.active_user_id = uid
+    db_save_state("active_user_id", uid)
+
+
+async def _auto_start_bot(user_id: str | None = None, *, source: str = "startup") -> bool:
+    """Start trading if not emergency-stopped and brain is enabled."""
+    if bot._emergency_stopped or bot._drawdown_killed:
+        return False
+    if bot_manager.global_pause or not bot_manager.brain_enabled:
+        return False
+    if bot.bot_running:
+        await _resume_user_instances(user_id)
+        return True
+    bot.set_running(True)
+    await _resume_user_instances(user_id)
+    bot.add_log(f"🟢 Bot auto-started ({source})", "success")
+    await broadcast(
+        {"type": "bot_status", "bot_running": True, "brain_enabled": bot_manager.brain_enabled}
+    )
+    return True
+
+
+async def bot_running_watchdog():
+    """Re-enable trading if persisted intent is RUN but runtime paused (crash recovery)."""
+    if not AUTO_START_BOT:
+        return
+    await asyncio.sleep(20)
+    while True:
+        try:
+            want = bool(db_load_state("bot_running"))
+            if (
+                want
+                and not bot.bot_running
+                and not bot._emergency_stopped
+                and not bot._drawdown_killed
+                and bot_manager.brain_enabled
+                and not bot_manager.global_pause
+            ):
+                await _auto_start_bot(source="watchdog")
+        except Exception as e:
+            file_log(f"Bot running watchdog error: {e}", "error")
+        await asyncio.sleep(BOT_RUNNING_WATCHDOG_SEC)
+
+
 # ─── Lifespan ────────────────────────────────────────────────────────────────
 async def _deferred_startup():
     """Heavy startup work that runs AFTER the HTTP server is accepting requests.
@@ -537,6 +618,9 @@ async def _deferred_startup():
         f"  Mode:     {mode_label}",
         "info" if PAPER_TRADING else "warning",
     )
+    if PAPER_TRADING:
+        mirror_label = "✅ ON (real orders mirror paper)" if LIVE_MIRROR_ENABLED else "⏸ OFF (paper only — safe)"
+        bot.add_log(f"  Live mirror: {mirror_label}", "warning" if LIVE_MIRROR_ENABLED else "info")
     bot.add_log(
         f"  Balance:  ${bot.account['balance']:.2f} (persisted={bool(db_load_state('account'))})",
         "info",
@@ -611,12 +695,22 @@ async def _deferred_startup():
         bot.add_log("  Bootstrap: Exchange candles — indicators warmed", "info")
 
     asyncio.create_task(coinbase_ws_loop(bot, broadcast, broadcast_price))
+    asyncio.create_task(price_stale_watchdog(bot, broadcast_price))
     asyncio.create_task(stats_refresh_cycle(bot, broadcast_price))
 
-    asyncio.create_task(hub_scan_cycle("starter"))
-    asyncio.create_task(hub_scan_cycle("pro"))
-    asyncio.create_task(hub_scan_cycle("elite"))
-    asyncio.create_task(meta_review_cycle())
+    from safety.shadow_logger import shadow_outcome_cycle
+
+    asyncio.create_task(shadow_outcome_cycle(bot))
+
+    if SPEED_MODE:
+        bot.add_log(f"⚡ SPEED MODE — single {PRIMARY_SCAN_TIER.upper()} hub @ ≤{CLAUDE_INTERVAL}s", "info")
+        asyncio.create_task(hub_scan_cycle(PRIMARY_SCAN_TIER))
+    else:
+        asyncio.create_task(hub_scan_cycle("starter"))
+        asyncio.create_task(hub_scan_cycle("pro"))
+        asyncio.create_task(hub_scan_cycle("elite"))
+    if not SPEED_MODE:
+        asyncio.create_task(meta_review_cycle())
 
     asyncio.create_task(bot_cycle())
 
@@ -650,19 +744,32 @@ async def _deferred_startup():
     asyncio.create_task(snapshot_cycle())
     asyncio.create_task(learning_cycle())
     asyncio.create_task(status_heartbeat())
+    asyncio.create_task(ws_client_heartbeat())
     asyncio.create_task(backup_cycle())
     asyncio.create_task(compaction_cycle())
     asyncio.create_task(news_pulse_cycle(bot, broadcast))
+    asyncio.create_task(bot_running_watchdog())
 
-    bot.bot_running = False
-    bot.countdown = 0
-    _coins = bot.active_coin_list
-    bot.add_log(
-        f"⏸️ Bot ready — scanning {len(_coins)} pairs ({', '.join(_coins)}). "
-        f"Paper: ${START_BALANCE:.0f} → ${TARGET_BALANCE:.0f} | "
-        f"Live: ${LIVE_START_BALANCE:.0f} (floor ${LIVE_MIN_BALANCE:.0f}). Hit START.",
-        "info",
-    )
+    if AUTO_START_BOT and bot.bot_running:
+        await _auto_start_bot(source="startup")
+        _coins = bot.active_coin_list
+        bot.add_log(
+            f"🟢 Bot running — scanning {len(_coins)} pairs ({', '.join(_coins)}). "
+            f"Paper: ${START_BALANCE:.0f} → ${TARGET_BALANCE:.0f} | "
+            f"Balance: ${bot.account['balance']:.2f}",
+            "success",
+        )
+    else:
+        bot.set_running(False, persist=False)
+        _coins = bot.active_coin_list
+        msg = (
+            f"⏸️ Bot ready — scanning {len(_coins)} pairs ({', '.join(_coins)}). "
+            f"Paper: ${START_BALANCE:.0f} → ${TARGET_BALANCE:.0f} | "
+            f"Live: ${LIVE_START_BALANCE:.0f} (floor ${LIVE_MIN_BALANCE:.0f}). Hit START."
+        )
+        if AUTO_START_BOT:
+            msg += " (Set bot_running=true in DB or POST /api/bot/start to resume.)"
+        bot.add_log(msg, "info")
 
 
 @asynccontextmanager
@@ -815,7 +922,7 @@ if API_SECRET:
                 return await call_next(request)
             if path.startswith("/assets") or path in self.OPEN_PATHS:
                 return await call_next(request)
-            if path.startswith("/api/coinbase") or path.startswith("/api/prices"):
+            if path.startswith("/api/coinbase") or path.startswith("/api/prices") or path == "/api/market/news":
                 return await call_next(request)
             if path == "/ws":
                 return await call_next(request)
@@ -1013,11 +1120,11 @@ async def ws_endpoint(ws: WebSocket):
             _user_to_ws[uid].discard(ws)
             if not _user_to_ws[uid]:
                 del _user_to_ws[uid]
-                # No more WS connections for this user — stop their bot instance
-                instance = bot_manager.get(uid)
-                if instance and instance.running:
-                    instance.running = False
-                    instance.persist_state()
+                if not KEEP_RUNNING_ON_DISCONNECT:
+                    instance = bot_manager.get(uid)
+                    if instance and instance.running:
+                        instance.running = False
+                        instance.persist_state()
                 if bot.active_user_id == uid:
                     remaining = next(iter(_user_to_ws), None)
                     bot.active_user_id = remaining
@@ -1029,14 +1136,15 @@ async def _handle_ws_command(msg: dict):
     cmd = msg.get("cmd")
 
     if cmd == "start_bot":
-        bot.bot_running = True
-        bot.countdown = 5
+        bot.set_running(True)
 
         # Register this user with bot_manager so the hub scan cycle sees them as active
         ws_user_id = msg.get("user_id") or bot.active_user_id
         if ws_user_id:
             instance = await bot_manager.get_or_create(ws_user_id)
             instance.running = True
+            bot.active_user_id = ws_user_id
+            db_save_state("active_user_id", ws_user_id)
             bot.add_log(f"🟢 Bot started (user registered in {instance.config.subscription_tier} tier hub)", "success")
         else:
             bot.add_log("🟢 Bot started", "success")
@@ -1048,7 +1156,7 @@ async def _handle_ws_command(msg: dict):
         await broadcast({"type": "bot_status", "bot_running": True, "brain_enabled": bot_manager.brain_enabled})
 
     elif cmd == "stop_bot":
-        bot.bot_running = False
+        bot.set_running(False)
 
         ws_user_id = msg.get("user_id") or bot.active_user_id
         if ws_user_id:

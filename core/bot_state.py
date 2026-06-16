@@ -27,6 +27,7 @@ from core.config import (
     FUTURES_LIVE,
     GAS_COST_USD,
     LIVE_MIN_BALANCE,
+    LIVE_MIRROR_ENABLED,
     LIVE_START_BALANCE,
     MAX_CONCURRENT_POSITIONS,
     MAX_DAILY_LOSS_PCT,
@@ -43,12 +44,18 @@ from core.config import (
     PROFIT_TO_TARGET,
     REQUIRE_TRADE_APPROVAL,
     ROUND_TRIP_FEE,
+    SHADOW_MODE_ENABLED,
     SL_ATR_WIDEN,
     STALE_POSITION_MIN,
     START_BALANCE,
     TARGET_BALANCE,
     TEST_MODE,
     TRADE_COOLDOWN_SEC,
+    COIN_BLOCKLIST,
+    PROFIT_MIN_CONFIDENCE,
+    PROFIT_MIN_CONFLUENCE,
+    PROFIT_MIN_RR,
+    PROFIT_MODE,
     TRADE_MODE,
     TRADING_PRESET,
     TRAILING_STOP_PCT,
@@ -61,7 +68,7 @@ from core.database import (
     db_save_trade,
 )
 from executors.solver_executor import execute_via_solver, get_solver_stats
-from learning.trade_memory import record_market_snapshot, record_trade_memory, run_learning_cycle
+from learning.coin_scorer import get_effective_blocklist
 from safety.circuit_breaker import CircuitBreaker
 from safety.semantic_kill_switch import SemanticKillSwitch
 from strategy.trading_presets import get_min_rr, get_sl_tp_for_regime
@@ -102,14 +109,17 @@ class BotState:
 
         self.trades: list = []
         self.logs: list = []
-        self.bot_running = False
+        saved_running = db_load_state("bot_running")
+        self.bot_running = bool(saved_running) if saved_running is not None else False
         self.active_user_id: str | None = None
         self.active_user_email: str | None = None
         self.claude_thinking = False
         self.last_claude_call = "--"
         self.countdown = CLAUDE_INTERVAL
         self.claude_decision = None
-        self.claude_model = db_load_state("claude_model") or "claude-3-haiku-20240307"
+        from ai.claude_ai import DEFAULT_HAIKU_MODEL, normalize_model_id
+
+        self.claude_model = normalize_model_id(db_load_state("claude_model") or DEFAULT_HAIKU_MODEL)
         self.coinbase_connected = False
 
         self.last_reset_date = db_load_state("last_reset_date") or ""
@@ -141,6 +151,20 @@ class BotState:
         self._spot_exchange_idx = 0
 
         self.profit_goal = db_load_state("profit_goal") or PROFIT_TO_TARGET
+
+        saved_user = db_load_state("active_user_id")
+        if saved_user:
+            self.active_user_id = saved_user
+
+    def set_running(self, running: bool, *, persist: bool = True) -> None:
+        """Start/stop trading and optionally persist intent across restarts."""
+        self.bot_running = running
+        if running:
+            self.countdown = CLAUDE_INTERVAL
+        else:
+            self.countdown = 0
+        if persist:
+            db_save_state("bot_running", running)
 
     def set_broadcast(self, fn):
         """Inject the broadcast coroutine from the app layer."""
@@ -495,6 +519,8 @@ class BotState:
         return False, 0.0, ""
 
     def _finalize_close(self, pos, pos_symbol, coin_size, pnl, reason):
+        from learning.trade_memory import record_trade_memory
+
         trading_fee = pos["usd_size"] * ROUND_TRIP_FEE
         onchain_cost = (pos["usd_size"] * ONCHAIN_SLIPPAGE + GAS_COST_USD * 2) if pos.get("onchain") else 0
 
@@ -556,6 +582,7 @@ class BotState:
                 coin_state,
                 fg_value,
                 self.account["balance"],
+                trading_preset=getattr(self, "trading_preset", ""),
             )
         except Exception as e:
             self.add_log(f"Memory record error: {str(e)[:60]}", "dim")
@@ -572,14 +599,7 @@ class BotState:
             self.add_log(f"🛡 SEMANTIC KILL SWITCH: {iso_reason}", "error")
             asyncio.create_task(send_notification(f"🛡 SEMANTIC KILL SWITCH activated: {iso_reason}", "alert"))
 
-        if net <= 0:
-            try:
-                run_learning_cycle()
-                self.add_log("📉 Loss recorded — learning cycle run to internalize mistake", "dim")
-            except Exception as e:
-                from core.database import file_log
-
-                file_log(f"Post-loss learning cycle error [{pos_symbol}]: {e}", "warning")
+        self._run_post_trade_learning(net, pos_symbol)
         color = "success" if net >= 0 else "error"
         self.add_log(
             f"{reason} [{pos_symbol}] | {pos['side'].upper()} | Net: {'+' if net >= 0 else ''}${net}",
@@ -597,6 +617,8 @@ class BotState:
     def finalize_paper_close(self, pos: dict, current_price: float, reason: str, exchange: str | None = None):
         """Public API for executors: close a position using paper-style accounting.
         Runs the full close path including memory, learning, notifications, and kill switch."""
+        from learning.trade_memory import record_trade_memory
+
         pos_symbol = pos.get("symbol", "BTC")
         resolved = self._resolve_close_price(pos, current_price)
         if resolved is None:
@@ -668,6 +690,7 @@ class BotState:
                 coin_state,
                 fg_value,
                 self.account["balance"],
+                trading_preset=getattr(self, "trading_preset", ""),
             )
         except Exception as e:
             from core.database import file_log
@@ -686,14 +709,7 @@ class BotState:
             self.add_log(f"🛡 SEMANTIC KILL SWITCH: {iso_reason}", "error")
             asyncio.create_task(send_notification(f"🛡 SEMANTIC KILL SWITCH activated: {iso_reason}", "alert"))
 
-        if net <= 0:
-            try:
-                run_learning_cycle()
-                self.add_log("📉 Loss recorded — learning cycle run", "dim")
-            except Exception as e:
-                from core.database import file_log
-
-                file_log(f"Post-loss learning cycle error [{pos_symbol}]: {e}", "warning")
+        self._run_post_trade_learning(net, pos_symbol)
 
         log_level = "warning" if net < 0 else "success"
         self.add_log(f"{reason} [{pos_symbol}] — Net: {'+' if net >= 0 else ''}${net}", log_level)
@@ -719,8 +735,7 @@ class BotState:
             "btc_size": coin_sz,
             "usd_size": usd_sz,
             "open_ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "confidence": decision.get("confidence", 0),
-            "patterns": decision.get("patterns_detected", []),
+            **self._decision_context_for_position(decision),
             "paper": True,
         }
         self.open_positions.append(new_pos)
@@ -819,7 +834,7 @@ class BotState:
         total_pnl = self.account.get("total_pnl", 0)
         if total_pnl < -max_loss:
             self._drawdown_killed = True
-            self.bot_running = False
+            self.set_running(False)
             self.add_log(
                 f"🚨 MAX DRAWDOWN HIT: P&L ${total_pnl:.2f} exceeds -{MAX_DRAWDOWN_PCT * 100:.0f}% "
                 f"(${max_loss:.2f}) — BOT KILLED",
@@ -835,7 +850,7 @@ class BotState:
 
     async def emergency_stop(self):
         """Close all positions, stop bot, send alert."""
-        self.bot_running = False
+        self.set_running(False)
         self._emergency_stopped = True
         self.add_log("🚨 EMERGENCY STOP — closing all positions", "error")
 
@@ -944,7 +959,7 @@ class BotState:
 
     async def _on_breaker_tripped(self):
         """Called when circuit breaker trips — stop bot and notify."""
-        self.bot_running = False
+        self.set_running(False)
         self.add_log(
             f"🛑 CIRCUIT BREAKER: {self.circuit_breaker.consecutive_losses} consecutive losses — bot paused",
             "error",
@@ -1014,7 +1029,16 @@ class BotState:
             return False
         self.clear_pending_decision("approved")
         self._cancel_pending_timeout()
-        self.execute_decision(dec)
+        from safety.risk_gate import evaluate_risk_gate, summarize_gate_log
+
+        gate_result = evaluate_risk_gate(dec, self)
+        gate_msg = summarize_gate_log(gate_result)
+        if gate_msg:
+            self.add_log(gate_msg, "warning" if gate_result.blocked else "dim")
+        if gate_result.blocked:
+            self.last_ai_block_reason = gate_result.reasons[0] if gate_result.reasons else "risk gate blocked"
+            return False
+        self.execute_decision(gate_result.final_decision)
         return True
 
     def reject_pending_trade(self):
@@ -1023,6 +1047,47 @@ class BotState:
             self._cancel_pending_timeout()
 
     # ── Execute decision ──────────────────────────────────────────────────
+    def apply_risk_gate(self, decision: dict, *, executed: bool | None = None) -> dict:
+        """
+        Run risk gate + shadow log. Returns final decision dict.
+        executed: True if trade will execute now, False if pending/blocked, None to infer.
+        """
+        from safety.risk_gate import evaluate_risk_gate, summarize_gate_log
+        from safety.shadow_logger import log_shadow_decision
+
+        gate_result = evaluate_risk_gate(decision, self)
+        final = gate_result.final_decision
+
+        gate_msg = summarize_gate_log(gate_result)
+        if gate_msg:
+            self.add_log(gate_msg, "warning" if gate_result.blocked else "dim")
+
+        if gate_result.blocked:
+            self.last_ai_block_reason = gate_result.reasons[0] if gate_result.reasons else "risk gate blocked"
+
+        original_action = decision.get("action", "wait")
+        final_action = final.get("action", "wait")
+        if executed is None:
+            executed = final_action in ("buy", "sell") and not gate_result.blocked
+
+        if SHADOW_MODE_ENABLED and original_action in ("buy", "sell"):
+            decision["_gate_action"] = gate_result.gate_action
+            log_shadow_decision(
+                decision,
+                gate_result,
+                executed=bool(executed),
+                bot=self,
+            )
+
+        return final
+
+    def process_ai_decision(self, decision: dict) -> dict:
+        """Risk gate + shadow logging, then execute. Entry point for Celery / auto-trading."""
+        final = self.apply_risk_gate(decision)
+        self.claude_decision = final
+        self.execute_decision(final)
+        return final
+
     def execute_decision(self, decision: dict):
         action = decision.get("action", "wait")
         if action == "wait":
@@ -1061,6 +1126,8 @@ class BotState:
             self._close_single_position(pos)
 
     def _close_single_position(self, pos: dict, reason: str = "⚡ FORCE CLOSE"):
+        from learning.trade_memory import record_trade_memory
+
         if pos.get("product_type") == "futures":
             pos_symbol = pos.get("symbol", "BTC")
             current_price = self._resolve_close_price(pos)
@@ -1205,6 +1272,7 @@ class BotState:
                 coin_state,
                 fg_value,
                 self.account["balance"],
+                trading_preset=getattr(self, "trading_preset", ""),
             )
         except Exception as e:
             self.add_log(f"Memory record error: {str(e)[:60]}", "dim")
@@ -1221,14 +1289,7 @@ class BotState:
             self.add_log(f"🛡 SEMANTIC KILL SWITCH: {iso_reason}", "error")
             asyncio.create_task(send_notification(f"🛡 SEMANTIC KILL SWITCH activated: {iso_reason}", "alert"))
 
-        if net <= 0:
-            try:
-                run_learning_cycle()
-                self.add_log("📉 Loss recorded — learning cycle run to internalize mistake", "dim")
-            except Exception as e:
-                from core.database import file_log
-
-                file_log(f"Post-loss learning cycle error [{pos_symbol}]: {e}", "warning")
+        self._run_post_trade_learning(net, pos_symbol)
         ex_label = f" ({pos.get('exchange', 'paper').upper()})" if pos.get("exchange") else ""
         self.add_log(
             f"{reason} [{pos_symbol}]{ex_label} — Net: {'+' if net >= 0 else ''}${net}",
@@ -1254,7 +1315,37 @@ class BotState:
             )
         )
 
-    def _adaptive_max_size_pct(self) -> int:
+    def _decision_context_for_position(self, decision: dict) -> dict:
+        """Capture full AI reasoning on the position so memory learns everything at close."""
+        from learning.trade_memory import extract_decision_metadata
+
+        meta = extract_decision_metadata(decision, getattr(self, "trading_preset", ""))
+        return {
+            "confidence": decision.get("confidence", 0),
+            "patterns": decision.get("patterns_detected", []),
+            "confluence_score": meta.get("confluence_score") or decision.get("confluence_score", 0),
+            "decision_meta": meta,
+            "reasoning": meta.get("reasoning", ""),
+            "key_signals": meta.get("key_signals", []),
+            "trading_preset": meta.get("trading_preset", ""),
+            "adversary_verdict": meta.get("adversary_verdict", ""),
+        }
+
+    def _run_post_trade_learning(self, pnl: float, symbol: str = ""):
+        """Learn from every closed trade — wins teach what works, losses teach what to avoid."""
+        from learning.trade_memory import trigger_post_trade_learning
+
+        try:
+            trigger_post_trade_learning(pnl, symbol)
+            if pnl > 0:
+                self.add_log("🧠 Win recorded — learning cycle updated winning patterns", "dim")
+            else:
+                self.add_log("📉 Loss recorded — learning cycle internalized mistake", "dim")
+        except Exception as e:
+            from core.database import file_log
+
+            file_log(f"Post-trade learning cycle error [{symbol}]: {e}", "warning")
+
         """Scale position size based on balance and conditions."""
         balance = self.account.get("balance", START_BALANCE)
         if balance < 400:
@@ -1309,6 +1400,11 @@ class BotState:
             self.add_log(self.last_ai_block_reason, "warning")
             return
 
+        if symbol in get_effective_blocklist(COIN_BLOCKLIST):
+            self.last_ai_block_reason = f"{ai_msg} — rejected: {symbol} on coin blocklist (historical underperformer)"
+            self.add_log(self.last_ai_block_reason, "warning")
+            return
+
         if not order.get("take_profit") or not order.get("stop_loss"):
             self.last_ai_block_reason = f"{ai_msg} — rejected: missing TP or SL"
             self.add_log(self.last_ai_block_reason, "warning")
@@ -1359,6 +1455,8 @@ class BotState:
         risk = abs(entry - sl)
 
         min_rr = get_min_rr(self.trading_preset)
+        if PROFIT_MODE:
+            min_rr = max(min_rr, PROFIT_MIN_RR)
         if self.circuit_breaker.consecutive_losses >= 3:
             min_rr = max(min_rr, 1.2)
         if risk == 0 or round(reward / risk, 2) < min_rr:
@@ -1380,15 +1478,24 @@ class BotState:
             self.add_log(self.last_ai_block_reason, "warning")
             return
 
+        if PROFIT_MODE and conf_strength < PROFIT_MIN_CONFLUENCE and conf_direction != action:
+            self.last_ai_block_reason = (
+                f"{ai_msg} — rejected: confluence too weak ({conf_strength} < {PROFIT_MIN_CONFLUENCE})"
+            )
+            self.add_log(self.last_ai_block_reason, "warning")
+            return
+
         confidence = decision.get("confidence", 0)
-        min_conf = 0.40
+        min_conf = PROFIT_MIN_CONFIDENCE if PROFIT_MODE else 0.40
         if self.circuit_breaker.consecutive_losses >= 4:
-            min_conf = 0.55
+            min_conf = max(min_conf, 0.55)
         elif self.circuit_breaker.consecutive_losses >= 2:
-            min_conf = 0.48
+            min_conf = max(min_conf, 0.48)
         regime = cs.market_cond
         if regime == "chaotic":
             min_conf = max(min_conf, 0.50)
+        if PROFIT_MODE and regime == "ranging" and action == "buy":
+            min_conf = max(min_conf, 0.58)
         if confidence < min_conf:
             self.last_ai_block_reason = (
                 f"{ai_msg} — rejected: confidence {confidence * 100:.0f}% < {min_conf * 100:.0f}% required"
@@ -1500,15 +1607,14 @@ class BotState:
             "btc_size": coin_sz,
             "usd_size": usd_sz,
             "open_ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "confidence": decision.get("confidence", 0),
-            "patterns": decision.get("patterns_detected", []),
+            **self._decision_context_for_position(decision),
             "exchange": spot_exchange if spot_exchange != "paper" else None,
             "paper": True,
         }
 
-        # Mirror on live exchange if we can afford it
+        # Mirror on live exchange if enabled and we can afford it
         live_mirrored = False
-        if spot_exchange in ("binance", "kraken", "coinbase"):
+        if LIVE_MIRROR_ENABLED and spot_exchange in ("binance", "kraken", "coinbase"):
             live_ok, live_reason = self._live_can_afford(usd_sz)
             if live_ok:
                 new_pos["live_mirrored"] = True
@@ -1707,6 +1813,8 @@ class BotState:
                         pass
 
             try:
+                from learning.trade_memory import run_learning_cycle
+
                 run_learning_cycle()
                 self.add_log("🧠 Memory learning cycle complete", "dim")
             except Exception as e:

@@ -20,7 +20,21 @@ ANTHROPIC_API_KEYS = (
 COINBASE_API_KEY = os.getenv("COINBASE_API_KEY", "")
 COINBASE_API_SECRET = os.getenv("COINBASE_API_SECRET", "")
 CRYPTOPANIC_API_KEY = os.getenv("CRYPTOPANIC_API_KEY", "")
+# Plan segment in URL: https://cryptopanic.com/api/{PLAN}/v2/posts/
+# Match the plan shown on https://cryptopanic.com/developers/api/ (e.g. developer, growth).
+CRYPTOPANIC_API_PLAN = os.getenv("CRYPTOPANIC_API_PLAN", "developer").strip().lower() or "developer"
+# Set false to skip CryptoPanic and use RSS feeds only (recommended while developer API returns 404).
+CRYPTOPANIC_ENABLED = os.getenv("CRYPTOPANIC_ENABLED", "false").lower() == "true"
 PAPER_TRADING = os.getenv("PAPER_TRADING", "true").lower() == "true"
+# Dual-track mirror: paper positions + real exchange orders. Default OFF in paper mode
+# so starting the bot never spends real money until you explicitly enable this.
+_LIVE_MIRROR_RAW = os.getenv("LIVE_MIRROR_ENABLED", "").strip().lower()
+if _LIVE_MIRROR_RAW in ("true", "1", "yes"):
+    LIVE_MIRROR_ENABLED = True
+elif _LIVE_MIRROR_RAW in ("false", "0", "no"):
+    LIVE_MIRROR_ENABLED = False
+else:
+    LIVE_MIRROR_ENABLED = not PAPER_TRADING
 START_BALANCE = float(os.getenv("START_BALANCE", "1000"))
 TARGET_BALANCE = float(os.getenv("TARGET_BALANCE", "2000"))
 PROFIT_TO_TARGET = TARGET_BALANCE - START_BALANCE
@@ -80,8 +94,8 @@ TEST_MODE = os.getenv("TEST_MODE", "true").lower() == "true"
 COINBASE_WS_URL = "wss://advanced-trade-ws.coinbase.com"
 FEAR_GREED_URL = "https://api.alternative.me/fng/"
 COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3/simple/price"
-CLAUDE_COOLDOWN_SEC = 5
-PRICE_MAX_AGE_SEC = 180
+CLAUDE_COOLDOWN_SEC = int(os.getenv("CLAUDE_COOLDOWN_SEC", "5"))
+PRICE_MAX_AGE_SEC = int(os.getenv("PRICE_MAX_AGE_SEC", "180"))
 TRAILING_STOP_PCT = float(os.getenv("TRAILING_STOP_PCT", "1.5"))
 # Widen stop loss (multiply preset SL ATR by this). 1.0=default, 1.3=30% wider, 1.5=50% wider.
 SL_ATR_WIDEN = float(os.getenv("SL_ATR_WIDEN", "1.0"))
@@ -128,6 +142,29 @@ TRADING_PRESET = (os.getenv("TRADING_PRESET", "turtle") or "turtle").lower()
 # Lower = more escalations to trade model = more trading, less analysis-only
 SCOUT_MIN_SIGNALS = int(os.getenv("SCOUT_MIN_SIGNALS", "2"))
 SCOUT_MIN_CONFIDENCE = float(os.getenv("SCOUT_MIN_CONFIDENCE", "0.35"))
+
+# ─── A+ Profit mode (paper validation with quality-first entries) ─────────────
+PROFIT_MODE = PAPER_TRADING and os.getenv("PROFIT_MODE", "true").lower() == "true"
+COIN_BLOCKLIST = [c.strip().upper() for c in os.getenv("COIN_BLOCKLIST", "SOL,LINK").split(",") if c.strip()]
+PROFIT_MIN_RR = float(os.getenv("PROFIT_MIN_RR", "2.0"))
+PROFIT_MIN_CONFIDENCE = float(os.getenv("PROFIT_MIN_CONFIDENCE", "0.55"))
+PROFIT_MIN_CONFLUENCE = int(os.getenv("PROFIT_MIN_CONFLUENCE", "40"))
+STRONG_ESCALATION_MIN_SIGNALS = int(os.getenv("STRONG_ESCALATION_MIN_SIGNALS", "6"))
+
+# ─── Elite speed mode (single fast hub, tight intervals, defer heavy background work) ─
+SPEED_MODE = os.getenv("SPEED_MODE", "true").lower() == "true"
+PRIMARY_SCAN_TIER = (os.getenv("PRIMARY_SCAN_TIER", "pro") or "pro").lower()
+if PRIMARY_SCAN_TIER not in ("starter", "pro", "elite"):
+    PRIMARY_SCAN_TIER = "pro"
+PRICE_STALE_WATCHDOG_SEC = int(os.getenv("PRICE_STALE_WATCHDOG_SEC", "25" if SPEED_MODE else "45"))
+
+# ─── Uptime: auto-resume after restart; keep trading when dashboard closes ────
+# Paper defaults ON so the bot keeps scanning/trading without the UI open.
+AUTO_START_BOT = os.getenv("AUTO_START_BOT", "true" if PAPER_TRADING else "false").lower() == "true"
+KEEP_RUNNING_ON_DISCONNECT = os.getenv(
+    "KEEP_RUNNING_ON_DISCONNECT", "true" if PAPER_TRADING else "false"
+).lower() == "true"
+BOT_RUNNING_WATCHDOG_SEC = int(os.getenv("BOT_RUNNING_WATCHDOG_SEC", "30"))
 
 
 def coinbase_product_id(symbol: str) -> str:
@@ -201,6 +238,25 @@ PRICE_FETCH_TIMEOUT = float(os.getenv("PRICE_FETCH_TIMEOUT", "4"))  # sec — pr
 API_PROXY_TIMEOUT = float(os.getenv("API_PROXY_TIMEOUT", "4"))  # sec — backend proxies
 CLAUDE_API_TIMEOUT = float(os.getenv("CLAUDE_API_TIMEOUT", "25"))  # sec — Anthropic
 FALLBACK_POLL_SEC = int(os.getenv("FALLBACK_POLL_SEC", "4"))  # fallback poll when WS down (was 8)
+
+# ─── Risk Gate (deterministic enforcement before execution) ───────────────────
+RISK_GATE_ENABLED = os.getenv("RISK_GATE_ENABLED", "true").lower() == "true"
+RISK_GATE_MIN_CONFIDENCE = float(os.getenv("RISK_GATE_MIN_CONFIDENCE", "0.45"))
+RISK_GATE_MAX_SPREAD_PCT = float(os.getenv("RISK_GATE_MAX_SPREAD_PCT", "0.0015"))
+
+# Paper mode: memory/adversary are advisory (reduce size) instead of hard-blocking entries
+PAPER_RELAX_GATES = PAPER_TRADING and os.getenv("PAPER_RELAX_GATES", "true").lower() == "true"
+RISK_GATE_MEMORY_BLOCK = os.getenv(
+    "RISK_GATE_MEMORY_BLOCK",
+    "false" if PAPER_RELAX_GATES else "true",
+).lower() == "true"
+ADVERSARY_MIN_CONFIDENCE = float(
+    os.getenv("ADVERSARY_MIN_CONFIDENCE", "0.55" if PAPER_RELAX_GATES else "0.70")
+)
+ADVERSARY_PAPER_SOFT = PAPER_RELAX_GATES and os.getenv("ADVERSARY_PAPER_SOFT", "true").lower() == "true"
+
+# ─── Shadow mode (counterfactual decision logging) ──────────────────────────
+SHADOW_MODE_ENABLED = os.getenv("SHADOW_MODE_ENABLED", "true").lower() == "true"
 
 
 def coingecko_url_for_coins(symbols: list[str]) -> str:
